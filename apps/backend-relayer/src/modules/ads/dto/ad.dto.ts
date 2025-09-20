@@ -27,9 +27,27 @@ export class CreateAdDto {
   @IsUUID()
   routeId!: string;
 
-  // decimal string, e.g. "1000000000000000000"
-  @Matches(/^\d+$/, { message: 'poolAmount must be a decimal string' })
-  poolAmount!: string;
+  @IsString()
+  creatorDstAddress!: string;
+
+  @IsOptional()
+  metadata?: Record<string, unknown>;
+}
+
+export class FundAdDto {
+  @Matches(/^\d+$/)
+  poolAmountTopUp!: string;
+}
+
+export class WithdrawalAdDto {
+  @Matches(/^\d+$/)
+  poolAmountWithdraw!: string;
+}
+
+export class UpdateAdDto {
+  @IsOptional()
+  @IsIn(['ACTIVE', 'PAUSED'] as const)
+  status?: 'ACTIVE' | 'PAUSED';
 
   @IsOptional()
   @Matches(/^\d+$/)
@@ -43,23 +61,8 @@ export class CreateAdDto {
   metadata?: Record<string, unknown>;
 }
 
-export class UpdateAdDto {
-  @IsOptional()
-  @Matches(/^\d+$/)
-  poolAmountTopUp?: string;
-
-  @IsOptional()
-  @IsIn(['ACTIVE', 'PAUSED', 'CLOSED'] as const)
-  status?: 'ACTIVE' | 'PAUSED' | 'CLOSED';
-
-  @IsOptional()
-  @Matches(/^\d+$/)
-  minAmount?: string;
-
-  @IsOptional()
-  @Matches(/^\d+$/)
-  maxAmount?: string;
-
-  @IsOptional()
-  metadata?: Record<string, unknown>;
+export class ConfirmChainActionDto {
+  @IsString() signature!: string;
+  @IsString() logId!: string;
+  @IsOptional() @IsString() txHash?: string;
 }

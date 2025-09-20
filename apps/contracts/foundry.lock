@@ -1,4 +1,13 @@
 {
+  "apps/contracts/lib/openzeppelin-contracts": {
+    "rev": "e2e9908763a25c814a80324ad2653566df2f8b55"
+  },
+  "apps/contracts/lib/poseidon2-evm": {
+    "rev": "c001f4b350d07dd03088b0aee5e099fa7c542494"
+  },
+  "apps/contracts/lib/solady": {
+    "rev": "208e4f31cfae26e4983eb95c3488a14fdc497ad7"
+  },
   "lib/forge-std": {
     "tag": {
       "name": "v1.10.0",
@@ -22,5 +31,11 @@
       "name": "v0.1.26",
       "rev": "acd959aa4bd04720d640bf4e6a5c71037510cc4b"
     }
+  },
+  "lib/solidity-mmr": {
+    "rev": "f371a4c60634969082b67e71625fa18784a6e0af"
+  },
+  "lib/solidity-mmr.git": {
+    "rev": "efe2772"
   }
 }

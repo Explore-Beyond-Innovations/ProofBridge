@@ -4,10 +4,11 @@ pragma solidity ^0.8.24;
 import "forge-std/Script.sol";
 import "forge-std/console2.sol";
 
-import {HonkVerifier} from "src/Verifier.sol";
+import {HonkVerifier, IVerifier} from "src/Verifier.sol";
 import {AdManager} from "src/AdManager.sol";
 import {OrderPortal} from "src/OrderPortal.sol";
-import {IVerifier} from "src/Verifier.sol";
+import {IMerkleManager, MerkleManager} from "src/MerkleManager.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
 contract Proofbridge is Script {
     function _envOrAddress(string memory key, address fallback_) internal view returns (address out) {
@@ -17,6 +18,8 @@ contract Proofbridge is Script {
             out = fallback_;
         }
     }
+
+    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
     function run() external {
         // --- Load deployer ---
@@ -41,12 +44,28 @@ contract Proofbridge is Script {
             console2.log("Reusing Verifier     :", address(verifier));
         }
 
+        // --- MerkleManager: reuse or deploy ---
+        address merkleManagerMaybe = _envOrAddress("MERKLE_MANAGER", address(0));
+        IMerkleManager merkleManager;
+        if (merkleManagerMaybe == address(0)) {
+            merkleManager = new MerkleManager(admin);
+            console2.log("Deployed MerkleManager    :", address(merkleManager));
+        } else {
+            merkleManager = IMerkleManager(merkleManagerMaybe);
+            console2.log("Reusing MerkleManager    :", address(merkleManager));
+        }
+
         // --- Deploy AdManager & OrderPortal ---
-        AdManager adManager = new AdManager(admin, verifier);
+        AdManager adManager = new AdManager(admin, verifier, merkleManager);
         console2.log("Deployed AdManager   :", address(adManager));
 
-        OrderPortal orderPortal = new OrderPortal(admin, verifier);
+        OrderPortal orderPortal = new OrderPortal(admin, verifier, merkleManager);
         console2.log("Deployed OrderPortal :", address(orderPortal));
+
+        // --- Assign Manager role to deployed contrats ---
+        IAccessControl merkleManagerAsAccessControl = IAccessControl(address(merkleManager));
+        merkleManagerAsAccessControl.grantRole(MANAGER_ROLE, address(adManager));
+        merkleManagerAsAccessControl.grantRole(MANAGER_ROLE, address(orderPortal));
 
         vm.stopBroadcast();
     }

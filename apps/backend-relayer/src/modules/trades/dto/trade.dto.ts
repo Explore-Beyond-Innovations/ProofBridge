@@ -21,13 +21,16 @@ export class QueryTradesDto {
 export class CreateTradeDto {
   @IsUUID() adId!: string;
   @IsUUID() routeId!: string;
-
   @Matches(/^\d+$/) amount!: string;
-
-  @IsString() adCreatorAddress!: string;
-  @IsString() bridgerAddress!: string;
+  @IsString() bridgerDstAddress!: string;
 }
 
 export class ConfirmTradeDto {
   @IsString() encodedSignature!: string;
+}
+
+export class ConfirmChainActionDto {
+  @IsString() signature!: string;
+  @IsString() logId!: string;
+  @IsOptional() @IsString() txHash?: string;
 }

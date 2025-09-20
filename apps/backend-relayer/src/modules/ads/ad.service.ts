@@ -6,7 +6,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '@prisma/prisma.service';
-import { CreateAdDto, QueryAdsDto, UpdateAdDto } from './dto/ad.dto';
+import {
+  CreateAdDto,
+  FundAdDto,
+  QueryAdsDto,
+  UpdateAdDto,
+  WithdrawalAdDto,
+  ConfirmChainActionDto,
+} from './dto/ad.dto';
 import { getAddress } from 'ethers';
 import { Prisma } from '@prisma/client';
 import { Request } from 'express';
@@ -165,6 +172,10 @@ export class AdsService {
 
     if (!user) throw new ForbiddenException('Unauthorized');
 
+    if (getAddress(dto.creatorDstAddress)) {
+      throw new BadRequestException('Invalid address');
+    }
+
     // Pull route + tokens to validate same-symbol & cross-chain
     const route = await this.prisma.route.findUnique({
       where: { id: dto.routeId },
@@ -175,6 +186,7 @@ export class AdsService {
             id: true,
             symbol: true,
             chain: { select: { chainId: true } },
+            address: true,
           },
         },
         toToken: {
@@ -186,6 +198,7 @@ export class AdsService {
         },
       },
     });
+
     if (!route) throw new NotFoundException('Route not found');
 
     const fromChainId = route.fromToken.chain.chainId;
@@ -195,63 +208,258 @@ export class AdsService {
       throw new BadRequestException('Route must be cross-chain');
     }
 
-    const poolBI = BigInt(dto.poolAmount);
-    const minBI = toBI(dto.minAmount);
-    const maxBI = toBI(dto.maxAmount);
-    if (minBI && minBI <= 0n)
-      throw new BadRequestException('minAmount must be > 0');
-    if (maxBI && maxBI <= 0n)
-      throw new BadRequestException('maxAmount must be > 0');
-    if (minBI && maxBI && minBI > maxBI)
-      throw new BadRequestException('minAmount > maxAmount');
-
     const jsonData: Prisma.JsonObject = JSON.parse(
       JSON.stringify(dto.metadata || {}),
     ) as Prisma.JsonObject;
 
-    const created = await this.prisma.ad.create({
-      data: {
-        creatorAddress: getAddress(user.walletAddress), // checksummed
-        routeId: route.id,
-        fromTokenId: route.fromToken.id,
-        toTokenId: route.toToken.id,
-        poolAmount: poolBI,
-        minAmount: minBI,
-        maxAmount: maxBI,
-        metadata: jsonData,
-        status: 'ACTIVE',
+    const { ad: created, logId } = await this.prisma.$transaction(
+      async (prisma) => {
+        const ad = await prisma.ad.create({
+          data: {
+            creatorAddress: getAddress(user.walletAddress),
+            creatorDstAddress: getAddress(dto.creatorDstAddress),
+            routeId: route.id,
+            fromTokenId: route.fromToken.id,
+            toTokenId: route.toToken.id,
+            metadata: jsonData,
+            status: 'INACTIVE',
+          },
+          select: {
+            id: true,
+            creatorDstAddress: true,
+            route: {
+              select: {
+                fromToken: {
+                  select: {
+                    address: true,
+                    chain: { select: { adManagerAddress: true } },
+                  },
+                },
+              },
+            },
+            status: true,
+          },
+        });
+
+        const logEntry = await prisma.adUpdateLog.create({
+          data: {
+            adId: ad.id,
+            signature: '0x',
+            log: {
+              create: [
+                {
+                  field: 'Status',
+                  oldValue: ad.status,
+                  newValue: 'ACTIVE',
+                },
+              ],
+            },
+          },
+        });
+
+        return { ad, logId: logEntry.id };
       },
+    );
+
+    return {
+      signature: '0x',
+      logId,
+      contractChainId: fromChainId,
+      contractAddress: created.route.fromToken.chain.adManagerAddress,
+      adId: created.id,
+      orderChainId: toChainId,
+      adToken: route.fromToken.address,
+      adRecipient: created.creatorDstAddress,
+    };
+  }
+
+  async fund(req: Request, id: string, dto: FundAdDto) {
+    const reqUser = req.user;
+
+    if (!reqUser) throw new ForbiddenException('Unauthorized');
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: reqUser.sub },
+    });
+
+    if (!user) throw new ForbiddenException('Unauthorized');
+
+    const ad = await this.prisma.ad.findUnique({
+      where: { id, creatorAddress: user.walletAddress },
       select: {
         id: true,
         creatorAddress: true,
-        routeId: true,
-        fromTokenId: true,
-        toTokenId: true,
-        poolAmount: true,
-        minAmount: true,
-        maxAmount: true,
         status: true,
-        metadata: true,
-        createdAt: true,
-        updatedAt: true,
+        poolAmount: true,
+        route: {
+          select: {
+            fromToken: {
+              select: {
+                chain: { select: { adManagerAddress: true, chainId: true } },
+              },
+            },
+          },
+        },
+        adUpdateLog: true,
       },
     });
 
-    // available == pool at creation (no locks yet)
+    if (!ad) throw new NotFoundException('Ad not found');
+
+    if (ad.adUpdateLog) {
+      throw new BadRequestException(
+        'Ad has pending update; please wait a few minutes and try again',
+      );
+    }
+
+    const poolBI = BigInt(dto.poolAmountTopUp);
+
+    if (poolBI <= 0n)
+      throw new BadRequestException('poolAmountTopUp must be > 0');
+
+    const effectiveStatus = ad.status == 'EXHAUSTED' ? 'ACTIVE' : ad.status;
+
+    const logEntry = await this.prisma.$transaction(async (prisma) => {
+      const entry = await prisma.adUpdateLog.create({
+        data: {
+          adId: ad.id,
+          signature: '0x',
+          log: {
+            create: [
+              {
+                field: 'PoolAmount',
+                oldValue: ad.poolAmount.toString(),
+                newValue: (ad.poolAmount + poolBI).toString(),
+              },
+              {
+                field: 'Status',
+                oldValue: ad.status,
+                newValue: effectiveStatus,
+              },
+            ],
+          },
+        },
+      });
+
+      // mark ad as PAUSED if ad is active as log is pending
+      if (ad.status === 'ACTIVE') {
+        await prisma.ad.update({
+          where: { id: ad.id },
+          data: { status: 'PAUSED' },
+        });
+      }
+
+      return entry;
+    });
+
     return {
-      id: created.id,
-      creatorAddress: created.creatorAddress,
-      routeId: created.routeId,
-      fromTokenId: created.fromTokenId,
-      toTokenId: created.toTokenId,
-      poolAmount: created.poolAmount.toString(),
-      availableAmount: created.poolAmount.toString(),
-      minAmount: created.minAmount ? created.minAmount.toString() : null,
-      maxAmount: created.maxAmount ? created.maxAmount.toString() : null,
-      status: created.status,
-      metadata: created.metadata ?? null,
-      createdAt: created.createdAt.toISOString(),
-      updatedAt: created.updatedAt.toISOString(),
+      signature: '0x',
+      logId: logEntry.id,
+      contractChainId: ad.route.fromToken.chain.chainId,
+      contractAddress: ad.route.fromToken.chain.adManagerAddress,
+      adId: ad.id,
+      amount: poolBI.toString(),
+    };
+  }
+
+  async withdraw(req: Request, id: string, dto: WithdrawalAdDto) {
+    const reqUser = req.user;
+
+    if (!reqUser) throw new ForbiddenException('Unauthorized');
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: reqUser.sub },
+    });
+
+    if (!user) throw new ForbiddenException('Unauthorized');
+
+    const ad = await this.prisma.ad.findUnique({
+      where: { id, creatorAddress: user.walletAddress },
+      select: {
+        id: true,
+        creatorAddress: true,
+        status: true,
+        poolAmount: true,
+        route: {
+          select: {
+            fromToken: {
+              select: {
+                chain: { select: { adManagerAddress: true, chainId: true } },
+              },
+            },
+          },
+        },
+        adUpdateLog: true,
+      },
+    });
+
+    if (!ad) throw new NotFoundException('Ad not found');
+
+    if (ad.adUpdateLog) {
+      throw new BadRequestException(
+        'Ad has pending update; please wait a few minutes and try again',
+      );
+    }
+
+    const poolBI = BigInt(dto.poolAmountWithdraw);
+
+    if (poolBI <= 0n)
+      throw new BadRequestException('poolAmountWithdraw must be > 0');
+
+    // get locksum
+    const lockSum = await this.prisma.adLock.aggregate({
+      where: { adId: ad.id, releasedAt: null },
+      _sum: { amount: true },
+    });
+
+    const locked = lockSum._sum.amount ?? 0n;
+    const available = ad.poolAmount - locked;
+
+    if (poolBI > available)
+      throw new BadRequestException('Insufficient available balance');
+
+    const effectiveStatus = available - poolBI === 0n ? 'EXHAUSTED' : ad.status;
+
+    const logEntry = await this.prisma.$transaction(async (prisma) => {
+      const entry = await prisma.adUpdateLog.create({
+        data: {
+          adId: ad.id,
+          signature: '0x',
+          log: {
+            create: [
+              {
+                field: 'PoolAmount',
+                oldValue: ad.poolAmount.toString(),
+                newValue: (ad.poolAmount - poolBI).toString(),
+              },
+              {
+                field: 'Status',
+                oldValue: ad.status,
+                newValue: effectiveStatus,
+              },
+            ],
+          },
+        },
+      });
+
+      // mark ad as PAUSED if it was ACTIVE as log is pending
+      if (ad.status === 'ACTIVE') {
+        await prisma.ad.update({
+          where: { id: ad.id },
+          data: { status: 'PAUSED' },
+        });
+      }
+
+      return entry;
+    });
+
+    return {
+      signature: '0x',
+      logId: logEntry.id,
+      contractChainId: ad.route.fromToken.chain.chainId,
+      contractAddress: ad.route.fromToken.chain.adManagerAddress,
+      adId: ad.id,
+      amount: poolBI.toString(),
     };
   }
 
@@ -278,12 +486,6 @@ export class AdsService {
 
     // Build data
     const data: any = {};
-    if (dto.poolAmountTopUp) {
-      const topUp = BigInt(dto.poolAmountTopUp);
-      if (topUp <= 0n)
-        throw new BadRequestException('poolAmountTopUp must be > 0');
-      data.poolAmount = { increment: topUp };
-    }
     if (dto.minAmount !== undefined) data.minAmount = toBI(dto.minAmount);
     if (dto.maxAmount !== undefined) data.maxAmount = toBI(dto.maxAmount);
     if (dto.metadata !== undefined) data.metadata = dto.metadata;
@@ -295,56 +497,19 @@ export class AdsService {
       select: {
         id: true,
         creatorAddress: true,
-        routeId: true,
-        fromTokenId: true,
-        toTokenId: true,
-        poolAmount: true,
         minAmount: true,
         maxAmount: true,
         status: true,
         metadata: true,
-        createdAt: true,
-        updatedAt: true,
       },
     });
-
-    const lockSum = await this.prisma.adLock.aggregate({
-      where: { adId: id, releasedAt: null },
-      _sum: { amount: true },
-    });
-
-    const locked = lockSum._sum.amount ?? 0n;
-    const available = updated.poolAmount - locked;
-
-    const effectiveStatus =
-      updated.status === 'CLOSED'
-        ? 'CLOSED'
-        : available === 0n
-          ? 'EXHAUSTED'
-          : updated.status;
-
-    if (effectiveStatus !== updated.status) {
-      await this.prisma.ad.update({
-        where: { id },
-        data: { status: effectiveStatus },
-        select: { id: true },
-      });
-    }
 
     return {
       id: updated.id,
       creatorAddress: updated.creatorAddress,
-      routeId: updated.routeId,
-      fromTokenId: updated.fromTokenId,
-      toTokenId: updated.toTokenId,
-      poolAmount: updated.poolAmount.toString(),
-      availableAmount: available.toString(),
       minAmount: updated.minAmount ? updated.minAmount.toString() : null,
       maxAmount: updated.maxAmount ? updated.maxAmount.toString() : null,
-      status: effectiveStatus,
       metadata: updated.metadata ?? null,
-      createdAt: updated.createdAt.toISOString(),
-      updatedAt: updated.updatedAt.toISOString(),
     };
   }
 
@@ -360,15 +525,124 @@ export class AdsService {
     if (!user) throw new ForbiddenException('Unauthorized');
 
     const ad = await this.prisma.ad.findUnique({
-      where: { id },
-      select: { id: true, creatorAddress: true, status: true },
+      where: { id, creatorAddress: user.walletAddress },
+      select: {
+        id: true,
+        creatorAddress: true,
+        status: true,
+        poolAmount: true,
+        route: {
+          select: {
+            fromToken: {
+              select: {
+                chain: { select: { adManagerAddress: true, chainId: true } },
+              },
+            },
+          },
+        },
+        adUpdateLog: true,
+      },
     });
     if (!ad) throw new NotFoundException('Ad not found');
 
-    await this.prisma.ad.update({
-      where: { id },
-      data: { status: 'CLOSED' },
-      select: { id: true },
+    if (ad.adUpdateLog) {
+      throw new BadRequestException(
+        'Ad has pending update; please wait a few minutes and try again',
+      );
+    }
+
+    // get locksum and ensure none are active
+    const lockSum = await this.prisma.adLock.aggregate({
+      where: { adId: ad.id, releasedAt: null },
+      _sum: { amount: true },
     });
+
+    const locked = lockSum._sum.amount ?? 0n;
+
+    if (locked > 0n)
+      throw new BadRequestException('Ad has active locks and cannot be closed');
+
+    if (ad.status === 'CLOSED') {
+      return;
+    }
+
+    const logEntry = await this.prisma.adUpdateLog.create({
+      data: {
+        adId: ad.id,
+        signature: '0x',
+        log: {
+          create: [
+            {
+              field: 'PoolAmount',
+              oldValue: ad.poolAmount.toString(),
+              newValue: (0).toString(),
+            },
+            {
+              field: 'Status',
+              oldValue: ad.status,
+              newValue: 'CLOSED',
+            },
+          ],
+        },
+      },
+    });
+
+    return {
+      signature: '0x',
+      logId: logEntry.id,
+      contractChainId: ad.route.fromToken.chain.chainId,
+      contractAddress: ad.route.fromToken.chain.adManagerAddress,
+      adId: ad.id,
+    };
+  }
+
+  async confirmChainAction(
+    req: Request,
+    adId: string,
+    dto: ConfirmChainActionDto,
+  ) {
+    const reqUser = req.user;
+
+    if (!reqUser) throw new ForbiddenException('Unauthorized');
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: reqUser.sub },
+    });
+
+    if (!user) throw new ForbiddenException('Unauthorized');
+
+    const adLogUpdate = await this.prisma.adUpdateLog.findUnique({
+      where: { id: dto.logId, adId, signature: dto.signature },
+      include: { ad: true, log: true },
+    });
+
+    if (!adLogUpdate) throw new NotFoundException('Ad update log not found');
+
+    if (adLogUpdate.ad.creatorAddress !== user.walletAddress) {
+      throw new ForbiddenException('Unauthorized');
+    }
+
+    // apply the updates
+    const data: any = {};
+
+    adLogUpdate.log.forEach((entry) => {
+      if (entry.field === 'PoolAmount') {
+        data.poolAmount = entry.newValue;
+      } else if (entry.field === 'Status') {
+        data.status = entry.newValue;
+      }
+    });
+
+    await this.prisma.ad.update({
+      where: { id: adLogUpdate.adId },
+      data,
+    });
+
+    // delete the log entry
+    await this.prisma.adUpdateLog.delete({ where: { id: adLogUpdate.id } });
+
+    return {
+      success: true,
+    };
   }
 }

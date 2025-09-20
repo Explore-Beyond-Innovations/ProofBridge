@@ -6,14 +6,17 @@ pragma solidity ^0.8.24;
  * @notice Makers (LPs) post/close liquidity ads, lock funds against EIP-712 orders,
  *         and bridgers unlock on this chain with a proof checked by an external verifier.
  */
+import {console} from "forge-std/console.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
-import {IVerifier} from "./Verifier.sol";
 import {EfficientHashLib} from "solady/utils/EfficientHashLib.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {IVerifier} from "./Verifier.sol";
+import {IMerkleManager} from "./MerkleManager.sol";
 
 contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
     using SafeERC20 for IERC20;
@@ -34,7 +37,7 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
      * @notice EIP-712 typehash for `Order` structs.
      */
     bytes32 public constant ORDER_TYPEHASH = keccak256(
-        "Order(address orderChainToken,address adChainToken,uint256 amount,address bridger,uint256 orderChainId,address orderPortal,address orderRecipient,uint256 adChainId,address adManager,uint256 adId,address adCreator,address adRecipient,uint256 salt)"
+        "Order(address orderChainToken,address adChainToken,uint256 amount,address bridger,uint256 orderChainId,address orderPortal,address orderRecipient,uint256 adChainId,address adManager,string adId,address adCreator,address adRecipient,uint256 salt)"
     );
 
     /// @notice Admin role identifier.
@@ -46,6 +49,9 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
 
     /// @notice External verifier used to validate zero-knowledge proofs.
     IVerifier public immutable i_verifier;
+
+    /// @notice MerkleManager for chain
+    IMerkleManager public immutable i_merkleManager;
 
     /**
      * @notice Source-chain configuration (where orders originate).
@@ -59,7 +65,6 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
 
     /**
      * @notice Liquidity ad created by a maker on the ad chain (this chain).
-     * @param id Sequential ad identifier.
      * @param orderChainId Source chain id this ad serves.
      * @param adRecipient Maker-controlled recipient on the order chain.
      * @param maker Owner of the ad.
@@ -69,7 +74,6 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
      * @param open Whether the ad is accepting new locks/funding.
      */
     struct Ad {
-        uint256 id;
         uint256 orderChainId;
         address adRecipient;
         address maker;
@@ -106,7 +110,7 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
         uint256 orderChainId;
         address srcOrderPortal;
         address orderRecipient;
-        uint256 adId;
+        string adId;
         address adCreator;
         address adRecipient;
         uint256 salt;
@@ -120,9 +124,6 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
 
     }
 
-    /// @notice Next ad id to assign.
-    uint256 public nextAdId = 1;
-
     /// @notice Source-chain configs.
     mapping(uint256 => ChainInfo) public chains;
 
@@ -130,13 +131,22 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
     mapping(address => mapping(uint256 => address)) public tokenRoute;
 
     /// @notice Ads by id.
-    mapping(uint256 => Ad) public ads;
+    mapping(string => Ad) public ads;
 
     /// @notice Order status by EIP-712 hash.
     mapping(bytes32 => Status) public orders;
 
     /// @notice Consumed nullifiers to prevent reuse across proofs.
     mapping(bytes32 => bool) public nullifierUsed;
+
+    /// @notice Tracks manager permissions for addresses
+    mapping(address => bool) public managers;
+
+    /// @notice Request tokens tracker to prevent replay attacks
+    mapping(bytes32 => bool) public requestTokens;
+
+    /// @notice Request hash tracker to prevent replay attacks
+    mapping(bytes32 => bool) public requestHashes;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -172,7 +182,7 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
      * @param token Escrowed token on this chain.
      * @param orderChainId Source chain this ad serves.
      */
-    event AdCreated(uint256 indexed adId, address indexed maker, address indexed token, uint256 orderChainId);
+    event AdCreated(string indexed adId, address indexed maker, address indexed token, uint256 orderChainId);
 
     /**
      * @notice Emitted when an ad is funded.
@@ -181,7 +191,7 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
      * @param amount Amount deposited.
      * @param newBalance New ad balance.
      */
-    event AdFunded(uint256 indexed adId, address indexed maker, uint256 amount, uint256 newBalance);
+    event AdFunded(string indexed adId, address indexed maker, uint256 amount, uint256 newBalance);
 
     /**
      * @notice Emitted when ad funds are withdrawn.
@@ -190,14 +200,14 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
      * @param amount Amount withdrawn.
      * @param newBalance New ad balance.
      */
-    event AdWithdrawn(uint256 indexed adId, address indexed maker, uint256 amount, uint256 newBalance);
+    event AdWithdrawn(string indexed adId, address indexed maker, uint256 amount, uint256 newBalance);
 
     /**
      * @notice Emitted when an ad is closed.
      * @param adId Ad identifier.
      * @param maker Ad owner.
      */
-    event AdClosed(uint256 indexed adId, address indexed maker);
+    event AdClosed(string indexed adId, address indexed maker);
 
     /**
      * @notice Emitted when liquidity is locked for an order.
@@ -210,7 +220,7 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
      * @param recipient Recipient to be paid on unlock (this chain).
      */
     event OrderLocked(
-        uint256 indexed adId,
+        string indexed adId,
         bytes32 indexed orderHash,
         address maker,
         address token,
@@ -226,6 +236,13 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
      * @param nullifierHash Consumed nullifier to prevent reuse.
      */
     event OrderUnlocked(bytes32 indexed orderHash, address indexed recipient, bytes32 nullifierHash);
+
+    /**
+     * @notice Emitted when a manager's status is updated
+     * @param manager Address of the manager
+     * @param status Boolean representing the new manager status
+     */
+    event UpdateManager(address indexed manager, bool status);
 
     /*//////////////////////////////////////////////////////////////
                                   ERRORS
@@ -247,6 +264,8 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
     error AdManager__BridgerZero();
     /// @notice Recipient address is zero.
     error AdManager__RecipientZero();
+    /// @notice Ad has active locked funds.
+    error Admanager__ActiveLocks();
 
     /// @notice Source chain not supported.
     error AdManager__ChainNotSupported(uint256 chainId);
@@ -275,6 +294,22 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
     /// @notice Zero Address error
     error AdManager__ZeroAddress();
 
+    /// @notice Invalid Message error
+    error AdManager__InvalidMessage();
+    /// @notice Token Already Used error
+    error AdManager__TokenAlreadyUsed();
+    /// @notice Request Token Expired error
+    error AdManager__RequestTokenExpired();
+    /// @notice Zero Signer error
+    error Admanage__ZeroSigner();
+    /// @notice Invalid Signer error
+    error Admanager__InvalidSigner();
+    /// @notice Request Hashed Processed error
+    error Admanager__RequestHashedProcessed();
+
+    /// @notice MerkleManager append failed
+    error AdManager__MerkleManagerAppendFailed();
+
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -284,12 +319,32 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
      * @param admin Address granted {ADMIN__ROLE}.
      * @param _verifier External zk-proof verifier contract.
      */
-    constructor(address admin, IVerifier _verifier) EIP712(_NAME, _VERSION) {
+    constructor(address admin, IVerifier _verifier, IMerkleManager _merkleManager) EIP712(_NAME, _VERSION) {
         if (admin == address(0) || address(_verifier) == address(0)) {
             revert AdManager__ZeroAddress();
         }
         _grantRole(ADMIN_ROLE, admin);
+        managers[admin] = true;
         i_verifier = _verifier;
+        i_merkleManager = _merkleManager;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                              ADMIN: MANAGERS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Sets or unsets an address as a manager
+     * @param _manager Address of the manager
+     * @param _status Boolean representing the desired manager status
+     */
+    function setManager(address _manager, bool _status) external onlyRole(ADMIN_ROLE) {
+        if (_manager == address(0)) {
+            revert AdManager__ZeroAddress();
+        }
+
+        managers[_manager] = _status;
+        emit UpdateManager(_manager, _status);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -352,12 +407,23 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
     /**
      * @notice Create a new liquidity ad to serve orders from `orderChainId`.
      * @dev Requires an existing token route for `(adToken, orderChainId)`.
+     * @param _signature Signature over the request hash.
+     * @param _token Unique token for the delegated action (prevents replay).
+     *  @param _timeToExpire Expiration time for the token (unix timestamp).
+     *  @param adId Returned ad id (sequential).
      * @param adToken ERC20 token to escrow for payouts on this chain.
      * @param orderChainId Source chain id this ad intends to serve.
      * @param adRecipient Maker-defined recipient on the order chain (checked in {lockForOrder}).
-     * @return adId Newly created ad id.
      */
-    function createAd(address adToken, uint256 orderChainId, address adRecipient) external returns (uint256 adId) {
+    function createAd(
+        bytes memory _signature,
+        bytes32 _token,
+        uint256 _timeToExpire,
+        string memory adId,
+        address adToken,
+        uint256 orderChainId,
+        address adRecipient
+    ) external nonReentrant {
         if (adToken == address(0)) revert AdManager__TokenZeroAddress();
         if (adRecipient == address(0)) revert AdManager__RecipientZero();
 
@@ -365,9 +431,19 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
             revert AdManager__ChainNotSupported(orderChainId);
         }
 
-        adId = nextAdId++;
+        bytes32 message = createAdRequestHash(adId, adToken, orderChainId, adRecipient, _token, _timeToExpire);
+
+        if (requestHashes[message]) {
+            revert Admanager__RequestHashedProcessed();
+        }
+
+        address signer = preAuthValidations(message, _token, _timeToExpire, _signature);
+
+        if (!managers[signer]) {
+            revert Admanager__InvalidSigner();
+        }
+
         ads[adId] = Ad({
-            id: adId,
             orderChainId: orderChainId,
             adRecipient: adRecipient,
             maker: msg.sender,
@@ -376,36 +452,88 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
             locked: 0,
             open: true
         });
+
+        requestHashes[message] = true;
         emit AdCreated(adId, msg.sender, adToken, orderChainId);
     }
 
     /**
      * @notice Fund an existing ad with `amount` of its ERC20 token.
+     * @dev Caller must be the ad's maker/owner.
+     * @param _signature Signature over the request hash.
+     * @param _token Unique token for the delegated action (prevents replay).
+     * @param _timeToExpire Expiration time for the token (unix timestamp).
      * @param adId Ad id to fund.
      * @param amount Amount to deposit.
      */
-    function fundAd(uint256 adId, uint256 amount) external nonReentrant {
+    function fundAd(bytes memory _signature, bytes32 _token, uint256 _timeToExpire, string memory adId, uint256 amount)
+        external
+        nonReentrant
+    {
         Ad storage ad = __getAdOwned(adId, msg.sender);
         if (!ad.open) revert AdManager__AdClosed();
         if (amount == 0) revert AdManager__ZeroAmount();
+
+        bytes32 message = fundAdRequestHash(adId, amount, _token, _timeToExpire);
+
+        if (requestHashes[message]) {
+            revert Admanager__RequestHashedProcessed();
+        }
+
+        address signer = preAuthValidations(message, _token, _timeToExpire, _signature);
+
+        if (!managers[signer]) {
+            revert Admanager__InvalidSigner();
+        }
+
         IERC20(ad.token).safeTransferFrom(msg.sender, address(this), amount);
         ad.balance += amount;
+        requestHashes[message] = true;
         emit AdFunded(adId, msg.sender, amount, ad.balance);
     }
 
     /**
      * @notice Withdraw unfrozen liquidity from an ad.
+     * @dev Caller must be the ad's maker/owner.
+     * @param _signature Signature over the request hash.
+     * @param _token Unique token for the delegated action (prevents replay).
+     * @param _timeToExpire Expiration time for the token (unix timestamp).
      * @param adId Ad id to withdraw from.
      * @param amount Amount to withdraw.
      * @param to Recipient address for the withdrawn tokens.
      */
-    function withdrawAd(uint256 adId, uint256 amount, address to) external nonReentrant {
+    function withdrawFromAd(
+        bytes memory _signature,
+        bytes32 _token,
+        uint256 _timeToExpire,
+        string memory adId,
+        uint256 amount,
+        address to
+    ) external nonReentrant {
         Ad storage ad = __getAdOwned(adId, msg.sender);
+
+        bytes32 message = withdrawFromAdRequestHash(adId, amount, to, _token, _timeToExpire);
+
+        if (requestHashes[message]) {
+            revert Admanager__RequestHashedProcessed();
+        }
+
+        address signer = preAuthValidations(message, _token, _timeToExpire, _signature);
+
         if (amount == 0) revert AdManager__ZeroAmount();
+
         uint256 available = ad.balance - ad.locked;
+
         if (amount > available) revert AdManager__InsufficientLiquidity();
+
+        if (!managers[signer]) {
+            revert Admanager__InvalidSigner();
+        }
+
         ad.balance -= amount;
         IERC20(ad.token).safeTransfer(to, amount);
+
+        requestHashes[message] = true;
         emit AdWithdrawn(adId, msg.sender, amount, ad.balance);
     }
 
@@ -415,19 +543,34 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
      * @param adId Ad id to close.
      * @param to Recipient of the remaining tokens.
      */
-    function closeAd(uint256 adId, address to) external nonReentrant {
+    function closeAd(bytes memory _signature, bytes32 _token, uint256 _timeToExpire, string memory adId, address to)
+        external
+        nonReentrant
+    {
         Ad storage ad = __getAdOwned(adId, msg.sender);
-        if (ad.locked != 0) revert AdManager__InsufficientLiquidity(); // has active locks
+        if (ad.locked != 0) revert Admanager__ActiveLocks(); // has active locks
+
+        bytes32 message = closeAdRequestHash(adId, to, _token, _timeToExpire);
+
+        if (requestHashes[message]) {
+            revert Admanager__RequestHashedProcessed();
+        }
+
+        address signer = preAuthValidations(message, _token, _timeToExpire, _signature);
+
+        if (!managers[signer]) {
+            revert Admanager__InvalidSigner();
+        }
+
         uint256 remaining = ad.balance;
+
         ad.balance = 0;
         ad.open = false;
         if (remaining > 0) IERC20(ad.token).safeTransfer(to, remaining);
+
+        requestHashes[message] = true;
         emit AdClosed(adId, msg.sender);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                     MAKER ACTION — LOCK FOR AN ORDER
-    //////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Reserve `params.amount` from `params.adId` to fulfill an order.
@@ -436,49 +579,46 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
      * @param params Order parameters (see {OrderParams}).
      * @return orderHash The EIP-712 order hash that identifies this reservation.
      */
-    function lockForOrder(OrderParams calldata params) external nonReentrant returns (bytes32 orderHash) {
+    function lockForOrder(bytes memory _signature, bytes32 _token, uint256 _timeToExpire, OrderParams calldata params)
+        external
+        nonReentrant
+        returns (bytes32 orderHash)
+    {
         Ad storage ad = __getAdOwned(params.adId, msg.sender);
-        if (!ad.open) revert AdManager__AdClosed();
-        if (params.amount == 0) revert AdManager__ZeroAmount();
-        if (params.bridger == address(0)) revert AdManager__BridgerZero();
-        if (params.orderRecipient == address(0)) revert AdManager__RecipientZero();
-
-        // Source chain must be supported and portal must match (if configured).
-        ChainInfo memory ci = chains[params.orderChainId];
-        if (!ci.supported) revert AdManager__ChainNotSupported(params.orderChainId);
-        if (ci.orderPortal != address(0) && ci.orderPortal != params.srcOrderPortal) {
-            revert AdManager__OrderPortalMismatch(ci.orderPortal, params.srcOrderPortal);
-        }
-
-        // Ad must serve the provided source chain.
-        if (params.orderChainId != ad.orderChainId) {
-            revert AdManager__OrderChainMismatch(ad.orderChainId, params.orderChainId);
-        }
-
-        // Token route: adChainToken (this chain) + orderChainId -> orderChainToken (source).
-        address routed = tokenRoute[params.adChainToken][params.orderChainId];
-        if (routed == address(0)) revert AdManager__MissingRoute(params.orderChainToken, block.chainid);
-        if (routed != params.orderChainToken) revert AdManager__OrderTokenMismatch(routed, params.orderChainToken);
-
-        // Identity and token checks.
-        if (params.adCreator != ad.maker) revert AdManager__NotMaker();
-        if (params.adChainToken != ad.token) revert AdManager__AdTokenMismatch(ad.token, params.adChainToken);
-        if (params.adRecipient != ad.adRecipient) {
-            revert AdManager__AdRecipientMismatch(ad.adRecipient, params.adRecipient);
-        }
 
         // Liquidity check.
         uint256 available = ad.balance - ad.locked;
         if (params.amount > available) revert AdManager__InsufficientLiquidity();
 
         // Open order.
-        orderHash = _hashOrder(params, block.chainid, address(this));
+        orderHash = validateOrder(ad, params);
+
         if (orders[orderHash] != Status.None) revert AdManager__OrderExists(orderHash);
+
+        bytes32 message = lockForOrderRequestHash(params.adId, orderHash, _token, _timeToExpire);
+
+        if (requestHashes[message]) {
+            revert Admanager__RequestHashedProcessed();
+        }
+        address signer = preAuthValidations(message, _token, _timeToExpire, _signature);
+
+        if (!managers[signer]) {
+            revert Admanager__InvalidSigner();
+        }
 
         ad.locked += params.amount;
         orders[orderHash] = Status.Open;
 
-        emit OrderLocked(ad.id, orderHash, ad.maker, ad.token, params.amount, params.bridger, params.orderRecipient);
+        // append order hash
+        if (!i_merkleManager.appendOrderHash(orderHash)) {
+            revert AdManager__MerkleManagerAppendFailed();
+        }
+
+        requestHashes[message] = true;
+
+        emit OrderLocked(
+            params.adId, orderHash, ad.maker, ad.token, params.amount, params.bridger, params.orderRecipient
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -490,21 +630,44 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
      * @dev Consumes `nullifierHash` and moves order status to {Status.Filled}.
      * @param params Original order parameters that hash to the open `orderHash`.
      * @param nullifierHash One-time nullifier preventing reuse of this proof.
-     * @param proof Opaque zk-proof bytes for the external verifier.
+     * @param targetRoot Source chain root of other chain appending the orderHash.
+     * @param proof zk-proof bytes for the external verifier.
      */
-    function unlock(OrderParams calldata params, bytes32 nullifierHash, bytes calldata proof) external nonReentrant {
+    function unlock(
+        bytes memory _signature,
+        bytes32 _token,
+        uint256 _timeToExpire,
+        OrderParams calldata params,
+        bytes32 nullifierHash,
+        bytes32 targetRoot,
+        bytes calldata proof
+    ) external nonReentrant {
         bytes32 orderHash = _hashOrder(params, block.chainid, address(this));
 
         if (orders[orderHash] != Status.Open) revert AdManager__OrderNotOpen(orderHash);
         if (nullifierUsed[nullifierHash]) revert AdManager__NullifierUsed(nullifierHash);
 
+        bytes32 message = unlockOrderRequestHash(params.adId, orderHash, targetRoot, _token, _timeToExpire);
+
+        if (requestHashes[message]) {
+            revert Admanager__RequestHashedProcessed();
+        }
+
+        address signer = preAuthValidations(message, _token, _timeToExpire, _signature);
+
+        if (!managers[signer]) {
+            revert Admanager__InvalidSigner();
+        }
+
         // Build public inputs for the verifier
-        bytes32[] memory publicInputs = buildPublicInputs(nullifierHash, params.adCreator, params.bridger, orderHash);
+        bytes32[] memory publicInputs = buildPublicInputs(nullifierHash, targetRoot, orderHash);
 
         if (!i_verifier.verify(proof, publicInputs)) revert AdManager__InvalidProof();
 
         nullifierUsed[nullifierHash] = true;
         orders[orderHash] = Status.Filled;
+
+        requestHashes[message] = true;
 
         // Pay recipient on this chain from the ad's escrowed token.
         Ad storage ad = ads[params.adId];
@@ -515,7 +678,7 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
     }
 
     /*//////////////////////////////////////////////////////////////
-                           VIEWS / SMALL HELPERS
+                           VIEWS
     //////////////////////////////////////////////////////////////*/
 
     /**
@@ -523,15 +686,99 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
      * @param adId Ad identifier.
      * @return amount Available token amount.
      */
-    function availableLiquidity(uint256 adId) public view returns (uint256 amount) {
+    function availableLiquidity(string memory adId) public view returns (uint256 amount) {
         Ad storage ad = ads[adId];
         if (ad.maker == address(0)) return 0;
         return ad.balance - ad.locked;
     }
 
+    /**
+     * @notice Check if a request hash exists
+     * @param message The message hash to check
+     * @return bool True if the request hash exists, false otherwise
+     */
+    function checkRequestHashExists(bytes32 message) external view returns (bool) {
+        return requestHashes[message];
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            VALIDATIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Validates the message and signature
+     * @param _message The message that the user signed
+     * @param _token The unique token for the delegated action
+     * @param _timeToExpire The time to expire the token
+     * @param _signature Signature
+     * @return address Signer of the message
+     */
+    function preAuthValidations(bytes32 _message, bytes32 _token, uint256 _timeToExpire, bytes memory _signature)
+        public
+        returns (address)
+    {
+        if (_message == bytes32(0)) {
+            revert AdManager__InvalidMessage();
+        }
+
+        if (requestTokens[_token]) {
+            revert AdManager__TokenAlreadyUsed();
+        }
+
+        if (block.timestamp > _timeToExpire) {
+            revert AdManager__RequestTokenExpired();
+        }
+
+        address signer = getSigner(_message, _signature);
+
+        if (signer == address(0)) {
+            revert Admanage__ZeroSigner();
+        }
+
+        requestTokens[_token] = true;
+
+        return signer;
+    }
+
+    /// @notice Find the signer
+    /// @param message The message that the user signed
+    /// @param signature Signature
+    /// @return address Signer of the message
+    function getSigner(bytes32 message, bytes memory signature) public pure returns (address) {
+        message = MessageHashUtils.toEthSignedMessageHash(message);
+        address signer = ECDSA.recover(message, signature);
+        return signer;
+    }
+
+    /// @notice Get the ID of the executing chain
+    /// @return uint256 value
+    function getChainID() public view returns (uint256) {
+        uint256 id;
+        assembly {
+            id := chainid()
+        }
+        return id;
+    }
+
     /*//////////////////////////////////////////////////////////////
                                HASHING
     //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Hash a request for pre-authorization
+     * @param _token Unique token for the delegated action
+     * @param _timeToExpire The time to expire the token
+     * @param _action The action to be performed
+     * @param _params Encoded parameters for the action
+     * @return bytes32 The hash of the request
+     */
+    function hashRequest(bytes32 _token, uint256 _timeToExpire, string memory _action, bytes[] memory _params)
+        public
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encode(_token, _timeToExpire, _action, _params));
+    }
 
     /**
      * @notice Compute the final EIP-712 typed-data digest for an order.
@@ -572,7 +819,7 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
         EfficientHashLib.set(buf, 7, toBytes32(p.orderRecipient));
         EfficientHashLib.set(buf, 8, adChainId);
         EfficientHashLib.set(buf, 9, toBytes32(dstAdManager));
-        EfficientHashLib.set(buf, 10, p.adId);
+        EfficientHashLib.set(buf, 10, keccak256(bytes(p.adId)));
         EfficientHashLib.set(buf, 11, toBytes32(p.adCreator));
         EfficientHashLib.set(buf, 12, toBytes32(p.adRecipient));
         EfficientHashLib.set(buf, 13, p.salt);
@@ -590,30 +837,164 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
 
     /**
      * @notice Builds an array of public inputs for zk-proof verification.
-     * @dev Encodes the provided orderHash and combines it with other parameters into a bytes32 array.
-     * @param nullifierHash The hash used to prevent double-spending in zk-proofs.
-     * @param adCreator The address of the ad creator.
-     * @param bridger The address of the entity bridging the proof.
-     * @param orderHash The hash representing the order details.
-     * @return inputs The constructed array of public inputs for zk-proof verification.
+     * @dev Encodes the provided nullifierHash, orderHash, targetRoot and constant 1 into a bytes32 array.
+     * @param nullifierHash The hash used to prevent proof reuse
+     * @param targetRoot The root of the Merkle tree in the source chain
+     * @param orderHash The EIP-712 order hash
+     * @return inputs Array of 4 bytes32 values: [nullifierHash, orderHash, targetRoot, 1]
      */
-    function buildPublicInputs(bytes32 nullifierHash, address adCreator, address bridger, bytes32 orderHash)
+    function buildPublicInputs(bytes32 nullifierHash, bytes32 targetRoot, bytes32 orderHash)
         internal
-        pure
+        view
         returns (bytes32[] memory inputs)
     {
-        bytes memory oHash = abi.encodePacked(orderHash);
-        uint256 offset = 4;
-        inputs = new bytes32[](offset + oHash.length);
-
+        bytes32 orderHashMod = i_merkleManager.fieldMod(orderHash);
+        inputs = new bytes32[](4);
         inputs[0] = nullifierHash;
-        inputs[1] = bytes32(uint256(uint160(adCreator)));
-        inputs[2] = bytes32(uint256(uint160(bridger)));
+        inputs[1] = orderHashMod;
+        inputs[2] = targetRoot;
         inputs[3] = bytes32(uint256(1));
+    }
 
-        for (uint256 i = 0; i < oHash.length; ++i) {
-            inputs[offset + i] = bytes32(uint256(uint8(oHash[i])));
-        }
+    /**
+     * @notice Creates a hash for ad creation requests
+     * @dev Generates a unique hash combining ad details and request parameters
+     * @param adId Unique identifier for the advertisement
+     * @param adToken The token address associated with the advertisement
+     * @param orderChainId The chain ID where the order exists
+     * @param adRecipient Address that will receive the advertisement
+     * @param _token Token identifier used in hash generation
+     * @param _timeToExpire Expiration timestamp for the request
+     * @return message The generated hash of the ad request
+     */
+    function createAdRequestHash(
+        string memory adId,
+        address adToken,
+        uint256 orderChainId,
+        address adRecipient,
+        bytes32 _token,
+        uint256 _timeToExpire
+    ) public pure returns (bytes32 message) {
+        string memory action = "createAd";
+        bytes[] memory params = new bytes[](4);
+        params[0] = abi.encode(adId);
+        params[1] = abi.encode(adToken);
+        params[2] = abi.encode(orderChainId);
+        params[3] = abi.encode(adRecipient);
+        message = hashRequest(_token, _timeToExpire, action, params);
+    }
+    /**
+     * @notice Creates a hash of a fund ad request
+     * @dev Uses hashRequest function to create a unique hash for funding an ad
+     * @param adId The unique identifier of the advertisement
+     * @param amount The funding amount for the advertisement
+     * @param _token The token hash identifier
+     * @param _timeToExpire The expiration time for the funding request
+     * @return message The keccak256 hash of the request parameters
+     */
+
+    function fundAdRequestHash(string memory adId, uint256 amount, bytes32 _token, uint256 _timeToExpire)
+        public
+        pure
+        returns (bytes32 message)
+    {
+        string memory action = "fundAd";
+        bytes[] memory params = new bytes[](2);
+        params[0] = abi.encode(adId);
+        params[1] = abi.encode(amount);
+        message = hashRequest(_token, _timeToExpire, action, params);
+    }
+
+    /**
+     * @notice Generates a hash for withdrawing funds from an ad request
+     * @dev Creates a unique hash combining ad details, withdrawal amount, recipient, token and expiry
+     * @param adId The unique identifier of the advertisement
+     * @param amount The amount to withdraw
+     * @param to The address that will receive the withdrawn funds
+     * @param _token The token address hash being used for the withdrawal
+     * @param _timeToExpire The timestamp when this request will expire
+     * @return message The keccak256 hash of the encoded withdrawal request
+     */
+    function withdrawFromAdRequestHash(
+        string memory adId,
+        uint256 amount,
+        address to,
+        bytes32 _token,
+        uint256 _timeToExpire
+    ) public pure returns (bytes32 message) {
+        string memory action = "withdrawFromAd";
+        bytes[] memory params = new bytes[](3);
+        params[0] = abi.encode(adId);
+        params[1] = abi.encode(amount);
+        params[2] = abi.encode(to);
+        message = hashRequest(_token, _timeToExpire, action, params);
+    }
+
+    /**
+     * @notice Generates a hash for closing an advertisement request
+     * @dev Combines the ad ID, recipient address, token and expiry time into a standardized hash format
+     * @param adId The unique identifier of the advertisement
+     * @param to The address that will receive the advertisement closure confirmation
+     * @param _token The token associated with this request
+     * @param _timeToExpire The timestamp when this request will expire
+     * @return message The generated hash of the close advertisement request
+     */
+    function closeAdRequestHash(string memory adId, address to, bytes32 _token, uint256 _timeToExpire)
+        public
+        pure
+        returns (bytes32 message)
+    {
+        string memory action = "closeAd";
+        bytes[] memory params = new bytes[](2);
+        params[0] = abi.encode(adId);
+        params[1] = abi.encode(to);
+        message = hashRequest(_token, _timeToExpire, action, params);
+    }
+
+    /**
+     * @notice Generates a hash for locking an advertisement for an order
+     * @dev Creates a hash combining the ad ID, order hash, token and expiry time
+     * @param adId The unique identifier of the advertisement
+     * @param orderHash The hash of the order for which the ad should be locked
+     * @param _token The token associated with this request
+     * @param _timeToExpire The timestamp when this request will expire
+     * @return message The generated hash of the lock advertisement request
+     */
+    function lockForOrderRequestHash(string memory adId, bytes32 orderHash, bytes32 _token, uint256 _timeToExpire)
+        public
+        pure
+        returns (bytes32 message)
+    {
+        string memory action = "lockForOrder";
+        bytes[] memory params = new bytes[](2);
+        params[0] = abi.encode(adId);
+        params[1] = abi.encode(orderHash);
+        message = hashRequest(_token, _timeToExpire, action, params);
+    }
+
+    /**
+     * @notice Generates a hash for unlocking an advertisement order
+     * @dev Creates a hash combining the ad ID, order hash, target root, token and expiry time
+     * @param adId The unique identifier of the advertisement
+     * @param orderHash The hash of the order to unlock
+     * @param _targetRoot The merkle root for verification
+     * @param _token The token associated with this request
+     * @param _timeToExpire The timestamp when this request will expire
+     * @return message The generated hash of the unlock order request
+     */
+    function unlockOrderRequestHash(
+        string memory adId,
+        bytes32 orderHash,
+        bytes32 _targetRoot,
+        bytes32 _token,
+        uint256 _timeToExpire
+    ) public pure returns (bytes32 message) {
+        string memory action = "unlockOrder";
+        bytes[] memory params = new bytes[](3);
+        params[0] = abi.encode(adId);
+        params[1] = abi.encode(orderHash);
+        params[2] = abi.encode(_targetRoot);
+        message = hashRequest(_token, _timeToExpire, action, params);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -649,9 +1030,49 @@ contract AdManager is AccessControl, ReentrancyGuard, EIP712 {
      * @param maker Expected owner (usually `msg.sender`).
      * @return ad Storage pointer to the ad.
      */
-    function __getAdOwned(uint256 adId, address maker) internal view returns (Ad storage ad) {
+    function __getAdOwned(string memory adId, address maker) internal view returns (Ad storage ad) {
         ad = ads[adId];
         if (ad.maker == address(0)) revert AdManager__AdNotFound();
         if (ad.maker != maker) revert AdManager__NotMaker();
+    }
+
+    /**
+     * @notice Validates an advertisement order against provided parameters and returns the order hash
+     * @dev Internal function used to validate and hash order details
+     * @param ad The Ad struct containing advertisement details to be validated
+     * @param params The OrderParams struct containing order parameters to validate against
+     * @return orderHash The computed hash of the validated order
+     */
+    function validateOrder(Ad memory ad, OrderParams calldata params) internal view returns (bytes32 orderHash) {
+        if (!ad.open) revert AdManager__AdClosed();
+        if (params.amount == 0) revert AdManager__ZeroAmount();
+        if (params.bridger == address(0)) revert AdManager__BridgerZero();
+        if (params.orderRecipient == address(0)) revert AdManager__RecipientZero();
+
+        // Source chain must be supported and portal must match (if configured).
+        ChainInfo memory ci = chains[params.orderChainId];
+        if (!ci.supported) revert AdManager__ChainNotSupported(params.orderChainId);
+        if (ci.orderPortal != address(0) && ci.orderPortal != params.srcOrderPortal) {
+            revert AdManager__OrderPortalMismatch(ci.orderPortal, params.srcOrderPortal);
+        }
+
+        // Ad must serve the provided source chain.
+        if (params.orderChainId != ad.orderChainId) {
+            revert AdManager__OrderChainMismatch(ad.orderChainId, params.orderChainId);
+        }
+
+        // Token route: adChainToken (this chain) + orderChainId -> orderChainToken (source).
+        address routed = tokenRoute[params.adChainToken][params.orderChainId];
+        if (routed == address(0)) revert AdManager__MissingRoute(params.orderChainToken, block.chainid);
+        if (routed != params.orderChainToken) revert AdManager__OrderTokenMismatch(routed, params.orderChainToken);
+
+        // Identity and token checks.
+        if (params.adCreator != ad.maker) revert AdManager__NotMaker();
+        if (params.adChainToken != ad.token) revert AdManager__AdTokenMismatch(ad.token, params.adChainToken);
+        if (params.adRecipient != ad.adRecipient) {
+            revert AdManager__AdRecipientMismatch(ad.adRecipient, params.adRecipient);
+        }
+
+        orderHash = _hashOrder(params, getChainID(), address(this));
     }
 }

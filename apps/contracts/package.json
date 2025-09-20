@@ -11,6 +11,15 @@
   "license": "ISC",
   "packageManager": "pnpm@10.10.0",
   "dependencies": {
-    "ethers": "^6.15.0"
+    "@accumulators/core": "^4.2.3",
+    "@accumulators/hashers": "^4.2.3",
+    "@accumulators/memory": "^4.2.3",
+    "@accumulators/merkle-mountain-range": "^4.2.3",
+    "@noble/curves": "^2.0.0",
+    "@zkpassport/poseidon2": "^0.6.2",
+    "ethereum-cryptography": "^3.2.0",
+    "ethers": "^6.15.0",
+    "hex": "^0.1.0",
+    "mcl-wasm": "^2.0.0"
   }
 }

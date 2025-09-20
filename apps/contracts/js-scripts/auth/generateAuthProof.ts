@@ -3,11 +3,11 @@ import { ethers, SigningKey } from "ethers";
 import { Noir } from "@noir-lang/noir_js";
 import path from "path";
 import fs from "fs";
-import { hexToArr } from "./utils";
+import { hexToArr } from "../utils";
 
 const circuitPath = path.resolve(
   __dirname,
-  "../../proof_circuit/target/proof_circuit.json"
+  "../../proof_circuits/auth/target/auth_circuit.json"
 );
 
 const circuit = JSON.parse(fs.readFileSync(circuitPath, "utf8"));

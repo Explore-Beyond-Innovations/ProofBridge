@@ -1,4 +1,4 @@
-# Proof Circuit
+# Auth Proof Circuit
 
 This is a Noir proof circuit that proves a user is authorized to execute a trade intent **without revealing the signature itself**. The verifier only needs the **hash** of that secret signature.
 

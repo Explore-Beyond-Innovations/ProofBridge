@@ -14,7 +14,14 @@ import {
   ParseUUIDPipe,
 } from '@nestjs/common';
 import { AdsService } from './ad.service';
-import { CreateAdDto, QueryAdsDto, UpdateAdDto } from '../ads/dto/ad.dto';
+import {
+  CreateAdDto,
+  FundAdDto,
+  QueryAdsDto,
+  UpdateAdDto,
+  WithdrawalAdDto,
+  ConfirmChainActionDto,
+} from '../ads/dto/ad.dto';
 import type { Request } from 'express';
 import { UserJwtGuard } from '../../common/guards/user-jwt.guard';
 
@@ -37,6 +44,39 @@ export class AdsController {
   @HttpCode(HttpStatus.CREATED)
   create(@Req() req: Request, @Body() dto: CreateAdDto) {
     return this.ads.create(req, dto);
+  }
+
+  @Post(':id/fund')
+  @UseGuards(UserJwtGuard)
+  @HttpCode(HttpStatus.OK)
+  fund(
+    @Req() req: Request,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: FundAdDto,
+  ) {
+    return this.ads.fund(req, id, dto);
+  }
+
+  @Post(':id/withdraw')
+  @UseGuards(UserJwtGuard)
+  @HttpCode(HttpStatus.OK)
+  withdraw(
+    @Req() req: Request,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: WithdrawalAdDto,
+  ) {
+    return this.ads.withdraw(req, id, dto);
+  }
+
+  @Post(':id/confirm')
+  @UseGuards(UserJwtGuard)
+  @HttpCode(HttpStatus.OK)
+  confirmUpdate(
+    @Req() req: Request,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: ConfirmChainActionDto,
+  ) {
+    return this.ads.confirmChainAction(req, id, dto);
   }
 
   @Patch(':id')

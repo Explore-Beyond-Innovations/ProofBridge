@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { TradesService } from './trade.service';
 import {
+  ConfirmChainActionDto,
   ConfirmTradeDto,
   CreateTradeDto,
   QueryTradesDto,
@@ -36,14 +37,11 @@ export class TradesController {
     return this.trades.getById(id);
   }
 
-  @Post(':id/authorize')
+  @Post(':id/lock')
   @UseGuards(UserJwtGuard)
   @HttpCode(HttpStatus.OK)
-  authorizeLock(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Req() req: Request,
-  ) {
-    return this.trades.authorizeLock(req, id);
+  lock(@Param('id', new ParseUUIDPipe()) id: string, @Req() req: Request) {
+    return this.trades.lockTrade(req, id);
   }
 
   @Post()
@@ -53,7 +51,7 @@ export class TradesController {
     return this.trades.create(req, dto);
   }
 
-  @Post(':id/confirm')
+  @Post(':id/authorize')
   @UseGuards(UserJwtGuard)
   @HttpCode(HttpStatus.OK)
   confirm(
@@ -61,6 +59,17 @@ export class TradesController {
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: ConfirmTradeDto,
   ) {
-    return this.trades.confirm(req, id, dto);
+    return this.trades.authorize(req, id, dto);
+  }
+
+  @Post(':id/confirm')
+  @UseGuards(UserJwtGuard)
+  @HttpCode(HttpStatus.OK)
+  confirmChainAction(
+    @Req() req: Request,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: ConfirmChainActionDto,
+  ) {
+    return this.trades.confirmChainAction(req, id, dto);
   }
 }

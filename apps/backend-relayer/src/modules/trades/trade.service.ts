@@ -1,12 +1,15 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '@prisma/prisma.service';
 import {
+  ConfirmChainActionDto,
   ConfirmTradeDto,
   CreateTradeDto,
   QueryTradesDto,
@@ -25,208 +28,6 @@ function sameSymbol(a: string, b: string) {
 @Injectable()
 export class TradesService {
   constructor(private readonly prisma: PrismaService) {}
-
-  // creates a new trade along with ad lock
-  async create(req: Request, dto: CreateTradeDto) {
-    const reqUser = req.user;
-    const idemKey = req.headers['idempotency-key'] as string | undefined;
-
-    if (!reqUser) throw new UnauthorizedException('Not authenticated');
-
-    if (!idemKey) throw new BadRequestException('Missing Idempotency-Key');
-
-    const user = await this.prisma.user.findUnique({
-      where: { id: reqUser.sub },
-    });
-
-    if (!user) throw new UnauthorizedException('Unauthorized');
-
-    if (!isAddress(dto.adCreatorAddress) || !isAddress(dto.bridgerAddress)) {
-      throw new BadRequestException('Invalid address');
-    }
-
-    if (isAddress(user.walletAddress) !== isAddress(dto.bridgerAddress)) {
-      throw new UnauthorizedException(
-        'Authenticated user does not match bridgerAddress',
-      );
-    }
-
-    const route = await this.prisma.route.findUnique({
-      where: { id: dto.routeId },
-      select: {
-        id: true,
-        fromToken: {
-          select: {
-            id: true,
-            symbol: true,
-            address: true,
-            decimals: true,
-            chain: { select: { id: true, chainId: true, name: true } },
-          },
-        },
-        toToken: {
-          select: {
-            id: true,
-            symbol: true,
-            address: true,
-            decimals: true,
-            chain: { select: { id: true, chainId: true, name: true } },
-          },
-        },
-      },
-    });
-    if (!route) throw new NotFoundException('Route not found');
-
-    const from = route.fromToken;
-    const to = route.toToken;
-
-    if (!sameSymbol(from.symbol, to.symbol)) {
-      throw new BadRequestException('Route must be same-symbol on both sides');
-    }
-    if (from.chain.chainId === to.chain.chainId) {
-      throw new BadRequestException('Route must be cross-chain');
-    }
-
-    // Ad must exist and belong to adCreatorAddress and same route
-    const ad = await this.prisma.ad
-      .findUnique({
-        where: { id: dto.adId },
-        select: {
-          id: true,
-          creatorAddress: true,
-          routeId: true,
-          poolAmount: true,
-          minAmount: true,
-          maxAmount: true,
-          status: true,
-        },
-      })
-      .catch(() => null);
-
-    if (!ad || ad.routeId !== route.id) {
-      throw new NotFoundException('Ad not found for route');
-    }
-    if (getAddress(ad.creatorAddress) !== getAddress(dto.adCreatorAddress)) {
-      throw new BadRequestException('adCreatorAddress mismatch');
-    }
-
-    const amount = toBI(dto.amount);
-    if (ad.minAmount && amount < ad.minAmount) {
-      throw new BadRequestException('Amount below minAmount');
-    }
-    if (ad.maxAmount && amount > ad.maxAmount) {
-      throw new BadRequestException('Amount above maxAmount');
-    }
-
-    // available = pool - sum(locks not released)
-    const lockSum = await this.prisma.adLock.aggregate({
-      where: { adId: ad.id, releasedAt: null },
-      _sum: { amount: true },
-    });
-    const locked = lockSum._sum.amount ?? 0n;
-    const available = ad.poolAmount - locked;
-    if (amount > available)
-      throw new BadRequestException('Insufficient liquidity');
-
-    // return same trade if payload matches, else 409
-    const existing = await this.prisma.trade.findUnique({
-      where: { idempotencyKey: idemKey },
-      select: {
-        id: true,
-        routeId: true,
-        adId: true,
-        amount: true,
-        bridgerAddress: true,
-        adCreatorAddress: true,
-      },
-    });
-    if (existing) {
-      const same =
-        existing.routeId === route.id &&
-        existing.adId === ad.id &&
-        existing.amount.toString() === amount.toString() &&
-        getAddress(existing.bridgerAddress) ===
-          getAddress(dto.bridgerAddress) &&
-        getAddress(existing.adCreatorAddress) ===
-          getAddress(dto.adCreatorAddress);
-
-      if (!same)
-        throw new ConflictException(
-          'Idempotency-Key reused with different payload',
-        );
-
-      const full = await this.getById(existing.id);
-
-      return { trade: full, idempotentHit: true as const };
-    }
-
-    // Persist in a single transaction: then AdLock
-    const result = await this.prisma.$transaction(async (tx) => {
-      const trade = await tx.trade.create({
-        data: {
-          idempotencyKey: idemKey,
-          routeId: route.id,
-          adId: ad.id,
-          amount: amount.toString(),
-          adCreatorAddress: getAddress(dto.adCreatorAddress),
-          bridgerAddress: getAddress(dto.bridgerAddress),
-          status: 'CREATED',
-        },
-        select: { id: true },
-      });
-
-      await tx.adLock.create({
-        data: { adId: ad.id, tradeId: trade.id, amount: amount },
-      });
-
-      return trade.id;
-    });
-
-    return { trade: await this.getById(result), idempotentHit: false as const };
-  }
-
-  async authorizeLock(req: Request, tradeId: string) {
-    const reqUser = req.user;
-    if (!reqUser) throw new UnauthorizedException('Not authenticated');
-
-    const user = await this.prisma.user.findUnique({
-      where: { id: reqUser.sub },
-    });
-
-    if (!user) throw new UnauthorizedException('Unauthorized');
-
-    const trade = await this.prisma.trade.findUnique({
-      where: { id: tradeId, adCreatorAddress: getAddress(user.walletAddress) },
-      select: { id: true, adId: true, amount: true, adLock: true },
-    });
-    if (!trade) throw new NotFoundException('Trade not found');
-
-    if (trade.adLock && trade.adLock.authorized) {
-      return { authorized: true };
-    }
-
-    if (trade.adLock && trade.adLock.amount !== toBI(trade.amount.toString())) {
-      throw new BadRequestException('AdLock amount mismatch');
-    }
-
-    // mark lock as authorized
-    const updated = await this.prisma.$transaction(async (tx) => {
-      if (!trade.adLock) throw new NotFoundException('AdLock not found');
-
-      await tx.trade.update({
-        where: { id: trade.id },
-        data: { status: 'LOCKED' },
-      });
-
-      return await tx.adLock.update({
-        where: { id: trade.adLock.id },
-        data: { authorized: true },
-        select: { authorized: true },
-      });
-    });
-
-    return { authorized: updated.authorized };
-  }
 
   async getById(id: string) {
     const row = await this.prisma.trade.findUnique({
@@ -348,7 +149,389 @@ export class TradesService {
     return { data: rows, nextCursor };
   }
 
-  async confirm(req: Request, id: string, dto: ConfirmTradeDto) {
+  // creates a new trade along with ad lock
+  async create(req: Request, dto: CreateTradeDto) {
+    const reqUser = req.user;
+    const idemKey = req.headers['idempotency-key'] as string | undefined;
+
+    if (!reqUser) throw new UnauthorizedException('Not authenticated');
+
+    if (!idemKey) throw new BadRequestException('Missing Idempotency-Key');
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: reqUser.sub },
+    });
+
+    if (!user) throw new UnauthorizedException('Unauthorized');
+
+    if (!isAddress(dto.bridgerDstAddress)) {
+      throw new BadRequestException('Invalid address');
+    }
+
+    const route = await this.prisma.route.findUnique({
+      where: { id: dto.routeId },
+      select: {
+        id: true,
+        fromToken: {
+          select: {
+            id: true,
+            symbol: true,
+            address: true,
+            decimals: true,
+            chain: {
+              select: {
+                id: true,
+                chainId: true,
+                name: true,
+                adManagerAddress: true,
+              },
+            },
+          },
+        },
+        toToken: {
+          select: {
+            id: true,
+            symbol: true,
+            address: true,
+            decimals: true,
+            chain: {
+              select: {
+                id: true,
+                chainId: true,
+                name: true,
+                orderPortalAddress: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!route) throw new NotFoundException('Route not found');
+
+    const from = route.fromToken;
+    const to = route.toToken;
+
+    if (!sameSymbol(from.symbol, to.symbol)) {
+      throw new BadRequestException('Route must be same-symbol on both sides');
+    }
+
+    if (from.chain.chainId === to.chain.chainId) {
+      throw new BadRequestException('Route must be cross-chain');
+    }
+
+    // Ad must exist and belong to adCreatorAddress and same route
+    const ad = await this.prisma.ad
+      .findUnique({
+        where: { id: dto.adId },
+        select: {
+          id: true,
+          creatorAddress: true,
+          creatorDstAddress: true,
+          routeId: true,
+          poolAmount: true,
+          minAmount: true,
+          maxAmount: true,
+          status: true,
+          adUpdateLog: true,
+        },
+      })
+      .catch(() => null);
+
+    if (!ad || ad.routeId !== route.id) {
+      throw new NotFoundException('Ad not found for route');
+    }
+
+    if (ad.adUpdateLog) {
+      throw new BadRequestException(
+        'Ad has a pending update, please try again later',
+      );
+    }
+
+    if (ad.status !== 'ACTIVE') {
+      throw new BadRequestException(
+        `Ad not ACTIVE, current status: ${ad.status}`,
+      );
+    }
+
+    const amount = toBI(dto.amount);
+    if (ad.minAmount && amount < ad.minAmount) {
+      throw new BadRequestException('Amount below minAmount');
+    }
+    if (ad.maxAmount && amount > ad.maxAmount) {
+      throw new BadRequestException('Amount above maxAmount');
+    }
+
+    // available = pool - sum(locks not released)
+    const lockSum = await this.prisma.adLock.aggregate({
+      where: { adId: ad.id, releasedAt: null },
+      _sum: { amount: true },
+    });
+    const locked = lockSum._sum.amount ?? 0n;
+    const available = ad.poolAmount - locked;
+    if (amount > available)
+      throw new BadRequestException('Insufficient liquidity');
+
+    // return same trade if payload matches, else 409
+    const existing = await this.prisma.trade.findUnique({
+      where: { idempotencyKey: idemKey },
+      select: {
+        id: true,
+        routeId: true,
+        adId: true,
+        amount: true,
+        bridgerAddress: true,
+        bridgerDstAddress: true,
+        adCreatorAddress: true,
+      },
+    });
+
+    if (existing) {
+      const same =
+        existing.routeId === route.id &&
+        existing.adId === ad.id &&
+        existing.amount.toString() === amount.toString() &&
+        getAddress(existing.bridgerDstAddress) ===
+          getAddress(dto.bridgerDstAddress);
+
+      if (!same)
+        throw new ConflictException(
+          'Idempotency-Key reused with different payload',
+        );
+
+      const full = await this.getById(existing.id);
+
+      return { trade: full, idempotentHit: true as const };
+    }
+
+    // Persist in a single transaction: then AdLock
+    const result = await this.prisma.$transaction(async (tx) => {
+      const trade = await tx.trade.create({
+        data: {
+          idempotencyKey: idemKey,
+          routeId: route.id,
+          adId: ad.id,
+          amount: amount.toString(),
+          adCreatorAddress: getAddress(ad.creatorAddress),
+          adCreatorDstAddress: getAddress(ad.creatorDstAddress),
+          bridgerAddress: getAddress(user.walletAddress),
+          bridgerDstAddress: getAddress(dto.bridgerDstAddress),
+          status: 'INACTIVE',
+        },
+        select: { id: true, status: true },
+      });
+
+      await tx.adLock.create({
+        data: { adId: ad.id, tradeId: trade.id, amount: amount },
+      });
+
+      // create trade update log to make status active
+      const logEntry = await tx.tradeUpdateLog.create({
+        data: {
+          tradeId: trade.id,
+          signature: '0x',
+          log: {
+            create: [
+              {
+                field: 'Status',
+                oldValue: trade.status,
+                newValue: 'ACTIVE',
+              },
+            ],
+          },
+        },
+      });
+      return { tradeId: trade.id, logId: logEntry.id };
+    });
+
+    return {
+      tradeId: result.tradeId,
+      logId: result.logId,
+      contractAddress: getAddress(to.chain.orderPortalAddress),
+      chainId: to.chain.chainId,
+      orderChainToken: to.address,
+      orderChainId: to.chain.chainId,
+      amount: amount.toString(),
+      bridger: getAddress(user.walletAddress),
+      orderRecipient: getAddress(dto.bridgerDstAddress),
+      adChainId: from.chain.chainId,
+      adManager: getAddress(from.chain.adManagerAddress),
+      adId: ad.id,
+      adCreator: getAddress(ad.creatorAddress),
+      adRecipient: getAddress(ad.creatorDstAddress),
+      salt: idemKey,
+    };
+  }
+
+  async lockTrade(req: Request, tradeId: string) {
+    const reqUser = req.user;
+    if (!reqUser) throw new UnauthorizedException('Not authenticated');
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: reqUser.sub },
+    });
+
+    if (!user) throw new UnauthorizedException('Unauthorized');
+
+    const trade = await this.prisma.trade.findUnique({
+      where: { id: tradeId, adCreatorAddress: getAddress(user.walletAddress) },
+      select: {
+        id: true,
+        adId: true,
+        amount: true,
+        adLock: true,
+        status: true,
+        tradeUpdateLog: true,
+        bridgerAddress: true,
+        bridgerDstAddress: true,
+        adCreatorDstAddress: true,
+        adCreatorAddress: true,
+        idempotencyKey: true,
+        route: {
+          select: {
+            fromToken: {
+              select: {
+                address: true,
+                chain: {
+                  select: {
+                    chainId: true,
+                    adManagerAddress: true,
+                  },
+                },
+              },
+            },
+            toToken: {
+              select: {
+                address: true,
+                chain: {
+                  select: {
+                    chainId: true,
+                    orderPortalAddress: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!trade) throw new NotFoundException('Trade not found');
+
+    if (trade.tradeUpdateLog) {
+      throw new BadRequestException(
+        'Trade already has a pending update, please try again later',
+      );
+    }
+
+    if (trade.status !== 'ACTIVE') {
+      throw new BadRequestException(
+        `Trade not ACTIVE, current status: ${trade.status}`,
+      );
+    }
+
+    if (trade.adLock && trade.adLock.authorized) {
+      return { authorized: true };
+    }
+
+    if (trade.adLock && trade.adLock.amount !== toBI(trade.amount.toString())) {
+      throw new BadRequestException('AdLock amount mismatch');
+    }
+
+    // create trade update log to make status locked
+    const logEntry = await this.prisma.tradeUpdateLog.create({
+      data: {
+        tradeId: trade.id,
+        signature: '0x',
+        log: {
+          create: [
+            {
+              field: 'Status',
+              oldValue: trade.status,
+              newValue: 'LOCKED',
+            },
+            {
+              field: 'AdLock',
+              oldValue: 'false',
+              newValue: 'true',
+            },
+          ],
+        },
+      },
+    });
+
+    return {
+      logId: logEntry.id,
+      contractAddress: getAddress(trade.route.fromToken.chain.adManagerAddress),
+      chainId: trade.route.fromToken.chain.chainId,
+      orderChainToken: trade.route.toToken.address,
+      adChainToken: trade.route.fromToken.address,
+      amount: trade.amount.toString(),
+      bridger: trade.bridgerAddress,
+      orderChainId: trade.route.toToken.chain.chainId,
+      srcOrderPortal: getAddress(trade.route.toToken.chain.orderPortalAddress),
+      orderRecipient: trade.bridgerDstAddress,
+      adId: trade.adId,
+      adCreator: trade.adCreatorAddress,
+      adRecipient: trade.adCreatorDstAddress,
+      salt: trade.idempotencyKey,
+    };
+  }
+
+  async confirmChainAction(
+    req: Request,
+    tradeId: string,
+    dto: ConfirmChainActionDto,
+  ) {
+    const reqUser = req.user;
+
+    if (!reqUser) throw new ForbiddenException('Unauthorized');
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: reqUser.sub },
+    });
+
+    if (!user) throw new ForbiddenException('Unauthorized');
+
+    const tradeLogUpdate = await this.prisma.tradeUpdateLog.findUnique({
+      where: { id: dto.logId, tradeId, signature: dto.signature },
+      include: { trade: true, log: true },
+    });
+
+    if (!tradeLogUpdate) throw new NotFoundException('Ad update log not found');
+
+    if (
+      tradeLogUpdate.trade.bridgerAddress !== user.walletAddress &&
+      tradeLogUpdate.trade.adCreatorAddress !== user.walletAddress
+    ) {
+      throw new ForbiddenException('Unauthorized');
+    }
+
+    // apply the updates
+    const data: any = {};
+
+    tradeLogUpdate.log.forEach((entry) => {
+      if (entry.field === 'Status') {
+        data.status = entry.newValue;
+      } else if (entry.field === 'AdLock') {
+        data.adLock = { authorized: entry.newValue === 'true' };
+      }
+    });
+
+    await this.prisma.trade.update({
+      where: { id: tradeLogUpdate.tradeId },
+      data,
+    });
+
+    // delete the log entry
+    await this.prisma.tradeUpdateLog.delete({
+      where: { id: tradeLogUpdate.id },
+    });
+
+    return {
+      success: true,
+    };
+  }
+
+  async authorize(req: Request, id: string, dto: ConfirmTradeDto) {
     const reqUser = req.user;
     if (!reqUser) throw new UnauthorizedException('Not authenticated');
 

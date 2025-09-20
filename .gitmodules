@@ -10,3 +10,6 @@
 [submodule "apps/contracts/lib/solady"]
 	path = apps/contracts/lib/solady
 	url = https://github.com/vectorized/solady
+[submodule "apps/contracts/lib/solidity-mmr"]
+	path = apps/contracts/lib/solidity-mmr
+	url = https://github.com/Explore-Beyond-Innovations/solidity-mmr

@@ -112,10 +112,11 @@ model Route {
 }
 
 model Ad {
-  id             String @id @default(uuid())
-  creatorAddress String
-  routeId        String
-  route          Route  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  id                String @id @default(uuid())
+  creatorAddress    String
+  creatorDstAddress String
+  routeId           String
+  route             Route  @relation(fields: [routeId], references: [id], onDelete: Cascade)
 
   fromTokenId String
   toTokenId   String
@@ -123,23 +124,34 @@ model Ad {
   toToken     Token  @relation("AdToToken", fields: [toTokenId], references: [id])
 
   // liquidity
-  poolAmount BigInt
-  minAmount  BigInt?
-  maxAmount  BigInt?
+  poolAmount BigInt  @default(0)
+  minAmount  BigInt? @default(0)
+  maxAmount  BigInt? @default(0)
 
   status   AdStatus @default(ACTIVE)
   metadata Json?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  Trade     Trade[]
-  AdLock    AdLock[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  Trade       Trade[]
+  AdLock      AdLock[]
+  adUpdateLog AdUpdateLog?
 
   @@index([creatorAddress, status])
   @@index([routeId, status])
 }
 
+model AdUpdateLog {
+  id        String      @id @default(uuid())
+  adId      String      @unique
+  signature String      @unique
+  ad        Ad          @relation(fields: [adId], references: [id], onDelete: Cascade)
+  log       UpdateLog[]
+  createdAt DateTime    @default(now())
+}
+
 enum AdStatus {
+  INACTIVE
   ACTIVE
   PAUSED
   EXHAUSTED
@@ -159,7 +171,8 @@ model AdLock {
 }
 
 enum TradeStatus {
-  CREATED
+  INACTIVE
+  ACTIVE
   LOCKED
   AUTH_BOTH
   PROVING
@@ -179,8 +192,10 @@ model Trade {
   idempotencyKey String @unique
 
   // Participants
-  adCreatorAddress String
-  bridgerAddress   String
+  adCreatorAddress    String
+  bridgerAddress      String
+  bridgerDstAddress   String
+  adCreatorDstAddress String
 
   // Amount in smallest unit (e.g., wei for ETH)
   amount Decimal @db.Decimal(78, 0)
@@ -188,17 +203,40 @@ model Trade {
   // Encoded signatures map (address -> sig)
   participantSignatures Json?
 
-  status TradeStatus @default(CREATED)
+  status TradeStatus @default(INACTIVE)
 
   signaturesCount Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  adLock AdLock?
+  adLock         AdLock?
+  tradeUpdateLog TradeUpdateLog?
 
   @@index([adId])
   @@index([routeId])
   @@index([adCreatorAddress])
   @@index([bridgerAddress])
+}
+
+model TradeUpdateLog {
+  id        String      @id @default(uuid())
+  tradeId   String      @unique
+  signature String      @unique
+  trade     Trade       @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  log       UpdateLog[]
+  createdAt DateTime    @default(now())
+}
+
+model UpdateLog {
+  id       String  @id @default(uuid())
+  ctx      String?
+  field    String
+  oldValue String
+  newValue String
+
+  AdUpdateLog      AdUpdateLog?    @relation(fields: [adUpdateLogId], references: [id])
+  adUpdateLogId    String?
+  TradeUpdateLog   TradeUpdateLog? @relation(fields: [tradeUpdateLogId], references: [id])
+  tradeUpdateLogId String?
 }

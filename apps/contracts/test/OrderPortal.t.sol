@@ -4,24 +4,31 @@ pragma solidity ^0.8.24;
 import {Test, console} from "forge-std/Test.sol";
 import {OrderPortal} from "src/OrderPortal.sol";
 import {MockVerifier} from "src/mocks/MockVerifier.sol";
+import {MerkleManager} from "src/MerkleManager.sol";
 import {IVerifier} from "src/Verifier.sol";
+import {IMerkleManager} from "src/MerkleManager.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 // Expose internal hash for assertions
 contract MockOrderPortal is OrderPortal {
-    constructor(address admin, IVerifier v) OrderPortal(admin, v) {}
+    constructor(address admin, IVerifier v, IMerkleManager m) OrderPortal(admin, v, m) {}
 
     function hashOrderPublic(OrderParams calldata p) external view returns (bytes32) {
-        return _hashOrder(p, block.chainid, address(this));
+        return _hashOrder(p, getChainID(), address(this));
     }
 }
 
 contract OrderPortalTest is Test {
     MockOrderPortal internal portal;
     MockVerifier internal verifier;
+    MerkleManager internal merkleManager;
     ERC20Mock internal orderToken;
 
-    address admin = makeAddr("admin");
+    address admin;
+    uint256 adminPk;
+
     address nonAdmin = makeAddr("nonAdmin");
     address maker = makeAddr("maker");
     address nonMaker = makeAddr("nonMaker");
@@ -42,9 +49,20 @@ contract OrderPortalTest is Test {
     uint256 internal minted = 1_000 ether;
     uint256 internal fundAmt = 300 ether;
 
+    // auth variables
+    bytes signature;
+    bytes32 authToken;
+    uint256 timeToLive;
+
     function setUp() public {
+        (admin, adminPk) = makeAddrAndKey("admin");
         verifier = new MockVerifier(true);
-        portal = new MockOrderPortal(admin, IVerifier(address(verifier)));
+        merkleManager = new MerkleManager(admin);
+        portal = new MockOrderPortal(admin, IVerifier(address(verifier)), IMerkleManager(address(merkleManager)));
+
+        vm.startPrank(admin);
+        merkleManager.grantRole(merkleManager.MANAGER_ROLE(), address(portal));
+        vm.stopPrank();
 
         orderToken = new ERC20Mock();
         orderToken.mint(bridger, minted);
@@ -61,10 +79,39 @@ contract OrderPortalTest is Test {
         p.orderRecipient = orderRecipient;
         p.adChainId = adChainId;
         p.adManager = adManager;
-        p.adId = 777;
+        p.adId = "777";
         p.adCreator = address(0xACAC);
         p.adRecipient = adRecipient;
         p.salt = 12345;
+    }
+
+    function generateCreateOrderRequestParams(string memory adId, bytes32 orderHash)
+        internal
+        view
+        returns (bytes32 token, uint256 ttl, bytes memory sig)
+    {
+        token = bytes32(vm.randomBytes(32));
+        ttl = block.timestamp + 1 hours;
+        bytes32 message = portal.createOrderRequestHash(adId, orderHash, token, ttl);
+        sig = sign(message, adminPk);
+    }
+
+    function generateUnlockOrderRequestHash(string memory adId, bytes32 orderHash, bytes32 targetRoot)
+        internal
+        view
+        returns (bytes32 token, uint256 ttl, bytes memory sig)
+    {
+        token = bytes32(vm.randomBytes(32));
+        ttl = block.timestamp + 1 hours;
+
+        bytes32 message = portal.unlockOrderRequestHash(adId, orderHash, targetRoot, token, ttl);
+        sig = sign(message, adminPk);
+    }
+
+    function sign(bytes32 message, uint256 pk) public pure returns (bytes memory sig) {
+        bytes32 hash = MessageHashUtils.toEthSignedMessageHash(message);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, hash);
+        sig = abi.encodePacked(r, s, v);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -196,9 +243,12 @@ contract OrderPortalTest is Test {
         OrderPortal.OrderParams memory p = _defaultParams();
         p.amount = 0;
 
+        bytes32 orderHash = portal.hashOrderPublic(p);
+        (authToken, timeToLive, signature) = generateCreateOrderRequestParams(p.adId, orderHash);
+
         vm.prank(bridger);
         vm.expectRevert(OrderPortal.OrderPortal__ZeroAmount.selector);
-        portal.createOrder(p);
+        portal.createOrder(signature, authToken, timeToLive, p);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -209,9 +259,12 @@ contract OrderPortalTest is Test {
         OrderPortal.OrderParams memory p = _defaultParams();
         p.adChainId = 9_999_999; // not configured
 
+        bytes32 orderHash = portal.hashOrderPublic(p);
+        (authToken, timeToLive, signature) = generateCreateOrderRequestParams(p.adId, orderHash);
+
         vm.prank(bridger);
         vm.expectRevert(abi.encodeWithSelector(OrderPortal.OrderPortal__AdChainNotSupported.selector, p.adChainId));
-        portal.createOrder(p);
+        portal.createOrder(signature, authToken, timeToLive, p);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -223,9 +276,12 @@ contract OrderPortalTest is Test {
         address otherAdMgr = makeAddr("otherAdMgr");
         p.adManager = otherAdMgr; // differs from configured dstAdMgr
 
+        bytes32 orderHash = portal.hashOrderPublic(p);
+        (authToken, timeToLive, signature) = generateCreateOrderRequestParams(p.adId, orderHash);
+
         vm.prank(bridger);
         vm.expectRevert(abi.encodeWithSelector(OrderPortal.OrderPortal__AdManagerMismatch.selector, adManager));
-        portal.createOrder(p);
+        portal.createOrder(signature, authToken, timeToLive, p);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -237,9 +293,12 @@ contract OrderPortalTest is Test {
         OrderPortal.OrderParams memory p = _defaultParams();
         p.orderChainToken = other;
 
+        bytes32 orderHash = portal.hashOrderPublic(p);
+        (authToken, timeToLive, signature) = generateCreateOrderRequestParams(p.adId, orderHash);
+
         vm.prank(bridger);
         vm.expectRevert(OrderPortal.OrderPortal__MissingRoute.selector);
-        portal.createOrder(p);
+        portal.createOrder(signature, authToken, timeToLive, p);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -253,9 +312,12 @@ contract OrderPortalTest is Test {
 
         OrderPortal.OrderParams memory p = _defaultParams();
 
+        bytes32 orderHash = portal.hashOrderPublic(p);
+        (authToken, timeToLive, signature) = generateCreateOrderRequestParams(p.adId, orderHash);
+
         vm.prank(bridger);
         vm.expectRevert(OrderPortal.OrderPortal__AdTokenMismatch.selector);
-        portal.createOrder(p);
+        portal.createOrder(signature, authToken, timeToLive, p);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -289,7 +351,8 @@ contract OrderPortalTest is Test {
             p.adRecipient
         );
 
-        bytes32 orderHash = portal.createOrder(p);
+        (authToken, timeToLive, signature) = generateCreateOrderRequestParams(p.adId, expectedHash);
+        bytes32 orderHash = portal.createOrder(signature, authToken, timeToLive, p);
         vm.stopPrank();
 
         // Hash returned matches expected
@@ -317,10 +380,13 @@ contract OrderPortalTest is Test {
         vm.startPrank(bridger);
         orderToken.approve(address(portal), p.amount * 2);
 
-        bytes32 h1 = portal.createOrder(p);
+        bytes32 orderHash = portal.hashOrderPublic(p);
+        (authToken, timeToLive, signature) = generateCreateOrderRequestParams(p.adId, orderHash);
+
+        bytes32 h1 = portal.createOrder(signature, authToken, timeToLive, p);
 
         vm.expectRevert(abi.encodeWithSelector(OrderPortal.OrderPortal__OrderExists.selector, h1));
-        portal.createOrder(p);
+        portal.createOrder(signature, authToken, timeToLive, p);
         vm.stopPrank();
     }
 
@@ -333,9 +399,12 @@ contract OrderPortalTest is Test {
         p.amount = _amount;
         p.salt = _salt;
 
+        bytes32 exHash = portal.hashOrderPublic(p);
+        (authToken, timeToLive, signature) = generateCreateOrderRequestParams(p.adId, exHash);
+
         vm.startPrank(bridger);
         orderToken.approve(address(portal), _amount);
-        orderHash = portal.createOrder(p);
+        orderHash = portal.createOrder(signature, authToken, timeToLive, p);
         vm.stopPrank();
     }
 
@@ -346,8 +415,13 @@ contract OrderPortalTest is Test {
         OrderPortal.OrderParams memory p = _defaultParams();
         bytes32 orderHash = portal.hashOrderPublic(p); // no order created
 
+        bytes32 t_root = bytes32(uint256(0));
+
+        // get auth
+        (authToken, timeToLive, signature) = generateUnlockOrderRequestHash(p.adId, orderHash, t_root);
+
         vm.expectRevert(abi.encodeWithSelector(OrderPortal.OrderPortal__OrderNotOpen.selector, orderHash));
-        portal.unlock(p, bytes32("N"), hex"");
+        portal.unlock(signature, authToken, timeToLive, p, bytes32("N"), t_root, hex"");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -357,6 +431,12 @@ contract OrderPortalTest is Test {
         test_setTokenRoute_setsAndEmits_whenSupported();
 
         (OrderPortal.OrderParams memory p,) = _openOrder(80 ether, 777);
+        bytes32 orderHash = portal.hashOrderPublic(p);
+
+        bytes32 t_root = bytes32(uint256(0));
+
+        // get auth
+        (authToken, timeToLive, signature) = generateUnlockOrderRequestHash(p.adId, orderHash, t_root);
 
         // First unlock OK
         vm.expectEmit(true, true, true, true);
@@ -365,11 +445,14 @@ contract OrderPortalTest is Test {
             p.adRecipient, // NOTE: contract emits dstRecipient in 2nd arg
             bytes32("N")
         );
-        portal.unlock(p, bytes32("N"), hex"AA");
+        portal.unlock(signature, authToken, timeToLive, p, bytes32("N"), t_root, hex"AA");
+
+        // get auth again
+        (authToken, timeToLive, signature) = generateUnlockOrderRequestHash(p.adId, orderHash, t_root);
 
         // Second unlock with same nullifier reverts
         vm.expectRevert(abi.encodeWithSelector(OrderPortal.OrderPortal__NullifierUsed.selector, bytes32("N")));
-        portal.unlock(p, bytes32("N"), hex"BB");
+        portal.unlock(signature, authToken, timeToLive, p, bytes32("N"), t_root, hex"BB");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -386,8 +469,12 @@ contract OrderPortalTest is Test {
         // Fail regardless of inputs
         verifier.setResult(false); // not strict, return false
 
+        bytes32 t_root = bytes32(uint256(0));
+
+        (authToken, timeToLive, signature) = generateUnlockOrderRequestHash(p.adId, orderHash, t_root);
+
         vm.expectRevert(OrderPortal.OrderPortal__InvalidProof.selector);
-        portal.unlock(p, bytes32("X"), hex"");
+        portal.unlock(signature, authToken, timeToLive, p, bytes32("X"), t_root, hex"");
 
         // Status & balances unchanged
         (OrderPortal.Status status) = portal.orders(orderHash);
@@ -411,10 +498,14 @@ contract OrderPortalTest is Test {
         bytes memory proof = hex"ABCD";
         bytes32 nullifier = bytes32("NOK");
 
+        bytes32 t_root = bytes32(uint256(0));
+
+        (authToken, timeToLive, signature) = generateUnlockOrderRequestHash(p.adId, orderHash, t_root);
+
         vm.expectEmit(true, true, true, true);
         emit OrderPortal.OrderUnlocked(orderHash, p.adRecipient, nullifier);
 
-        portal.unlock(p, nullifier, proof);
+        portal.unlock(signature, authToken, timeToLive, p, nullifier, t_root, proof);
 
         // Status moved to Filled
         (OrderPortal.Status status) = portal.orders(orderHash);
@@ -431,10 +522,15 @@ contract OrderPortalTest is Test {
     function test_unlock_cannotUnlockTwice_sameOrder() public {
         test_setTokenRoute_setsAndEmits_whenSupported();
         (OrderPortal.OrderParams memory p, bytes32 orderHash) = _openOrder(40 ether, 321);
+        bytes32 t_root = bytes32(uint256(0));
 
-        portal.unlock(p, bytes32("one"), hex"");
+        (authToken, timeToLive, signature) = generateUnlockOrderRequestHash(p.adId, orderHash, t_root);
+
+        portal.unlock(signature, authToken, timeToLive, p, bytes32("one"), t_root, hex"");
+
+        (authToken, timeToLive, signature) = generateUnlockOrderRequestHash(p.adId, orderHash, t_root);
 
         vm.expectRevert(abi.encodeWithSelector(OrderPortal.OrderPortal__OrderNotOpen.selector, orderHash));
-        portal.unlock(p, bytes32("two"), hex"");
+        portal.unlock(signature, authToken, timeToLive, p, bytes32("two"), t_root, hex"");
     }
 }

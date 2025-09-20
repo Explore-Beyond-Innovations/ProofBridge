@@ -6,11 +6,19 @@ import {AdManager} from "src/AdManager.sol";
 import {OrderPortal} from "src/OrderPortal.sol";
 import {HonkVerifier} from "src/Verifier.sol";
 import {IVerifier} from "src/Verifier.sol";
+import {MerkleManager, IMerkleManager} from "src/MerkleManager.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 contract MockAdManager is AdManager {
-    constructor(address admin, IVerifier v) AdManager(admin, v) {}
+    constructor(address admin, IVerifier v, IMerkleManager m) AdManager(admin, v, m) {}
+
+    string public lastId;
+
+    function setLastId(string memory id) public {
+        lastId = id;
+    }
 
     function hashOrderPublic(OrderParams calldata p) external view returns (bytes32) {
         return _hashOrder(p, block.chainid, address(this));
@@ -18,7 +26,7 @@ contract MockAdManager is AdManager {
 }
 
 contract MockOrderPortal is OrderPortal {
-    constructor(address admin, IVerifier v) OrderPortal(admin, v) {}
+    constructor(address admin, IVerifier v, IMerkleManager m) OrderPortal(admin, v, m) {}
 
     function hashOrderPublic(OrderParams calldata p) external view returns (bytes32) {
         return _hashOrder(p, block.chainid, address(this));
@@ -30,10 +38,14 @@ contract ProofBridge is Test {
     MockOrderPortal internal orderPortal;
     HonkVerifier internal adChainVerifier;
     HonkVerifier internal orderChainVerifier;
+    MerkleManager internal adChainMerkleManager;
+    MerkleManager internal orderChainMerkleManager;
     ERC20Mock internal orderToken;
     ERC20Mock internal adToken;
 
-    address admin = makeAddr("admin");
+    address admin;
+    uint256 adminPk;
+
     address nonAdmin = makeAddr("nonAdmin");
     address maker;
     uint256 makerPk;
@@ -55,6 +67,11 @@ contract ProofBridge is Test {
     uint256 internal fundAmt = 1_000 ether;
     uint256 internal orderAmt = 100 ether;
 
+    // auth variables
+    bytes signature;
+    bytes32 authToken;
+    uint256 timeToLive;
+
     struct Order {
         address orderToken;
         address adToken;
@@ -65,7 +82,7 @@ contract ProofBridge is Test {
         address orderRecipient;
         uint256 adChainId;
         address adManager;
-        uint256 adId;
+        string adId;
         address adCreator;
         address adRecipient;
         uint256 salt;
@@ -75,6 +92,7 @@ contract ProofBridge is Test {
         uint256 neutral = block.chainid;
 
         // setup addresses
+        (admin, adminPk) = makeAddrAndKey("admin");
         (maker, makerPk) = makeAddrAndKey("maker");
         (bridger, bridgerPk) = makeAddrAndKey("bridger");
 
@@ -82,14 +100,24 @@ contract ProofBridge is Test {
         // AdChain contracts
         vm.chainId(adChainId);
         adChainVerifier = new HonkVerifier();
-        adManager = new MockAdManager(admin, adChainVerifier);
+        adChainMerkleManager = new MerkleManager(admin);
+        adManager = new MockAdManager(admin, adChainVerifier, adChainMerkleManager);
         adToken = new ERC20Mock();
+        // assign manager role
+        vm.startPrank(admin);
+        adChainMerkleManager.grantRole(adChainMerkleManager.MANAGER_ROLE(), address(adManager));
+        vm.stopPrank();
 
         // Order chain Contracts
         vm.chainId(orderChainId);
         orderChainVerifier = new HonkVerifier();
-        orderPortal = new MockOrderPortal(admin, orderChainVerifier);
+        orderChainMerkleManager = new MerkleManager(admin);
+        orderPortal = new MockOrderPortal(admin, orderChainVerifier, orderChainMerkleManager);
         orderToken = new ERC20Mock();
+        // assign manager role
+        vm.startPrank(admin);
+        orderChainMerkleManager.grantRole(orderChainMerkleManager.MANAGER_ROLE(), address(orderPortal));
+        vm.stopPrank();
 
         // Set Ad Chain configs
         vm.chainId(adChainId);
@@ -105,12 +133,19 @@ contract ProofBridge is Test {
         // Setup Ads
         vm.startPrank(maker);
         // Create an ad
-        adManager.createAd(address(adToken), orderChainId, adRecipient);
-        // Get the latest adId
-        uint256 adId = _adId();
-        // Fund the ad with tokens
+        string memory adId = "1";
+        // Generate request params
+        (authToken, timeToLive, signature) = generateCreateAdRequestParams(adId);
+        // Create the ad
+        adManager.createAd(signature, authToken, timeToLive, adId, address(adToken), orderChainId, adRecipient);
+        // Set last id to the created ad
+        adManager.setLastId(adId);
+        // Approve the ad with tokens
         adToken.approve(address(adManager), fundAmt);
-        adManager.fundAd(adId, fundAmt);
+        // Generate request params
+        (authToken, timeToLive, signature) = generateFundAdRequestParams(adId, fundAmt);
+        // Fund the ad
+        adManager.fundAd(signature, authToken, timeToLive, adId, fundAmt);
         vm.stopPrank();
 
         // Set Order Chain configs
@@ -129,7 +164,7 @@ contract ProofBridge is Test {
     /*//////////////////////////////////////////////////////////////
            HELPERS
     //////////////////////////////////////////////////////////////*/
-    function _defaultAdChainParams(uint256 adId, uint256 amount, uint256 salt)
+    function _defaultAdChainParams(string memory adId, uint256 amount, uint256 salt)
         internal
         view
         returns (AdManager.OrderParams memory p)
@@ -147,7 +182,7 @@ contract ProofBridge is Test {
         p.salt = salt;
     }
 
-    function _defaultOrderChainParams(uint256 adId, uint256 amount, uint256 salt)
+    function _defaultOrderChainParams(string memory adId, uint256 amount, uint256 salt)
         internal
         view
         returns (OrderPortal.OrderParams memory p)
@@ -165,11 +200,75 @@ contract ProofBridge is Test {
         p.salt = salt;
     }
 
-    function _adId() internal returns (uint256 adId) {
+    function _adId() internal returns (string memory adId) {
         uint256 prevChain = block.chainid;
         vm.chainId(adChainId);
-        adId = adManager.nextAdId() - 1;
+        adId = adManager.lastId();
         vm.chainId(prevChain);
+    }
+
+    function ethSign(bytes32 message, uint256 pk) public pure returns (bytes memory sig) {
+        bytes32 hash = MessageHashUtils.toEthSignedMessageHash(message);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, hash);
+        sig = abi.encodePacked(r, s, v);
+    }
+
+    function generateCreateAdRequestParams(string memory adId)
+        internal
+        view
+        returns (bytes32 token, uint256 ttl, bytes memory sig)
+    {
+        token = bytes32(vm.randomBytes(32));
+        ttl = block.timestamp + 1 hours;
+        bytes32 message = adManager.createAdRequestHash(adId, address(adToken), orderChainId, adRecipient, token, ttl);
+
+        sig = ethSign(message, adminPk);
+    }
+
+    function generateFundAdRequestParams(string memory adId, uint256 amount)
+        internal
+        view
+        returns (bytes32 token, uint256 ttl, bytes memory sig)
+    {
+        token = bytes32(vm.randomBytes(32));
+        ttl = block.timestamp + 1 hours;
+        bytes32 message = adManager.fundAdRequestHash(adId, amount, token, ttl);
+        sig = ethSign(message, adminPk);
+    }
+
+    function generateLockForOrderRequestHash(string memory adId, bytes32 orderHash)
+        internal
+        view
+        returns (bytes32 token, uint256 ttl, bytes memory sig)
+    {
+        token = bytes32(vm.randomBytes(32));
+        ttl = block.timestamp + 1 hours;
+
+        bytes32 message = adManager.lockForOrderRequestHash(adId, orderHash, token, ttl);
+        sig = ethSign(message, adminPk);
+    }
+
+    function generateCreateOrderRequestParams(string memory adId, bytes32 orderHash)
+        internal
+        view
+        returns (bytes32 token, uint256 ttl, bytes memory sig)
+    {
+        token = bytes32(vm.randomBytes(32));
+        ttl = block.timestamp + 1 hours;
+        bytes32 message = orderPortal.createOrderRequestHash(adId, orderHash, token, ttl);
+        sig = ethSign(message, adminPk);
+    }
+
+    function generateUnlockOrderRequestHash(string memory adId, bytes32 orderHash, bytes32 targetRoot)
+        internal
+        view
+        returns (bytes32 token, uint256 ttl, bytes memory sig)
+    {
+        token = bytes32(vm.randomBytes(32));
+        ttl = block.timestamp + 1 hours;
+
+        bytes32 message = adManager.unlockOrderRequestHash(adId, orderHash, targetRoot, token, ttl);
+        sig = ethSign(message, adminPk);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -178,7 +277,7 @@ contract ProofBridge is Test {
     function test_orderHashMatchesOnBothChains() public {
         uint256 neutral = block.chainid;
 
-        uint256 adId = _adId();
+        string memory adId = _adId();
 
         // get order chain params
         OrderPortal.OrderParams memory orderChainParams = _defaultOrderChainParams(adId, 100 ether, 777);
@@ -206,7 +305,7 @@ contract ProofBridge is Test {
     function test_orderHashNotMatchesOnBothChainsIfParamsDifferent() public {
         uint256 neutral = block.chainid;
 
-        uint256 adId = _adId();
+        string memory adId = _adId();
 
         // get order chain params
         OrderPortal.OrderParams memory orderChainParams = _defaultOrderChainParams(adId, 90 ether, 777);
@@ -240,7 +339,7 @@ contract ProofBridge is Test {
         inputs[9] = vm.toString(order.orderRecipient);
         inputs[10] = vm.toString(order.adChainId);
         inputs[11] = vm.toString(order.adManager);
-        inputs[12] = vm.toString(order.adId);
+        inputs[12] = order.adId;
         inputs[13] = vm.toString(order.adCreator);
         inputs[14] = vm.toString(order.adRecipient);
         inputs[15] = vm.toString(order.salt);
@@ -250,54 +349,56 @@ contract ProofBridge is Test {
         typedHash = abi.decode(result, (bytes32));
     }
 
-    function getNullfierHash(bytes memory signature) public returns (bytes32 nullifierHash) {
+    function getNullfierHashes(bytes32 orderHash)
+        public
+        returns (bytes32 adCreatorNullifierHash, bytes32 bridgerNullifierHash, bytes32 secret)
+    {
         string[] memory inputs = new string[](4);
 
         inputs[0] = "npx";
         inputs[1] = "tsx";
-        inputs[2] = "js-scripts/getNullifierHash.ts";
-        inputs[3] = vm.toString(signature);
+        inputs[2] = "js-scripts/deposits/getNullifierHash.ts";
+        inputs[3] = vm.toString(orderHash);
 
         bytes memory result = vm.ffi(inputs);
-        nullifierHash = abi.decode(result, (bytes32));
+        (adCreatorNullifierHash, bridgerNullifierHash, secret) = abi.decode(result, (bytes32, bytes32, bytes32));
     }
 
     function getProof(
-        bool isAdContract,
+        bytes32[] memory leaves,
+        bytes32 orderHash,
         bytes32 nullifierHash,
-        address _maker,
-        bytes memory makerSig,
-        address _bridger,
-        bytes memory bridgerSig,
-        bytes32 orderHash
+        bytes32 secret,
+        bool isAdContract
     ) public returns (bytes memory proof, bytes32[] memory publicInputs) {
-        string[] memory inputs = new string[](10);
+        string[] memory inputs = new string[](7 + leaves.length);
 
         inputs[0] = "npx";
         inputs[1] = "tsx";
-        inputs[2] = "js-scripts/generateProof.ts";
+        inputs[2] = "js-scripts/deposits/generateProof.ts";
         inputs[3] = vm.toString(nullifierHash); // nullifierHash
-        inputs[4] = vm.toString(_maker); // maker
-        inputs[5] = vm.toString(makerSig); // maker signature
-        inputs[6] = vm.toString(_bridger); // bridger
-        inputs[7] = vm.toString(bridgerSig); // bridger signature
-        inputs[8] = vm.toString(isAdContract); // to known whose nullifier we're using
-        inputs[9] = vm.toString(orderHash); // order hash
+        inputs[4] = vm.toString(orderHash); // order hash
+        inputs[5] = vm.toString(isAdContract); // location where proof is generated
+        inputs[6] = vm.toString(secret); // secret
+
+        for (uint256 i = 0; i < leaves.length; i++) {
+            inputs[7 + i] = vm.toString(leaves[i]);
+        }
 
         bytes memory result = vm.ffi(inputs);
         (proof, publicInputs) = abi.decode(result, (bytes, bytes32[]));
     }
 
-    function sign(bytes32 hash, uint256 pk) public pure returns (bytes memory signature) {
+    function sign(bytes32 hash, uint256 pk) public pure returns (bytes memory sig) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, hash);
-        signature = abi.encodePacked(r, s, v);
+        sig = abi.encodePacked(r, s, v);
     }
 
     // Test that EIP712 hash matches onchain hashes
     function test_onChainHashesMatchesTypedDataHash() public {
         uint256 neutral = block.chainid;
 
-        uint256 adId = _adId();
+        string memory adId = _adId();
 
         // get order chain params
         OrderPortal.OrderParams memory orderChainParams = _defaultOrderChainParams(adId, 100 ether, 777);
@@ -339,10 +440,10 @@ contract ProofBridge is Test {
     }
 
     // Test that proof verifies offchain if maker is on order chain
-    function test_makerCanVerifyWithMakerSecretOffChain() public {
+    function test_makerCanVerifyWithMakerSecret() public {
         uint256 neutral = block.chainid;
 
-        uint256 adId = _adId();
+        string memory adId = _adId();
 
         // get order chain params
         OrderPortal.OrderParams memory orderChainParams = _defaultOrderChainParams(adId, 100 ether, 777);
@@ -350,18 +451,17 @@ contract ProofBridge is Test {
         vm.chainId(orderChainId);
         // since both hashes match, we can just use any chain's
         bytes32 orderHash = orderPortal.hashOrderPublic(orderChainParams);
+
+        bytes32[] memory leaves = new bytes32[](1);
+        leaves[0] = orderChainMerkleManager.fieldMod(orderHash);
+
         vm.chainId(neutral);
 
-        // sign order hash by maker and bridger
-        bytes memory makerSig = sign(orderHash, makerPk);
-        bytes memory bridgerSig = sign(orderHash, bridgerPk);
-
         // get maker nullifier hash
-        bytes32 makerNullifierHash = getNullfierHash(makerSig);
+        (bytes32 makerNullifierHash,, bytes32 secret) = getNullfierHashes(orderHash);
 
-        // get proof
         (bytes memory proof, bytes32[] memory publicInputs) =
-            getProof(false, makerNullifierHash, maker, makerSig, bridger, bridgerSig, orderHash);
+            getProof(leaves, orderHash, makerNullifierHash, secret, false);
 
         vm.chainId(orderChainId);
 
@@ -374,44 +474,56 @@ contract ProofBridge is Test {
     // Test that maker proof verifies on order chain and fulfills the order
     function test_makerCanVerifyWithMakerSecretOnOrderChainAndOrderFulfills() public {
         uint256 neutral = block.chainid;
+        string memory adId = _adId();
 
-        uint256 adId = _adId();
-
-        // get order chain params
+        // Setup Params
         OrderPortal.OrderParams memory orderChainParams = _defaultOrderChainParams(adId, orderAmt, 777);
+        AdManager.OrderParams memory adChainParams = _defaultAdChainParams(adId, orderAmt, 777);
 
-        // create order
+        // Create order on order chain
         vm.chainId(orderChainId);
+        bytes32 expectedHash = orderPortal.hashOrderPublic(orderChainParams);
+        (authToken, timeToLive, signature) = generateCreateOrderRequestParams(adId, expectedHash);
+
         vm.startPrank(bridger);
         orderToken.approve(address(orderPortal), orderAmt);
-        bytes32 orderHash = orderPortal.createOrder(orderChainParams);
+        bytes32 orderHash = orderPortal.createOrder(signature, authToken, timeToLive, orderChainParams);
+        assertEq(orderHash, expectedHash);
         vm.stopPrank();
 
+        // Lock order on ad chain
+        vm.chainId(adChainId);
+        vm.startPrank(maker);
+        (authToken, timeToLive, signature) = generateLockForOrderRequestHash(adId, orderHash);
+        adManager.lockForOrder(signature, authToken, timeToLive, adChainParams);
+        vm.stopPrank();
+
+        // Get Merkle tree state from ad chain
+        bytes32[] memory leaves = new bytes32[](1);
+        leaves[0] = adChainMerkleManager.fieldMod(orderHash);
+        bytes32 adChainRoot = adChainMerkleManager.getRootHash();
+
+        // Generate proof
         vm.chainId(neutral);
+        (bytes32 makerNullifierHash,, bytes32 secret) = getNullfierHashes(orderHash);
+        (bytes memory proof,) = getProof(leaves, orderHash, makerNullifierHash, secret, false);
 
-        // sign order hash by maker and bridger
-        bytes memory makerSig = sign(orderHash, makerPk);
-        bytes memory bridgerSig = sign(orderHash, bridgerPk);
-
-        // get maker nullifier hash
-        bytes32 makerNullifierHash = getNullfierHash(makerSig);
-
-        // get proof
-        (bytes memory proof,) = getProof(false, makerNullifierHash, maker, makerSig, bridger, bridgerSig, orderHash);
-
+        // Unlock and verify on order chain
         vm.chainId(orderChainId);
-        // check balances before
+
+        // Check initial balances
         uint256 orderPortalBalanceBefore = orderToken.balanceOf(address(orderPortal));
         uint256 recipientBalBefore = orderToken.balanceOf(adRecipient);
 
-        // verify and fulfill order
-        vm.prank(maker);
-        orderPortal.unlock(orderChainParams, makerNullifierHash, proof);
+        // Execute unlock
+        (authToken, timeToLive, signature) = generateUnlockOrderRequestHash(adId, orderHash, adChainRoot);
 
-        // check balances after
+        vm.prank(maker);
+        orderPortal.unlock(signature, authToken, timeToLive, orderChainParams, makerNullifierHash, adChainRoot, proof);
+
+        // Verify final balances
         uint256 orderPortalBalanceAfter = orderToken.balanceOf(address(orderPortal));
         uint256 recipientBalAfter = orderToken.balanceOf(adRecipient);
-
         assertEq(orderPortalBalanceBefore - orderPortalBalanceAfter, orderAmt);
         assertEq(recipientBalAfter - recipientBalBefore, orderAmt);
     }
@@ -420,65 +532,80 @@ contract ProofBridge is Test {
     function test_makerCannotUnlockOnAdChain() public {
         uint256 neutral = block.chainid;
 
-        uint256 adId = _adId();
+        string memory adId = _adId();
 
-        // get adchain params
+        // Setup Params
+        OrderPortal.OrderParams memory orderChainParams = _defaultOrderChainParams(adId, orderAmt, 777);
         AdManager.OrderParams memory adChainParams = _defaultAdChainParams(adId, orderAmt, 777);
 
+        // Create order on order chain
+        vm.chainId(orderChainId);
+        bytes32 expectedHash = orderPortal.hashOrderPublic(orderChainParams);
+        (authToken, timeToLive, signature) = generateCreateOrderRequestParams(adId, expectedHash);
+
+        vm.startPrank(bridger);
+        orderToken.approve(address(orderPortal), orderAmt);
+        bytes32 orderHash = orderPortal.createOrder(signature, authToken, timeToLive, orderChainParams);
+        assertEq(orderHash, expectedHash);
+        vm.stopPrank();
+
+        // Get Merkle tree state from order chain
+        bytes32[] memory leaves = new bytes32[](1);
+        leaves[0] = orderChainMerkleManager.fieldMod(orderHash);
+        bytes32 orderChainRoot = orderChainMerkleManager.getRootHash();
+
+        // Lock order on ad chain
         vm.chainId(adChainId);
         vm.startPrank(maker);
-        adManager.lockForOrder(adChainParams);
+        (authToken, timeToLive, signature) = generateLockForOrderRequestHash(adId, orderHash);
+        adManager.lockForOrder(signature, authToken, timeToLive, adChainParams);
         vm.stopPrank();
-        bytes32 orderHash = adManager.hashOrderPublic(adChainParams);
+
         vm.chainId(neutral);
 
-        // sign order hash by maker and bridger
-        bytes memory makerSig = sign(orderHash, makerPk);
-        bytes memory bridgerSig = sign(orderHash, bridgerPk);
-
-        // get maker nullifier hash
-        bytes32 makerNullifierHash = getNullfierHash(makerSig);
-
         // get bridger nullifier hash
-        bytes32 bridgerNullifierHash = getNullfierHash(bridgerSig);
+        (bytes32 makerNullifierHash, bytes32 bridgerNullifierHash, bytes32 secret) = getNullfierHashes(orderHash);
 
         // get proof
-        (bytes memory proof,) = getProof(true, bridgerNullifierHash, maker, makerSig, bridger, bridgerSig, orderHash);
+        (bytes memory proof,) = getProof(leaves, orderHash, bridgerNullifierHash, secret, true);
 
         vm.chainId(adChainId);
+
+        // get auth
+        (authToken, timeToLive, signature) = generateUnlockOrderRequestHash(adId, orderHash, orderChainRoot);
 
         // verify and fulfill order
         vm.prank(maker);
         vm.expectRevert(); // should revert because the nullifier is not for the bridger
-        adManager.unlock(adChainParams, makerNullifierHash, proof);
+        adManager.unlock(signature, authToken, timeToLive, adChainParams, makerNullifierHash, orderChainRoot, proof);
 
         vm.chainId(neutral);
     }
 
     // Test that proof verifies offchain if bridger is on ad chain
-    function test_bridgerCanVerifyWithBridgerSecretOffchain() public {
+    function test_bridgerCanVerifyWithBridgerSecret() public {
         uint256 neutral = block.chainid;
 
-        uint256 adId = _adId();
+        string memory adId = _adId();
 
         // get order chain params
         OrderPortal.OrderParams memory orderChainParams = _defaultOrderChainParams(adId, 100 ether, 777);
 
         vm.chainId(orderChainId);
+
         // since both hashes match, we can just use any chain's
         bytes32 orderHash = orderPortal.hashOrderPublic(orderChainParams);
+
+        bytes32[] memory leaves = new bytes32[](1);
+        leaves[0] = orderChainMerkleManager.fieldMod(orderHash);
         vm.chainId(neutral);
 
-        // sign order hash by maker and bridger
-        bytes memory makerSig = sign(orderHash, makerPk);
-        bytes memory bridgerSig = sign(orderHash, bridgerPk);
-
         // get maker nullifier hash
-        bytes32 bridgerNullifierHash = getNullfierHash(bridgerSig);
+        (, bytes32 bridgerNullifierHash, bytes32 secret) = getNullfierHashes(orderHash);
 
         // get proof
         (bytes memory proof, bytes32[] memory publicInputs) =
-            getProof(true, bridgerNullifierHash, maker, makerSig, bridger, bridgerSig, orderHash);
+            getProof(leaves, orderHash, bridgerNullifierHash, secret, true);
 
         vm.chainId(adChainId);
 
@@ -491,37 +618,54 @@ contract ProofBridge is Test {
     // Test that bridger proof verifies on ad chain and fulfills the order
     function test_bridgerCanVerifyWithBridgerSecretOnAdChainAndOrderFulfills() public {
         uint256 neutral = block.chainid;
-        uint256 adId = _adId();
+        string memory adId = _adId();
 
-        // get adchain params
+        // Setup Params
+        OrderPortal.OrderParams memory orderChainParams = _defaultOrderChainParams(adId, orderAmt, 777);
         AdManager.OrderParams memory adChainParams = _defaultAdChainParams(adId, orderAmt, 777);
 
-        vm.chainId(adChainId);
+        // Create order on order chain
+        vm.chainId(orderChainId);
+        bytes32 expectedHash = orderPortal.hashOrderPublic(orderChainParams);
+        (authToken, timeToLive, signature) = generateCreateOrderRequestParams(adId, expectedHash);
 
-        vm.startPrank(maker);
-        adManager.lockForOrder(adChainParams);
+        vm.startPrank(bridger);
+        orderToken.approve(address(orderPortal), orderAmt);
+        bytes32 orderHash = orderPortal.createOrder(signature, authToken, timeToLive, orderChainParams);
+        assertEq(orderHash, expectedHash);
         vm.stopPrank();
 
-        bytes32 orderHash = adManager.hashOrderPublic(adChainParams);
-        vm.chainId(neutral);
+        // Get Merkle tree state from ad chain
+        bytes32[] memory leaves = new bytes32[](1);
+        leaves[0] = orderChainMerkleManager.fieldMod(orderHash);
+        bytes32 orderChainRoot = orderChainMerkleManager.getRootHash();
 
-        // sign order hash by maker and bridger
-        bytes memory makerSig = sign(orderHash, makerPk);
-        bytes memory bridgerSig = sign(orderHash, bridgerPk);
-        // get bridger nullifier hash
-        bytes32 bridgerNullifierHash = getNullfierHash(bridgerSig);
-        // get proof
-        (bytes memory proof,) = getProof(true, bridgerNullifierHash, maker, makerSig, bridger, bridgerSig, orderHash);
+        // Lock order on ad chain
+        vm.chainId(adChainId);
+        vm.startPrank(maker);
+        (authToken, timeToLive, signature) = generateLockForOrderRequestHash(adId, orderHash);
+        adManager.lockForOrder(signature, authToken, timeToLive, adChainParams);
+        vm.stopPrank();
+
+        // Generate proof
+        vm.chainId(neutral);
+        (, bytes32 bridgerNullifierHash, bytes32 secret) = getNullfierHashes(orderHash);
+        (bytes memory proof,) = getProof(leaves, orderHash, bridgerNullifierHash, secret, true);
 
         vm.chainId(adChainId);
-        // check balances before
+
+        // Check balances before
         uint256 adManagerBalanceBefore = adToken.balanceOf(address(adManager));
         uint256 recipientBalBefore = adToken.balanceOf(orderRecipient);
 
-        // verify and fulfill order
+        // Get auth
+        (authToken, timeToLive, signature) = generateUnlockOrderRequestHash(adId, orderHash, orderChainRoot);
+
+        // Verify and fulfill order
         vm.prank(bridger);
-        adManager.unlock(adChainParams, bridgerNullifierHash, proof);
-        // check balances after
+        adManager.unlock(signature, authToken, timeToLive, adChainParams, bridgerNullifierHash, orderChainRoot, proof);
+
+        // Check balances after
         uint256 adManagerBalanceAfter = adToken.balanceOf(address(adManager));
         uint256 recipientBalAfter = adToken.balanceOf(orderRecipient);
         assertEq(adManagerBalanceBefore - adManagerBalanceAfter, orderAmt);
@@ -531,39 +675,51 @@ contract ProofBridge is Test {
     // Test that bridger secret cannot be user to unlock on order chain even if they know the right proof
     function test_bridgerCannotUnlockOnOrderChain() public {
         uint256 neutral = block.chainid;
-        uint256 adId = _adId();
+        string memory adId = _adId();
 
-        // get order chain params
+        // Setup Params
         OrderPortal.OrderParams memory orderChainParams = _defaultOrderChainParams(adId, orderAmt, 777);
+        AdManager.OrderParams memory adChainParams = _defaultAdChainParams(adId, orderAmt, 777);
 
+        // Create order on order chain
         vm.chainId(orderChainId);
+        bytes32 expectedHash = orderPortal.hashOrderPublic(orderChainParams);
+        (authToken, timeToLive, signature) = generateCreateOrderRequestParams(adId, expectedHash);
 
         vm.startPrank(bridger);
         orderToken.approve(address(orderPortal), orderAmt);
-        bytes32 orderHash = orderPortal.createOrder(orderChainParams);
+        bytes32 orderHash = orderPortal.createOrder(signature, authToken, timeToLive, orderChainParams);
+        assertEq(orderHash, expectedHash);
         vm.stopPrank();
 
+        // Lock order on ad chain
+        vm.chainId(adChainId);
+        vm.startPrank(maker);
+        (authToken, timeToLive, signature) = generateLockForOrderRequestHash(adId, orderHash);
+        adManager.lockForOrder(signature, authToken, timeToLive, adChainParams);
+        vm.stopPrank();
+
+        // Get Merkle tree state from ad chain
+        bytes32[] memory leaves = new bytes32[](1);
+        leaves[0] = adChainMerkleManager.fieldMod(orderHash);
+        bytes32 adChainRoot = adChainMerkleManager.getRootHash();
+
+        // Generate proof
         vm.chainId(neutral);
-
-        // sign order hash by maker and bridger
-        bytes memory makerSig = sign(orderHash, makerPk);
-        bytes memory bridgerSig = sign(orderHash, bridgerPk);
-
-        // get bridger nullifier hash
-        bytes32 bridgerNullifierHash = getNullfierHash(bridgerSig);
-
-        // get maker nullifier hash
-        bytes32 makerNullifierHash = getNullfierHash(makerSig);
-
-        // get proof
-        (bytes memory proof,) = getProof(false, makerNullifierHash, maker, makerSig, bridger, bridgerSig, orderHash);
-
+        (bytes32 makerNullifierHash, bytes32 bridgerNullifierHash, bytes32 secret) = getNullfierHashes(orderHash);
+        (bytes memory proof,) = getProof(leaves, orderHash, makerNullifierHash, secret, false);
         vm.chainId(orderChainId);
+
+        // Unlock and verify on order chain
+        vm.chainId(orderChainId);
+
+        // get auth
+        (authToken, timeToLive, signature) = generateUnlockOrderRequestHash(adId, orderHash, adChainRoot);
 
         // verify and fulfill order
         vm.prank(bridger);
         vm.expectRevert(); // should revert because the nullifier is not for the maker
-        orderPortal.unlock(orderChainParams, bridgerNullifierHash, proof);
+        orderPortal.unlock(signature, authToken, timeToLive, orderChainParams, bridgerNullifierHash, adChainRoot, proof);
 
         vm.chainId(neutral);
     }
@@ -571,68 +727,112 @@ contract ProofBridge is Test {
     // Test that nullifier hash cannot be used twice on order chain
     function test_nullifierCannotBeUsedTwiceOnOrderChain() public {
         uint256 neutral = block.chainid;
-        uint256 adId = _adId();
+        string memory adId = _adId();
 
-        // get order chain params
+        // Setup Params
         OrderPortal.OrderParams memory orderChainParams = _defaultOrderChainParams(adId, orderAmt, 777);
+        AdManager.OrderParams memory adChainParams = _defaultAdChainParams(adId, orderAmt, 777);
 
+        // Create order on order chain
         vm.chainId(orderChainId);
+        bytes32 expectedHash = orderPortal.hashOrderPublic(orderChainParams);
+        (authToken, timeToLive, signature) = generateCreateOrderRequestParams(adId, expectedHash);
 
         vm.startPrank(bridger);
         orderToken.approve(address(orderPortal), orderAmt);
-        bytes32 orderHash = orderPortal.createOrder(orderChainParams);
+        bytes32 orderHash = orderPortal.createOrder(signature, authToken, timeToLive, orderChainParams);
+        assertEq(orderHash, expectedHash);
         vm.stopPrank();
 
+        // Lock order on ad chain
+        vm.chainId(adChainId);
+        vm.startPrank(maker);
+        (authToken, timeToLive, signature) = generateLockForOrderRequestHash(adId, orderHash);
+        adManager.lockForOrder(signature, authToken, timeToLive, adChainParams);
+        vm.stopPrank();
+
+        // Get Merkle tree state from ad chain
+        bytes32[] memory leaves = new bytes32[](1);
+        leaves[0] = adChainMerkleManager.fieldMod(orderHash);
+        bytes32 adChainRoot = adChainMerkleManager.getRootHash();
+
+        // Generate proof
         vm.chainId(neutral);
-        // sign order hash by maker and bridger
-        bytes memory makerSig = sign(orderHash, makerPk);
-        bytes memory bridgerSig = sign(orderHash, bridgerPk);
-
-        // get maker nullifier hash
-        bytes32 makerNullifierHash = getNullfierHash(makerSig);
-        // get proof
-        (bytes memory proof,) = getProof(false, makerNullifierHash, maker, makerSig, bridger, bridgerSig, orderHash);
-
+        (bytes32 makerNullifierHash,, bytes32 secret) = getNullfierHashes(orderHash);
+        (bytes memory proof,) = getProof(leaves, orderHash, makerNullifierHash, secret, false);
         vm.chainId(orderChainId);
+
+        // Unlock and verify on order chain
+        vm.chainId(orderChainId);
+
+        // get auth
+        (authToken, timeToLive, signature) = generateUnlockOrderRequestHash(adId, orderHash, adChainRoot);
 
         // verify and fulfill order
         vm.prank(maker);
-        orderPortal.unlock(orderChainParams, makerNullifierHash, proof);
-        // try to use the same nullifier again
+        orderPortal.unlock(signature, authToken, timeToLive, orderChainParams, makerNullifierHash, adChainRoot, proof);
+
+        // get another auth
+        (authToken, timeToLive, signature) = generateUnlockOrderRequestHash(adId, orderHash, adChainRoot);
+
         vm.prank(maker);
-        vm.expectRevert(); // should revert because the nullifier is already used
-        orderPortal.unlock(orderChainParams, makerNullifierHash, proof);
+        vm.expectRevert();
+        orderPortal.unlock(signature, authToken, timeToLive, orderChainParams, makerNullifierHash, adChainRoot, proof);
+
+        vm.chainId(neutral);
     }
 
     // Test that nullifier hash cannot be used twice on ad chain
     function test_nullifierCannotBeUsedTwiceOnAdChain() public {
         uint256 neutral = block.chainid;
-        uint256 adId = _adId();
-        // get adchain params
+        string memory adId = _adId();
+
+        // Setup Params
+        OrderPortal.OrderParams memory orderChainParams = _defaultOrderChainParams(adId, orderAmt, 777);
         AdManager.OrderParams memory adChainParams = _defaultAdChainParams(adId, orderAmt, 777);
+
+        // Create order on order chain
+        vm.chainId(orderChainId);
+        bytes32 expectedHash = orderPortal.hashOrderPublic(orderChainParams);
+        (authToken, timeToLive, signature) = generateCreateOrderRequestParams(adId, expectedHash);
+
+        vm.startPrank(bridger);
+        orderToken.approve(address(orderPortal), orderAmt);
+        bytes32 orderHash = orderPortal.createOrder(signature, authToken, timeToLive, orderChainParams);
+        assertEq(orderHash, expectedHash);
+        vm.stopPrank();
+
+        // Get Merkle tree state from ad chain
+        bytes32[] memory leaves = new bytes32[](1);
+        leaves[0] = orderChainMerkleManager.fieldMod(orderHash);
+        bytes32 orderChainRoot = orderChainMerkleManager.getRootHash();
+
+        // Lock order on ad chain
         vm.chainId(adChainId);
         vm.startPrank(maker);
-        adManager.lockForOrder(adChainParams);
+        (authToken, timeToLive, signature) = generateLockForOrderRequestHash(adId, orderHash);
+        adManager.lockForOrder(signature, authToken, timeToLive, adChainParams);
         vm.stopPrank();
-        bytes32 orderHash = adManager.hashOrderPublic(adChainParams);
+
+        // Generate proof
         vm.chainId(neutral);
+        (, bytes32 bridgerNullifierHash, bytes32 secret) = getNullfierHashes(orderHash);
+        (bytes memory proof,) = getProof(leaves, orderHash, bridgerNullifierHash, secret, true);
 
-        // sign order hash by maker and bridger
-        bytes memory makerSig = sign(orderHash, makerPk);
-        bytes memory bridgerSig = sign(orderHash, bridgerPk);
-
-        // get bridger nullifier hash
-        bytes32 bridgerNullifierHash = getNullfierHash(bridgerSig);
-        // get proof
-        (bytes memory proof,) = getProof(true, bridgerNullifierHash, maker, makerSig, bridger, bridgerSig, orderHash);
         vm.chainId(adChainId);
 
-        // verify and fulfill order
+        // Get auth
+        (authToken, timeToLive, signature) = generateUnlockOrderRequestHash(adId, orderHash, orderChainRoot);
+
+        // Verify and fulfill order
         vm.prank(bridger);
-        adManager.unlock(adChainParams, bridgerNullifierHash, proof);
-        // try to use the same nullifier again
+        adManager.unlock(signature, authToken, timeToLive, adChainParams, bridgerNullifierHash, orderChainRoot, proof);
+
+        // Get another auth
+        (authToken, timeToLive, signature) = generateUnlockOrderRequestHash(adId, orderHash, orderChainRoot);
+
         vm.prank(bridger);
-        vm.expectRevert(); // should revert because the nullifier is already used
-        adManager.unlock(adChainParams, bridgerNullifierHash, proof);
+        vm.expectRevert();
+        adManager.unlock(signature, authToken, timeToLive, adChainParams, bridgerNullifierHash, orderChainRoot, proof);
     }
 }
