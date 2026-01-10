@@ -22,38 +22,37 @@ async function run() {
 
   let lastElem = 0;
   let lastOrderHash = Fr.ZERO;
-  for (let i = 0; i < 20; i++) {
-    let x = hex(i);
-    let hash = await bb.poseidon2Hash([Fr.fromString(x)]);
-    const elementIndex = await mmr.append(hash.toString());
-    console.log(elementIndex);
+  const hashes: string[] = [];
+  const elementIndexes: number[] = [];
 
-    if (elementIndex == 17) {
-      lastElem = elementIndex;
-      lastOrderHash = hash;
-    }
+  for (let i = 0; i < 5; i++) {
+    let x = hex(i);
+
+    console.log(`element value ${i}:`, x);
+
+    let hash = await bb.poseidon2Hash([Fr.fromString(x)]);
+    hashes.push(hash.toString());
+    const elementIndex = await mmr.append(hash.toString());
+    elementIndexes.push(elementIndex);
+    console.log(`element index: ${elementIndex}`);
+
+    // Get root after each append
+    const currentRoot = mmr.getHexRoot();
+    console.log(`root after append ${i}: ${currentRoot}`);
+    console.log(`hash: ${hash.toString()}`);
+    console.log("---");
+
+    lastElem = elementIndex;
+    lastOrderHash = hash;
   }
 
-  const proof = await mmr.getMerkleProof(lastElem);
-
-  const root = mmr.getHexRoot();
-
-  console.log("root: ", root);
-
-  console.log("orderHash: ", lastOrderHash.toString());
-
-  console.log(proof);
-
-  console.log(
-    mmr.verify(
-      proof.root,
-      proof.width,
-      lastElem,
-      lastOrderHash.toString(),
-      proof.peaks,
-      proof.siblings
-    )
-  );
+  console.log("\n=== Summary ===");
+  console.log("Width (leaf count):", mmr.width);
+  console.log("Size (total nodes):", mmr.size);
+  console.log("Final root:", mmr.getHexRoot());
+  console.log("\nElement indexes:", elementIndexes);
+  console.log("\nHashes:");
+  hashes.forEach((h, i) => console.log(`  ${i}: ${h}`));
 
   // mmr.clear();
 }
