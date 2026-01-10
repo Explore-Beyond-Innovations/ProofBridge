@@ -122,7 +122,7 @@ Topics will include:
 ## 🔗 Quick Links
 
 - **Pitch Deck**: [Proof Bridge Pitch Deck](https://drive.google.com/file/d/1-293K4ucIXvWaurejT1FX6ocZJ0RmEVH/view?usp=drivesdk)
-- **Demo Video**: [Proof Bridge Demo Video](https://youtu.be/DndG_KEsDds)
+- **Demo Video**: [Proof Bridge Demo Video](https://www.youtube.com/watch?v=iSAXf1KP-bM)
 - **Web application**: [https://proof-bridge.vercel.app/](https://proof-bridge.vercel.app/)
 
 ## 👥 Team
