@@ -1,0 +1,24 @@
+[workspace]
+resolver = "2"
+members = [
+  "contracts/*",
+]
+
+[workspace.dependencies]
+# Preview SDK with bn254, poseidon, and poseidon2 support
+soroban-sdk = { git = "https://github.com/stellar/rs-soroban-sdk", rev = "4667e58b20e3bbed726fc16c11978746dee4cf59", default-features = false, features = ["alloc"] }
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "symbols"
+debug-assertions = false
+panic = "abort"
+codegen-units = 1
+lto = true
+
+# For more information about this profile see https://soroban.stellar.org/docs/basic-tutorials/logging#cargotoml-profile
+[profile.release-with-logs]
+inherits = "release"
+debug-assertions = true

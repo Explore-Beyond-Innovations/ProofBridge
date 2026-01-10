@@ -1,0 +1,17 @@
+[package]
+name = "order-portal"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+sha3 = { version = "0.10", default-features = false }
+stellar-strkey = { version = "0.0.11", default-features = false }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
