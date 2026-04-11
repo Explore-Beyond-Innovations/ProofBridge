@@ -60,6 +60,12 @@ jobs:
           chmod +x $HOME/.local/bin/stellar
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
+      - name: Build deposit circuit
+        run: scripts/build_circuits.sh proof_circuits/deposits
+
+      - name: Build verifier test circuits
+        run: scripts/build_circuits.sh contracts/stellar/contracts/verifier/tests --prove
+
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
@@ -75,10 +81,6 @@ jobs:
       - name: Generate integration test fixtures
         run: npx tsx generate_fixtures.ts
         working-directory: contracts/stellar/tests/fixtures
-
-      - name: Build verifier test circuits
-        run: contracts/verifier/tests/build_circuits.sh
-        working-directory: contracts/stellar
 
       - name: Build contract WASMs
         run: |
