@@ -59,6 +59,10 @@ jobs:
           chmod +x $HOME/.local/bin/stellar
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
+      - name: Build verifier test circuits
+        run: contracts/verifier/tests/build_circuits.sh
+        working-directory: contracts/stellar
+
       - name: Build contract WASMs
         run: |
           stellar contract build --package ad-manager
