@@ -15,7 +15,7 @@
   "dependencies": {
     "@noble/curves": "^2.0.0",
     "@zkpassport/poseidon2": "^0.6.2",
-    "dotenv": "^17.2.2",
+    "dotenv": "^17.4.1",
     "ethereum-cryptography": "^3.2.0",
     "ethers": "^6.15.0",
     "hex": "^0.1.0",
