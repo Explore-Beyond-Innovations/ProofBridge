@@ -24,7 +24,7 @@
   "dependencies": {
     "@aztec/bb.js": "^0.87.0",
     "@biconomy/account": "^4.5.7",
-    "@nestjs/cache-manager": "^3.0.1",
+    "@nestjs/cache-manager": "^3.1.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
