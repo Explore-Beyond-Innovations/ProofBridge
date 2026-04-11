@@ -67,10 +67,12 @@ The ProofBridge system is composed of four main layers, each working together to
 
 For detailed information about each component of the ProofBridge system, refer to the following documentation:
 
-- **[Contracts](./apps/contracts/README.md)** - Smart contract architecture, deployed addresses with explorer links, deployment guides, and cross-chain route configuration
-- **[Proof Circuits](./apps/proof_circuits/)** - Zero-knowledge proof circuits for cross-chain verification
-  - [Auth Circuits](./apps/proof_circuits/auth/README.md) - Authentication proof circuits using BLS signatures
-  - [Deposit Circuits](./apps/proof_circuits/deposits/README.md) - Deposit validation and Merkle proof circuits
+- **[Contracts](./contracts/README.md)** - Smart contract architecture, deployed addresses with explorer links, deployment guides, and cross-chain route configuration
+  - [EVM Contracts](./contracts/evm/README.md) - Solidity/Foundry implementation (Ethereum, Hedera)
+  - [Stellar Contracts](./contracts/stellar/README.md) - Soroban/Rust implementation (Stellar)
+- **[Proof Circuits](./proof_circuits/)** - Zero-knowledge proof circuits for cross-chain verification
+  - [Auth Circuits](./proof_circuits/auth/README.md) - Authentication proof circuits using BLS signatures
+  - [Deposit Circuits](./proof_circuits/deposits/README.md) - Deposit validation and Merkle proof circuits
 - **[Backend Relayer](./apps/backend-relayer/README.md)** - Relayer setup, configuration, and operation instructions
 - **[Frontend](./apps/frontend/README.md)** - User interface setup and development guide
 - **[MMR Package](./packages/proofbridge_mmr/README.md)** - Merkle Mountain Range implementation and usage
@@ -127,21 +129,11 @@ Topics will include:
 
 ## 👥 Team
 
-![alt text](images/team_picture.jpg)
+![alt text](team_images/team_picture.jpg)
 
 - **Joseph Edoh** - Blockchain Developer,
 - **Ugonna Dike** - Program manager,
 - **Osaretin Frank** - Fullstack Developer.
-
-### Team Hashgraph Certificate
-
-### Joseph Edoh
-
-![alt text](images/joseph_certificate.png)
-
-### Osaretin Frank
-
-![alt text](images/frank_certificate.jpg)
 
 ## 📜 License
 

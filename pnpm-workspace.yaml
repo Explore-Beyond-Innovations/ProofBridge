@@ -1,4 +1,5 @@
 packages:
   - "apps/*"
+  - "contracts/*"
   - "packages/*"
-  - "apps/stellar_contracts/tests/fixtures"
+  - "contracts/stellar/tests/fixtures"
