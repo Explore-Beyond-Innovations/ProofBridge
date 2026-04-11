@@ -41,7 +41,7 @@
     "abstract-level": "^3.1.0",
     "buffer-reverse": "^1.0.1",
     "crypto-js": "^4.2.0",
-    "ethers": "^6.15.0",
+    "ethers": "^6.16.0",
     "level": "^10.0.0",
     "rave-level": "^1.0.0"
   },
