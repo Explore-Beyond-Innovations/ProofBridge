@@ -1061,7 +1061,7 @@ dependencies = [
  "rand",
  "sha3",
  "soroban-sdk",
- "stellar-strkey 0.0.13",
+ "stellar-strkey 0.0.16",
 ]
 
 [[package]]
