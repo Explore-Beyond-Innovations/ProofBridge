@@ -5,7 +5,7 @@ members = ["contracts/*", "lib/*"]
 [workspace.dependencies]
 ed25519-dalek = { version = "2.2" }
 hex = "0.4"
-sha3 = { version = "0.10", default-features = false }
+sha3 = { version = "0.11", default-features = false }
 soroban-sdk = { version = "26.0.0-rc.1", features = ["alloc"] }
 soroban-poseidon = { git = "https://github.com/Explore-Beyond-Innovations/rs-soroban-poseidon.git", rev = "9bf9d7e930cb59304d9311f0acbe3d535cae0f70" }
 stellar-strkey = "0.0.13"
