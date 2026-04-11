@@ -1,0 +1,59 @@
+name: EVM Contracts CI
+
+on:
+  push:
+    paths:
+      - "contracts/evm/**"
+      - ".github/workflows/evm-contracts.yml"
+  pull_request:
+    paths:
+      - "contracts/evm/**"
+      - ".github/workflows/evm-contracts.yml"
+  workflow_dispatch:
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  check:
+    name: EVM Contracts
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/evm
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Show Forge version
+        run: forge --version
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Run Forge fmt
+        run: forge fmt --check
+        id: fmt
+
+      - name: Run Forge build
+        run: forge build --sizes
+        id: build
+
+      - name: Run Forge tests
+        run: forge test -vvv
+        id: test
