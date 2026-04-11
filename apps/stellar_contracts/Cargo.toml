@@ -10,7 +10,7 @@ soroban-sdk = { version = "26.0.0-rc.1", features = ["alloc"] }
 soroban-poseidon = { git = "https://github.com/Explore-Beyond-Innovations/rs-soroban-poseidon.git", rev = "9bf9d7e930cb59304d9311f0acbe3d535cae0f70" }
 stellar-strkey = "0.0.16"
 ultrahonk_soroban_verifier = { git = "https://github.com/Explore-Beyond-Innovations/rs-soroban-ultrahonk.git", rev = "d762995d8c181c05fe9a15962793dba6641a79ba" }
-rand = "0.8"
+rand = "0.10"
 
 # internal
 proofbridge-core = { path = "lib/proofbridge-core" }
