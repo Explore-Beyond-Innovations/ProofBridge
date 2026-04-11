@@ -46,6 +46,7 @@
     "rave-level": "^1.0.0"
   },
   "devDependencies": {
+    "@types/crypto-js": "^4.2.2",
     "@types/node": "^22.18.13",
     "js-sha3": "^0.9.3",
     "ts-loader": "^9.5.2",
