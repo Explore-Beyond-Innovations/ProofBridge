@@ -78,7 +78,8 @@ build_circuit() {
   local dir="$1"
   local prove="$2"
   local name
-  name=$(basename "$dir")
+  # Use the package name from Nargo.toml (nargo names artifacts after the package, not the directory)
+  name=$(grep '^name' "$dir/Nargo.toml" | head -1 | sed 's/.*= *"\(.*\)"/\1/')
 
   echo "building $name (prove=$prove)"
   pushd "$dir" >/dev/null
