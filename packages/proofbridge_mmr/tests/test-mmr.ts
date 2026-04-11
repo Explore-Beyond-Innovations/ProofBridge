@@ -78,8 +78,8 @@ async function testMerkleMountainRange() {
     console.log("Width:", proof.width);
 
     console.log("\nPeaks:");
-    for (let i = 0; i < proof.peakBagging.length; i++) {
-      console.log(proof.peakBagging[i]);
+    for (let i = 0; i < proof.peaks.length; i++) {
+      console.log(proof.peaks[i]);
     }
 
     console.log("\nSiblings:");
@@ -92,8 +92,8 @@ async function testMerkleMountainRange() {
       proof.width,
       lastIndex,
       hash10,
-      proof.peakBagging,
-      proof.siblings
+      proof.peaks,
+      proof.siblings,
     );
 
     if (!isValid) {
