@@ -2,6 +2,7 @@ name: EVM Contracts CI
 
 on:
   push:
+    branches: [main]
     paths:
       - "contracts/evm/**"
       - ".github/workflows/evm-contracts.yml"

@@ -2,6 +2,7 @@ name: Stellar Contracts CI
 
 on:
   push:
+    branches: [main]
     paths:
       - "contracts/stellar/**"
       - ".github/workflows/stellar-contracts.yml"
@@ -58,6 +59,22 @@ jobs:
           tar -xzf /tmp/stellar-cli.tar.gz -C $HOME/.local/bin stellar
           chmod +x $HOME/.local/bin/stellar
           echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "pnpm"
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate integration test fixtures
+        run: npx tsx generate_fixtures.ts
+        working-directory: contracts/stellar/tests/fixtures
 
       - name: Build verifier test circuits
         run: contracts/verifier/tests/build_circuits.sh
