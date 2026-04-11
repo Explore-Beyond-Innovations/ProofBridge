@@ -55,7 +55,7 @@
     "unique-names-generator": "^4.7.1",
     "uuid": "^13.0.0",
     "viem": "^2.37.7",
-    "winston": "^3.17.0"
+    "winston": "^3.19.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
