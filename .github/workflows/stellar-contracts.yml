@@ -60,7 +60,11 @@ jobs:
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Build contract WASMs
-        run: stellar contract build
+        run: |
+          stellar contract build --package ad-manager
+          stellar contract build --package order-portal
+          stellar contract build --package merkle-manager
+          stellar contract build --package verifier
         working-directory: contracts/stellar
 
       - name: Run unit tests
