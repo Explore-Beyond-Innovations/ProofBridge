@@ -60,12 +60,6 @@ jobs:
           chmod +x $HOME/.local/bin/stellar
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Build deposit circuit
-        run: scripts/build_circuits.sh proof_circuits/deposits
-
-      - name: Build verifier test circuits
-        run: scripts/build_circuits.sh contracts/stellar/contracts/verifier/tests --prove
-
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
@@ -78,10 +72,6 @@ jobs:
       - name: Install Node dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Generate integration test fixtures
-        run: npx tsx generate_fixtures.ts
-        working-directory: contracts/stellar/tests/fixtures
-
       - name: Build contract WASMs
         run: |
           stellar contract build --package ad-manager
@@ -90,9 +80,19 @@ jobs:
           stellar contract build --package verifier
         working-directory: contracts/stellar
 
+      - name: Build deposit circuit
+        run: scripts/build_circuits.sh proof_circuits/deposits
+
+      - name: Build verifier test circuits
+        run: scripts/build_circuits.sh contracts/stellar/contracts/verifier/tests --prove
+
       - name: Run unit tests
         run: cargo test --workspace --exclude proofbridge-stellar
         working-directory: contracts/stellar
+
+      - name: Generate integration test fixtures
+        run: npx tsx generate_fixtures.ts
+        working-directory: contracts/stellar/tests/fixtures
 
       - name: Run integration tests
         run: cargo test --test integration_test -- --nocapture
