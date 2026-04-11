@@ -222,40 +222,6 @@ importers:
         specifier: ^8.20.0
         version: 8.58.1(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3)
 
-  apps/evm_contracts:
-    dependencies:
-      '@noble/curves':
-        specifier: ^2.0.0
-        version: 2.0.1
-      '@zkpassport/poseidon2':
-        specifier: ^0.6.2
-        version: 0.6.2
-      dotenv:
-        specifier: ^17.2.2
-        version: 17.4.1
-      ethereum-cryptography:
-        specifier: ^3.2.0
-        version: 3.2.0
-      ethers:
-        specifier: ^6.15.0
-        version: 6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
-      hex:
-        specifier: ^0.1.0
-        version: 0.1.0
-      proofbridge-mmr:
-        specifier: 1.0.8
-        version: 1.0.8(bufferutil@4.1.0)(utf-8-validate@5.0.10)
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.39
-      ts-node:
-        specifier: ^10.9.2
-        version: 10.9.2(@types/node@20.19.39)(typescript@5.9.3)
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-
   apps/frontend:
     dependencies:
       '@ant-design/nextjs-registry':
@@ -374,7 +340,41 @@ importers:
         specifier: ^5
         version: 5.9.3
 
-  apps/stellar_contracts/tests/fixtures:
+  contracts/evm:
+    dependencies:
+      '@noble/curves':
+        specifier: ^2.0.0
+        version: 2.0.1
+      '@zkpassport/poseidon2':
+        specifier: ^0.6.2
+        version: 0.6.2
+      dotenv:
+        specifier: ^17.2.2
+        version: 17.4.1
+      ethereum-cryptography:
+        specifier: ^3.2.0
+        version: 3.2.0
+      ethers:
+        specifier: ^6.15.0
+        version: 6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
+      hex:
+        specifier: ^0.1.0
+        version: 0.1.0
+      proofbridge-mmr:
+        specifier: 1.0.8
+        version: 1.0.8(bufferutil@4.1.0)(utf-8-validate@5.0.10)
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.39
+      ts-node:
+        specifier: ^10.9.2
+        version: 10.9.2(@types/node@20.19.39)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
+  contracts/stellar/tests/fixtures:
     dependencies:
       '@aztec/bb.js':
         specifier: 0.87.0
@@ -12942,7 +12942,7 @@ snapshots:
       eslint: 9.39.4(jiti@2.6.1)
       eslint-import-resolver-node: 0.3.10
       eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.4(jiti@2.6.1)))(eslint@9.39.4(jiti@2.6.1))
-      eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.4(jiti@2.6.1))
+      eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.4(jiti@2.6.1)))(eslint@9.39.4(jiti@2.6.1)))(eslint@9.39.4(jiti@2.6.1))
       eslint-plugin-jsx-a11y: 6.10.2(eslint@9.39.4(jiti@2.6.1))
       eslint-plugin-react: 7.37.5(eslint@9.39.4(jiti@2.6.1))
       eslint-plugin-react-hooks: 7.0.1(eslint@9.39.4(jiti@2.6.1))
@@ -12979,7 +12979,7 @@ snapshots:
       tinyglobby: 0.2.16
       unrs-resolver: 1.11.1
     optionalDependencies:
-      eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.4(jiti@2.6.1))
+      eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.4(jiti@2.6.1)))(eslint@9.39.4(jiti@2.6.1)))(eslint@9.39.4(jiti@2.6.1))
     transitivePeerDependencies:
       - supports-color
 
@@ -12993,7 +12993,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-plugin-import@2.32.0(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.4(jiti@2.6.1)):
+  eslint-plugin-import@2.32.0(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.4(jiti@2.6.1)))(eslint@9.39.4(jiti@2.6.1)))(eslint@9.39.4(jiti@2.6.1)):
     dependencies:
       '@rtsao/scc': 1.1.0
       array-includes: 3.1.9
@@ -15034,8 +15034,8 @@ snapshots:
       '@adraffy/ens-normalize': 1.11.1
       '@noble/curves': 1.9.7
       '@noble/hashes': 1.8.0
-      '@scure/bip32': 1.6.2
-      '@scure/bip39': 1.5.4
+      '@scure/bip32': 1.7.0
+      '@scure/bip39': 1.6.0
       abitype: 1.0.8(typescript@5.9.3)(zod@4.3.6)
       eventemitter3: 5.0.1
     optionalDependencies:

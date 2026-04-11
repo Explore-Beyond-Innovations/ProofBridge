@@ -8,7 +8,7 @@ import { modOrderHash, padArray } from "../utils";
 
 const circuitPath = path.resolve(
   __dirname,
-  "../../../proof_circuits/deposits/target/deposit_circuit.json"
+  "../../../../proof_circuits/deposits/target/deposit_circuit.json"
 );
 
 const circuit = JSON.parse(fs.readFileSync(circuitPath, "utf8"));

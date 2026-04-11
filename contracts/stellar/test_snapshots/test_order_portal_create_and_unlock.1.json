@@ -109,7 +109,7 @@
     [],
     [
       [
-        "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ",
+        "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV",
         {
           "function": {
             "contract_fn": {
@@ -117,7 +117,7 @@
               "function_name": "initialize",
               "args": [
                 {
-                  "address": "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ"
+                  "address": "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV"
                 },
                 {
                   "address": "CBKMUZNFQIAL775XBB2W2GP5CNHBM5YGH6C3XB7AY6SUVO2IBU3VYK2V"
@@ -141,7 +141,7 @@
     [],
     [
       [
-        "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ",
+        "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV",
         {
           "function": {
             "contract_fn": {
@@ -163,7 +163,7 @@
     ],
     [
       [
-        "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ",
+        "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV",
         {
           "function": {
             "contract_fn": {
@@ -186,7 +186,7 @@
     [],
     [
       [
-        "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ",
+        "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV",
         {
           "function": {
             "contract_fn": {
@@ -212,7 +212,7 @@
     [],
     [
       [
-        "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ",
+        "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV",
         {
           "function": {
             "contract_fn": {
@@ -238,7 +238,7 @@
     [],
     [
       [
-        "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ",
+        "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV",
         {
           "function": {
             "contract_fn": {
@@ -246,7 +246,7 @@
               "function_name": "transfer",
               "args": [
                 {
-                  "address": "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ"
+                  "address": "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV"
                 },
                 {
                   "address": "CCQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2CNSG"
@@ -261,7 +261,6 @@
         }
       ]
     ],
-    [],
     [],
     [
       [
@@ -290,9 +289,6 @@
     ],
     [],
     [],
-    [],
-    [],
-    [],
     []
   ],
   "ledger": {
@@ -311,7 +307,7 @@
           "data": {
             "contract_data": {
               "ext": "v0",
-              "contract": "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ",
+              "contract": "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV",
               "key": {
                 "ledger_key_nonce": {
                   "nonce": "1194852393571756375"
@@ -331,7 +327,7 @@
           "data": {
             "contract_data": {
               "ext": "v0",
-              "contract": "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ",
+              "contract": "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV",
               "key": {
                 "ledger_key_nonce": {
                   "nonce": "2032731177588607455"
@@ -351,7 +347,7 @@
           "data": {
             "contract_data": {
               "ext": "v0",
-              "contract": "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ",
+              "contract": "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV",
               "key": {
                 "ledger_key_nonce": {
                   "nonce": "4270020994084947596"
@@ -371,7 +367,7 @@
           "data": {
             "contract_data": {
               "ext": "v0",
-              "contract": "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ",
+              "contract": "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV",
               "key": {
                 "ledger_key_nonce": {
                   "nonce": "5806905060045992000"
@@ -391,7 +387,7 @@
           "data": {
             "contract_data": {
               "ext": "v0",
-              "contract": "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ",
+              "contract": "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV",
               "key": {
                 "ledger_key_nonce": {
                   "nonce": "6277191135259896685"
@@ -411,7 +407,7 @@
           "data": {
             "contract_data": {
               "ext": "v0",
-              "contract": "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ",
+              "contract": "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV",
               "key": {
                 "ledger_key_nonce": {
                   "nonce": "8370022561469687789"
@@ -535,60 +531,6 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "hashes"
-                  },
-                  {
-                    "u128": "1"
-                  }
-                ]
-              },
-              "durability": "persistent",
-              "val": {
-                "bytes": "1392e388371d39757e2c11df6802eedce4a6616d01e5d0b910518090b5cfe7f1"
-              }
-            }
-          },
-          "ext": "v0"
-        },
-        "live_until": 4095
-      },
-      {
-        "entry": {
-          "last_modified_ledger_seq": 0,
-          "data": {
-            "contract_data": {
-              "ext": "v0",
-              "contract": "CAJXGFIU32R2SF4BVXV2EB2XSSUPUBQMNXWJWB5GYS7WE76TFPPR7Q7P",
-              "key": {
-                "vec": [
-                  {
-                    "symbol": "history"
-                  },
-                  {
-                    "u128": "1"
-                  }
-                ]
-              },
-              "durability": "persistent",
-              "val": {
-                "bytes": "297424a526874811ced8d53814bd55f93ff763494a7db433c25e82a0cfd6cb45"
-              }
-            }
-          },
-          "ext": "v0"
-        },
-        "live_until": 4095
-      },
-      {
-        "entry": {
-          "last_modified_ledger_seq": 0,
-          "data": {
-            "contract_data": {
-              "ext": "v0",
-              "contract": "CAJXGFIU32R2SF4BVXV2EB2XSSUPUBQMNXWJWB5GYS7WE76TFPPR7Q7P",
-              "key": {
-                "vec": [
-                  {
                     "symbol": "mgrs"
                   },
                   {
@@ -626,7 +568,7 @@
                         "symbol": "admin"
                       },
                       "val": {
-                        "address": "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ"
+                        "address": "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV"
                       }
                     },
                     {
@@ -635,30 +577,6 @@
                       },
                       "val": {
                         "bool": true
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "root"
-                      },
-                      "val": {
-                        "bytes": "297424a526874811ced8d53814bd55f93ff763494a7db433c25e82a0cfd6cb45"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "size"
-                      },
-                      "val": {
-                        "u128": "1"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "width"
-                      },
-                      "val": {
-                        "u128": "1"
                       }
                     }
                   ]
@@ -771,7 +689,7 @@
                         "symbol": "admin"
                       },
                       "val": {
-                        "address": "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ"
+                        "address": "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV"
                       }
                     },
                     {
@@ -939,7 +857,7 @@
                       "symbol": "balance"
                     },
                     "val": {
-                      "u128": "0"
+                      "u128": "1000000"
                     }
                   },
                   {
@@ -955,7 +873,7 @@
                       "symbol": "maker"
                     },
                     "val": {
-                      "address": "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ"
+                      "address": "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV"
                     }
                   },
                   {
@@ -1047,67 +965,13 @@
                     "symbol": "mgrs"
                   },
                   {
-                    "address": "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ"
+                    "address": "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV"
                   }
                 ]
               },
               "durability": "persistent",
               "val": {
                 "bool": true
-              }
-            }
-          },
-          "ext": "v0"
-        },
-        "live_until": 4095
-      },
-      {
-        "entry": {
-          "last_modified_ledger_seq": 0,
-          "data": {
-            "contract_data": {
-              "ext": "v0",
-              "contract": "CCQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2CNSG",
-              "key": {
-                "vec": [
-                  {
-                    "symbol": "nulls"
-                  },
-                  {
-                    "bytes": "2876b3352d014d18e2dcf4c2fe6f0a0879a19abedf682e27c848d8cedc333ded"
-                  }
-                ]
-              },
-              "durability": "persistent",
-              "val": {
-                "bool": true
-              }
-            }
-          },
-          "ext": "v0"
-        },
-        "live_until": 4095
-      },
-      {
-        "entry": {
-          "last_modified_ledger_seq": 0,
-          "data": {
-            "contract_data": {
-              "ext": "v0",
-              "contract": "CCQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2CNSG",
-              "key": {
-                "vec": [
-                  {
-                    "symbol": "orders"
-                  },
-                  {
-                    "bytes": "519b6ed4358f1c8025a9166fa0b1e9c186256aa43bc9edb5331101c6beafce20"
-                  }
-                ]
-              },
-              "durability": "persistent",
-              "val": {
-                "u32": 2
               }
             }
           },
@@ -1155,61 +1019,7 @@
                     "symbol": "rhashes"
                   },
                   {
-                    "bytes": "bebe796b80d19a99c5873ef00409f5ba96b00882ec19893a2c147d962209db68"
-                  }
-                ]
-              },
-              "durability": "persistent",
-              "val": {
-                "bool": true
-              }
-            }
-          },
-          "ext": "v0"
-        },
-        "live_until": 4095
-      },
-      {
-        "entry": {
-          "last_modified_ledger_seq": 0,
-          "data": {
-            "contract_data": {
-              "ext": "v0",
-              "contract": "CCQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2CNSG",
-              "key": {
-                "vec": [
-                  {
-                    "symbol": "rhashes"
-                  },
-                  {
                     "bytes": "c247f551503775c795bed63d1c88aaed002504ce0184d02687827d53baa44945"
-                  }
-                ]
-              },
-              "durability": "persistent",
-              "val": {
-                "bool": true
-              }
-            }
-          },
-          "ext": "v0"
-        },
-        "live_until": 4095
-      },
-      {
-        "entry": {
-          "last_modified_ledger_seq": 0,
-          "data": {
-            "contract_data": {
-              "ext": "v0",
-              "contract": "CCQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2CNSG",
-              "key": {
-                "vec": [
-                  {
-                    "symbol": "rhashes"
-                  },
-                  {
-                    "bytes": "e75d2dbbaf24bcaf3c1568efcd884401cc13d960362cf64bd269878546957ae7"
                   }
                 ]
               },
@@ -1368,60 +1178,6 @@
             "contract_data": {
               "ext": "v0",
               "contract": "CCQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2CNSG",
-              "key": {
-                "vec": [
-                  {
-                    "symbol": "rtokens"
-                  },
-                  {
-                    "bytes": "0400000000000000000000000000000000000000000000000000000000000000"
-                  }
-                ]
-              },
-              "durability": "persistent",
-              "val": {
-                "bool": true
-              }
-            }
-          },
-          "ext": "v0"
-        },
-        "live_until": 4095
-      },
-      {
-        "entry": {
-          "last_modified_ledger_seq": 0,
-          "data": {
-            "contract_data": {
-              "ext": "v0",
-              "contract": "CCQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2CNSG",
-              "key": {
-                "vec": [
-                  {
-                    "symbol": "rtokens"
-                  },
-                  {
-                    "bytes": "0600000000000000000000000000000000000000000000000000000000000000"
-                  }
-                ]
-              },
-              "durability": "persistent",
-              "val": {
-                "bool": true
-              }
-            }
-          },
-          "ext": "v0"
-        },
-        "live_until": 4095
-      },
-      {
-        "entry": {
-          "last_modified_ledger_seq": 0,
-          "data": {
-            "contract_data": {
-              "ext": "v0",
-              "contract": "CCQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2CNSG",
               "key": "ledger_key_contract_instance",
               "durability": "persistent",
               "val": {
@@ -1441,7 +1197,7 @@
                               "symbol": "admin"
                             },
                             "val": {
-                              "address": "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ"
+                              "address": "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV"
                             }
                           },
                           {
@@ -1553,7 +1309,7 @@
                     "symbol": "mgrs"
                   },
                   {
-                    "address": "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ"
+                    "address": "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV"
                   }
                 ]
               },
@@ -1634,7 +1390,7 @@
                     "symbol": "rhashes"
                   },
                   {
-                    "bytes": "7eea1b969d4bf1070a158217124e0c8b5cc0a797fc3eec0cd8dfde2e0cb07982"
+                    "bytes": "a2487e340a7d2af80aa02a081eb44405fb1be11b223d4d9ddbe6c8a3bc57d94b"
                   }
                 ]
               },
@@ -1661,7 +1417,7 @@
                     "symbol": "rhashes"
                   },
                   {
-                    "bytes": "d7d75a968a9cde6d48d80b68e6610124d06d382a6403ea841a3b99e64743a197"
+                    "bytes": "c95668d705ff046af3aef708b3da4e54dc24a004d870c73676e41ee655b8fc76"
                   }
                 ]
               },
@@ -1718,7 +1474,7 @@
                     "symbol": "rtokens"
                   },
                   {
-                    "bytes": "0500000000000000000000000000000000000000000000000000000000000000"
+                    "bytes": "0400000000000000000000000000000000000000000000000000000000000000"
                   }
                 ]
               },
@@ -1745,7 +1501,7 @@
                     "symbol": "rtokens"
                   },
                   {
-                    "bytes": "0700000000000000000000000000000000000000000000000000000000000000"
+                    "bytes": "0500000000000000000000000000000000000000000000000000000000000000"
                   }
                 ]
               },
@@ -1785,7 +1541,7 @@
                               "symbol": "admin"
                             },
                             "val": {
-                              "address": "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ"
+                              "address": "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV"
                             }
                           },
                           {
@@ -1880,7 +1636,7 @@
                     "symbol": "Balance"
                   },
                   {
-                    "address": "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ"
+                    "address": "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV"
                   }
                 ]
               },
@@ -1997,7 +1753,7 @@
                     "symbol": "Balance"
                   },
                   {
-                    "address": "GCP65NSLNAUGEL3AUYKHYYNLPJDVNFZ43FYS32VBD6RZVHYVCEUXFOHJ"
+                    "address": "GBRHL7S7GFDGBIY67LAR55BZI3BLZGCSMNQKPAW5XQKSABLFFADQ6JRV"
                   }
                 ]
               },
@@ -2024,7 +1780,7 @@
                     "symbol": "Balance"
                   },
                   {
-                    "address": "GD3PN5XW633PN5XW633PN5XW633PN5XW633PN5XW633PN5XW633PNK3W"
+                    "address": "CCQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2CNSG"
                   }
                 ]
               },
@@ -2037,33 +1793,6 @@
           "ext": "v0"
         },
         "live_until": 4095
-      },
-      {
-        "entry": {
-          "last_modified_ledger_seq": 0,
-          "data": {
-            "contract_data": {
-              "ext": "v0",
-              "contract": "CDKNJVGU2TKNJVGU2TKNJVGU2TKNJVGU2TKNJVGU2TKNJVGU2TKNJJM5",
-              "key": {
-                "vec": [
-                  {
-                    "symbol": "Balance"
-                  },
-                  {
-                    "address": "CCQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2DINBUGQ2CNSG"
-                  }
-                ]
-              },
-              "durability": "persistent",
-              "val": {
-                "i128": "0"
-              }
-            }
-          },
-          "ext": "v0"
-        },
-        "live_until": 518400
       },
       {
         "entry": {

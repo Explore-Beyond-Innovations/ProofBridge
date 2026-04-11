@@ -30,7 +30,7 @@ import * as path from "path";
 
 const CIRCUIT_PATH = path.resolve(
   __dirname,
-  "../../../proof_circuits/deposits/target/deposit_circuit.json"
+  "../../../../proof_circuits/deposits/target/deposit_circuit.json"
 );
 
 const OUTPUT_DIR = path.resolve(__dirname);
@@ -401,7 +401,7 @@ async function main() {
 
   const vkSrc = path.resolve(
     __dirname,
-    "../../../proof_circuits/deposits/target/vk"
+    "../../../../proof_circuits/deposits/target/vk"
   );
   fs.copyFileSync(vkSrc, path.join(OUTPUT_DIR, "vk"));
 

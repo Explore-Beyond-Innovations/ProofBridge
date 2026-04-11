@@ -7,7 +7,7 @@ import { hexToArr } from "../utils";
 
 const circuitPath = path.resolve(
   __dirname,
-  "../../proof_circuits/auth/target/auth_circuit.json"
+  "../../../proof_circuits/auth/target/auth_circuit.json"
 );
 
 const circuit = JSON.parse(fs.readFileSync(circuitPath, "utf8"));
