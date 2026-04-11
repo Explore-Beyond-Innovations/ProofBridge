@@ -5,6 +5,9 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "@aztec/bb.js"
+      - dependency-name: "@noir-lang/noir_js"
     groups:
       nestjs:
         patterns:
