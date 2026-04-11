@@ -1,0 +1,99 @@
+name: Stellar Contracts CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "contracts/stellar/**"
+      - ".github/workflows/stellar-contracts.yml"
+  pull_request:
+    paths:
+      - "contracts/stellar/**"
+      - ".github/workflows/stellar-contracts.yml"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    name: Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+        working-directory: contracts/stellar
+
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install wasm32v1-none target
+        run: rustup target add wasm32v1-none
+
+      - name: Cache cargo directories
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/stellar/target
+          key: ${{ runner.os }}-cargo-stellar-${{ hashFiles('contracts/stellar/Cargo.lock') }}
+
+      - name: Install Stellar CLI
+        run: |
+          curl -Ls https://github.com/stellar/stellar-cli/releases/download/v23.3.0/stellar-cli-23.3.0-x86_64-unknown-linux-gnu.tar.gz -o /tmp/stellar-cli.tar.gz
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf /tmp/stellar-cli.tar.gz -C "$HOME/.local/bin" stellar
+          chmod +x "$HOME/.local/bin/stellar"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "pnpm"
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build contract WASMs
+        run: |
+          stellar contract build --package ad-manager
+          stellar contract build --package order-portal
+          stellar contract build --package merkle-manager
+          stellar contract build --package verifier
+        working-directory: contracts/stellar
+
+      - name: Build deposit circuit
+        run: scripts/build_circuits.sh proof_circuits/deposits
+
+      - name: Build verifier test circuits
+        run: scripts/build_circuits.sh contracts/stellar/contracts/verifier/tests --prove
+
+      - name: Run unit tests
+        run: cargo test --workspace --exclude proofbridge-stellar
+        working-directory: contracts/stellar
+
+      - name: Generate integration test fixtures
+        run: npx tsx generate_fixtures.ts
+        working-directory: contracts/stellar/tests/fixtures
+
+      - name: Run integration tests
+        run: cargo test --test integration_test -- --nocapture
+        working-directory: contracts/stellar
