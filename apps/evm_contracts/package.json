@@ -22,7 +22,7 @@
     "proofbridge-mmr": "1.0.8"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^25.6.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   }
