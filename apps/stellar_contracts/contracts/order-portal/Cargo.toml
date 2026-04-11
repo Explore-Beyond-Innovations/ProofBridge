@@ -10,8 +10,10 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-sha3 = { version = "0.10", default-features = false }
-stellar-strkey = { version = "0.0.11", default-features = false }
+proofbridge-core = { workspace = true }
 
 [dev-dependencies]
-soroban-sdk = { workspace = true, features = ["testutils"] }
+soroban-sdk = { workspace = true, features = ["testutils", "alloc"] }
+
+[features]
+testutils = ["soroban-sdk/testutils"]

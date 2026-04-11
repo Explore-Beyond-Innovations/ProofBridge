@@ -1,103 +1,71 @@
-//! Event publishing for the OrderPortal contract
+//! Event types for the OrderPortal contract
+//!
+//! Uses the `#[contractevent]` macro (SDK v23+) instead of the deprecated
+//! `env.events().publish()` API.
 
-use soroban_sdk::{symbol_short, Address, BytesN, Env, String};
+use soroban_sdk::{contractevent, Address, BytesN, String};
 
 // =============================================================================
-// Chain Events
+// Admin Events
 // =============================================================================
 
-/// Emit ChainSet event
-pub fn emit_chain_set(env: &Env, chain_id: u128, ad_manager: &BytesN<32>, supported: bool) {
-    env.events().publish(
-        (symbol_short!("chain_set"), chain_id),
-        (ad_manager.clone(), supported),
-    );
+#[contractevent(topics = ["mgr_upd"], data_format = "single-value")]
+pub struct ManagerUpdated {
+    #[topic]
+    pub manager: Address,
+    pub status: bool,
 }
 
 // =============================================================================
-// Token Route Events
+// Chain / Route Events
 // =============================================================================
 
-/// Emit TokenRouteSet event
-pub fn emit_token_route_set(
-    env: &Env,
-    order_token: &BytesN<32>,
-    ad_chain_id: u128,
-    ad_token: &BytesN<32>,
-) {
-    env.events().publish(
-        (symbol_short!("route_set"), order_token.clone()),
-        (ad_token.clone(), ad_chain_id),
-    );
+#[contractevent(topics = ["chain_set"], data_format = "vec")]
+pub struct ChainSet {
+    #[topic]
+    pub chain_id: u128,
+    pub ad_manager: BytesN<32>,
+    pub supported: bool,
 }
 
-/// Emit TokenRouteRemoved event
-pub fn emit_token_route_removed(env: &Env, order_token: &BytesN<32>, ad_chain_id: u128) {
-    env.events().publish(
-        (symbol_short!("route_rm"), order_token.clone()),
-        ad_chain_id,
-    );
+#[contractevent(topics = ["route_set"], data_format = "vec")]
+pub struct TokenRouteSet {
+    #[topic]
+    pub order_token: BytesN<32>,
+    pub ad_token: BytesN<32>,
+    pub ad_chain_id: u128,
+}
+
+#[contractevent(topics = ["route_rm"], data_format = "vec")]
+pub struct TokenRouteRemoved {
+    #[topic]
+    pub order_token: BytesN<32>,
+    pub ad_chain_id: u128,
 }
 
 // =============================================================================
 // Order Events
 // =============================================================================
 
-/// Emit OrderCreated event
-pub fn emit_order_created(
-    env: &Env,
-    order_hash: &BytesN<32>,
-    bridger: &BytesN<32>,
-    order_chain_token: &BytesN<32>,
-    amount: u128,
-    ad_chain_id: u128,
-    ad_chain_token: &BytesN<32>,
-    ad_manager: &BytesN<32>,
-    ad_id: &String,
-    ad_creator: &BytesN<32>,
-    ad_recipient: &BytesN<32>,
-) {
-    env.events().publish(
-        (symbol_short!("ord_creat"), order_hash.clone()),
-        (
-            bridger.clone(),
-            order_chain_token.clone(),
-            amount,
-            ad_chain_id,
-            ad_chain_token.clone(),
-        ),
-    );
-    // Additional event data (split due to tuple size limits)
-    env.events().publish(
-        (symbol_short!("ord_cr_2"), order_hash.clone()),
-        (
-            ad_manager.clone(),
-            ad_id.clone(),
-            ad_creator.clone(),
-            ad_recipient.clone(),
-        ),
-    );
+#[contractevent(topics = ["ord_creat"], data_format = "vec")]
+pub struct OrderCreated {
+    #[topic]
+    pub order_hash: BytesN<32>,
+    pub bridger: BytesN<32>,
+    pub order_chain_token: BytesN<32>,
+    pub amount: u128,
+    pub ad_chain_id: u128,
+    pub ad_chain_token: BytesN<32>,
+    pub ad_manager: BytesN<32>,
+    pub ad_id: String,
+    pub ad_creator: BytesN<32>,
+    pub ad_recipient: BytesN<32>,
 }
 
-/// Emit OrderUnlocked event
-pub fn emit_order_unlocked(
-    env: &Env,
-    order_hash: &BytesN<32>,
-    recipient: &BytesN<32>,
-    nullifier_hash: &BytesN<32>,
-) {
-    env.events().publish(
-        (symbol_short!("ord_unlck"), order_hash.clone()),
-        (recipient.clone(), nullifier_hash.clone()),
-    );
-}
-
-// =============================================================================
-// Manager Events
-// =============================================================================
-
-/// Emit UpdateManager event
-pub fn emit_manager_updated(env: &Env, manager: &Address, status: bool) {
-    env.events()
-        .publish((symbol_short!("mgr_upd"), manager.clone()), status);
+#[contractevent(topics = ["ord_unlck"], data_format = "vec")]
+pub struct OrderUnlocked {
+    #[topic]
+    pub order_hash: BytesN<32>,
+    pub recipient: BytesN<32>,
+    pub nullifier_hash: BytesN<32>,
 }

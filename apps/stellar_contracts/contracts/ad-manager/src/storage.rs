@@ -243,14 +243,3 @@ pub fn extend_instance_ttl(env: &Env) {
         .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
 }
 
-/// Extend persistent storage TTL for a key
-pub fn extend_persistent_ttl(env: &Env) {
-    const PERSISTENT_LIFETIME_THRESHOLD: u32 = 17280; // ~1 day
-    const PERSISTENT_BUMP_AMOUNT: u32 = 518400; // ~30 days
-
-    // Extend all accessed persistent entries
-    // This is called at the end of operations
-    env.storage()
-        .persistent()
-        .extend_ttl(&KEY_CHAINS, PERSISTENT_LIFETIME_THRESHOLD, PERSISTENT_BUMP_AMOUNT);
-}

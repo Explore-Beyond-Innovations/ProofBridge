@@ -11,9 +11,9 @@
 extern crate std;
 
 use soroban_sdk::{Bytes, Env};
-use ultrahonk_rust_verifier::PROOF_BYTES;
+use ultrahonk_soroban_verifier::PROOF_BYTES;
 
-use crate::{VerifierContract, VerifierContractClient};
+use crate::{ProofBridgeVerifierContract, ProofBridgeVerifierContractClient};
 
 // =============================================================================
 // Constructor Validation Tests
@@ -33,7 +33,7 @@ fn test_constructor_rejects_invalid_vk() {
     let invalid_vk_bytes = Bytes::from_slice(&env, &[1u8; 100]);
 
     // This should panic because the VK bytes are invalid
-    let _contract_id = env.register(VerifierContract, (invalid_vk_bytes,));
+    let _contract_id = env.register(ProofBridgeVerifierContract, (invalid_vk_bytes,));
 }
 
 /// Test that the contract rejects empty VK bytes.
@@ -46,7 +46,7 @@ fn test_constructor_rejects_empty_vk() {
     let empty_vk_bytes = Bytes::new(&env);
 
     // This should panic because the VK bytes are empty/invalid
-    let _contract_id = env.register(VerifierContract, (empty_vk_bytes,));
+    let _contract_id = env.register(ProofBridgeVerifierContract, (empty_vk_bytes,));
 }
 
 // =============================================================================
@@ -66,10 +66,10 @@ const SIMPLE_PROOF: &[u8] = include_bytes!("../tests/simple_circuit/target/proof
 const SIMPLE_PUBLIC_INPUTS: &[u8] = include_bytes!("../tests/simple_circuit/target/public_inputs");
 
 /// Helper to create a verifier contract with the simple circuit VK
-fn setup_simple_circuit_verifier(env: &Env) -> VerifierContractClient {
+fn setup_simple_circuit_verifier<'a>(env: &'a Env) -> ProofBridgeVerifierContractClient<'a> {
     let vk_bytes = Bytes::from_slice(env, SIMPLE_VK);
-    let contract_id = env.register(VerifierContract, (vk_bytes,));
-    VerifierContractClient::new(env, &contract_id)
+    let contract_id = env.register(ProofBridgeVerifierContract, (vk_bytes,));
+    ProofBridgeVerifierContractClient::new(env, &contract_id)
 }
 
 /// Test that simple_circuit proof verification succeeds with valid inputs
@@ -133,7 +133,10 @@ fn test_simple_circuit_wrong_proof_fails() {
 
     // Verify - should fail
     let result = client.try_verify_proof(&public_inputs, &invalid_proof);
-    assert!(result.is_err(), "Verification should fail with invalid proof");
+    assert!(
+        result.is_err(),
+        "Verification should fail with invalid proof"
+    );
 }
 
 /// Test that verification fails with wrong public inputs
@@ -171,5 +174,8 @@ fn test_simple_circuit_wrong_proof_size_fails() {
 
     // Verify - should fail with ProofParseError
     let result = client.try_verify_proof(&public_inputs, &wrong_size_proof);
-    assert!(result.is_err(), "Verification should fail with wrong proof size");
+    assert!(
+        result.is_err(),
+        "Verification should fail with wrong proof size"
+    );
 }

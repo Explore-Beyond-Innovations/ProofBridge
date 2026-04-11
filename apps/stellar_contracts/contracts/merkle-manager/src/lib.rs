@@ -6,8 +6,8 @@
 //! ## Usage
 //!
 //! 1. Deploy and initialize the contract with an admin address
-//! 2. Admin sets the AdManager contract as a manager
-//! 3. Manager calls `append_order_hash` to add order hashes
+//! 2. Admin sets the AdManager and OrderPortal contracts as a managers
+//! 3. AdManager contract And OrderPortal contracts call `append_order_hash` to add order hashes
 //! 4. Anyone can query `get_root`, `get_width`, etc.
 
 #![no_std]
@@ -17,7 +17,28 @@ mod mmr;
 mod storage;
 
 use errors::MerkleError;
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, BytesN, Env};
+use soroban_sdk::{contract, contractevent, contractimpl, Address, BytesN, Env, Vec};
+
+// =============================================================================
+// Events
+// =============================================================================
+
+#[contractevent(topics = ["mgr_upd"], data_format = "single-value")]
+pub struct ManagerUpdated {
+    #[topic]
+    manager: Address,
+    status: bool,
+}
+
+#[contractevent(topics = ["mmr_add"], data_format = "vec")]
+pub struct MmrAppend {
+    #[topic]
+    leaf_index: u128,
+    order_hash: BytesN<32>,
+    width: u128,
+    size: u128,
+    root: BytesN<32>,
+}
 
 // =============================================================================
 // Contract Definition
@@ -27,10 +48,10 @@ use soroban_sdk::{contract, contractimpl, symbol_short, Address, BytesN, Env};
 ///
 /// Manages order hashes using a Merkle Mountain Range (MMR) with Poseidon2.
 #[contract]
-pub struct MerkleManagerContract;
+pub struct ProofBridgeMerkleManagerContract;
 
 #[contractimpl]
-impl MerkleManagerContract {
+impl ProofBridgeMerkleManagerContract {
     // =========================================================================
     // Initialization
     // =========================================================================
@@ -82,8 +103,11 @@ impl MerkleManagerContract {
         storage::set_manager(&env, &manager, status);
 
         // Emit event
-        env.events()
-            .publish((symbol_short!("mgr_upd"), manager.clone()), status);
+        ManagerUpdated {
+            manager: manager.clone(),
+            status,
+        }
+        .publish(&env);
 
         // Extend TTL
         storage::extend_instance_ttl(&env);
@@ -125,10 +149,14 @@ impl MerkleManagerContract {
         let root = storage::get_root(&env);
 
         // Emit event
-        env.events().publish(
-            (symbol_short!("mmr_add"), leaf_index),
-            (order_hash, width, size, root),
-        );
+        MmrAppend {
+            leaf_index,
+            order_hash,
+            width,
+            size,
+            root,
+        }
+        .publish(&env);
 
         // Extend TTL
         storage::extend_instance_ttl(&env);
@@ -167,11 +195,46 @@ impl MerkleManagerContract {
         storage::get_node_hash(&env, index).unwrap_or(BytesN::from_array(&env, &[0u8; 32]))
     }
 
+    /// Return all current peak hashes (same order as in peak bagging).
+    pub fn get_peaks(env: Env) -> Vec<BytesN<32>> {
+        mmr::get_peaks(&env)
+    }
+
     /// Apply BN254 field modulus to a hash.
     ///
     /// This is useful for ensuring hashes are within the Poseidon2 field.
     pub fn field_mod(env: Env, order_hash: BytesN<32>) -> BytesN<32> {
         mmr::field_mod(&env, &order_hash)
+    }
+
+    // =========================================================================
+    // Proof Functions
+    // =========================================================================
+
+    /// Build a Merkle inclusion proof for a leaf at `index`.
+    ///
+    /// Returns (root, width, peak_bag, siblings).
+    pub fn get_merkle_proof(
+        env: Env,
+        index: u128,
+    ) -> (BytesN<32>, u128, Vec<BytesN<32>>, Vec<BytesN<32>>) {
+        mmr::get_merkle_proof(&env, index)
+    }
+
+    /// Stateless inclusion proof verification.
+    ///
+    /// Mirrors the EVM `MMRPoseidon2.verifyInclusion`. Returns true if the
+    /// proof is valid; panics on invalid proof.
+    pub fn verify_inclusion(
+        env: Env,
+        root: BytesN<32>,
+        width: u128,
+        index: u128,
+        value_hash: BytesN<32>,
+        peak_bag: Vec<BytesN<32>>,
+        siblings: Vec<BytesN<32>>,
+    ) -> bool {
+        mmr::verify_inclusion(&env, &root, width, index, &value_hash, &peak_bag, &siblings)
     }
 
     /// Check if an address is a manager.

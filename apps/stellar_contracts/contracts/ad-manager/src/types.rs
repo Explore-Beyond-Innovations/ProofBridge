@@ -2,24 +2,8 @@
 
 use soroban_sdk::{contracttype, Address, BytesN, String};
 
-/// Native token placeholder address (all 0xEE bytes)
-/// Equivalent to EVM's 0xEeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
-pub const NATIVE_TOKEN_ADDRESS: [u8; 32] = [
-    0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE,
-    0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE,
-    0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE,
-    0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE,
-];
-
-/// Stellar Network Chain IDs
-pub mod chain_ids {
-    /// Stellar Mainnet chain ID
-    pub const STELLAR_MAINNET: u128 = 2_000_000_001;
-    /// Stellar Testnet chain ID
-    pub const STELLAR_TESTNET: u128 = 2_000_000_002;
-    /// Stellar Futurenet chain ID
-    pub const STELLAR_FUTURENET: u128 = 2_000_000_003;
-}
+pub use proofbridge_core::token::NATIVE_TOKEN_ADDRESS;
+pub use proofbridge_core::types::{ContractConfig, Status};
 
 /// Source chain configuration
 #[contracttype]
@@ -51,7 +35,7 @@ pub struct Ad {
     pub open: bool,
 }
 
-/// Parameters describing a cross-chain order
+/// Parameters describing a cross-chain order (ad-manager variant)
 #[contracttype]
 #[derive(Clone, Debug)]
 pub struct OrderParams {
@@ -77,39 +61,4 @@ pub struct OrderParams {
     pub ad_recipient: BytesN<32>,
     /// Unique nonce to avoid hash collisions
     pub salt: u128,
-}
-
-/// Order lifecycle status
-#[contracttype]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[repr(u32)]
-pub enum Status {
-    /// Not present in storage
-    None = 0,
-    /// Liquidity reserved
-    Open = 1,
-    /// Unlocked and paid
-    Filled = 2,
-}
-
-impl Default for Status {
-    fn default() -> Self {
-        Status::None
-    }
-}
-
-/// Contract configuration stored at initialization
-#[contracttype]
-#[derive(Clone, Debug)]
-pub struct ContractConfig {
-    /// Admin address
-    pub admin: Address,
-    /// Verifier contract address
-    pub verifier: Address,
-    /// MerkleManager contract address
-    pub merkle_manager: Address,
-    /// Wrapped native token (XLM) contract address
-    pub w_native_token: Address,
-    /// This chain's ID
-    pub chain_id: u128,
 }

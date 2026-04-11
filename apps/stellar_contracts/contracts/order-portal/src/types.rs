@@ -1,25 +1,9 @@
 //! Data types for the OrderPortal contract
 
-use soroban_sdk::{contracttype, Address, BytesN, String};
+use soroban_sdk::{contracttype, BytesN, String};
 
-// =============================================================================
-// Constants
-// =============================================================================
-
-/// Native token address placeholder (matches EVM's 0xEeee...)
-pub const NATIVE_TOKEN_ADDRESS: [u8; 32] = [
-    0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE,
-    0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE,
-    0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE,
-    0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE,
-];
-
-/// Stellar chain IDs (2 billion range)
-pub mod chain_ids {
-    pub const STELLAR_MAINNET: u128 = 2_000_000_001;
-    pub const STELLAR_TESTNET: u128 = 2_000_000_002;
-    pub const STELLAR_FUTURENET: u128 = 2_000_000_003;
-}
+pub use proofbridge_core::token::NATIVE_TOKEN_ADDRESS;
+pub use proofbridge_core::types::{ContractConfig, Status};
 
 // =============================================================================
 // Chain Configuration
@@ -39,9 +23,7 @@ pub struct ChainInfo {
 // Order Types
 // =============================================================================
 
-/// Parameters for creating or unlocking an order
-///
-/// All fields are used when computing the EIP-712 order hash.
+/// Parameters for creating or unlocking an order (order-portal variant)
 #[contracttype]
 #[derive(Clone, Debug)]
 pub struct OrderParams {
@@ -67,37 +49,4 @@ pub struct OrderParams {
     pub ad_recipient: BytesN<32>,
     /// Unique nonce to avoid hash collisions / replay
     pub salt: u128,
-}
-
-/// Order lifecycle status
-#[contracttype]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[repr(u32)]
-pub enum Status {
-    /// Unknown / not created
-    None = 0,
-    /// Created and funded
-    Open = 1,
-    /// Unlocked / paid out
-    Filled = 2,
-}
-
-// =============================================================================
-// Contract Configuration
-// =============================================================================
-
-/// Immutable contract configuration set at initialization
-#[contracttype]
-#[derive(Clone, Debug)]
-pub struct ContractConfig {
-    /// Admin address
-    pub admin: Address,
-    /// Verifier contract address
-    pub verifier: Address,
-    /// MerkleManager contract address
-    pub merkle_manager: Address,
-    /// Wrapped native token (XLM) contract address
-    pub w_native_token: Address,
-    /// This chain's ID
-    pub chain_id: u128,
 }

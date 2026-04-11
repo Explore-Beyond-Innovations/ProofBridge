@@ -10,14 +10,11 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-# Keccak256 for EIP-712 compatibility
-sha3 = { version = "0.10", default-features = false }
-# Stellar strkey encoding for address conversion
-stellar-strkey = "0.0.13"
+proofbridge-core = { workspace = true }
 
 [dev-dependencies]
-soroban-sdk = { workspace = true, features = ["testutils"] }
-hex = "0.4"
+soroban-sdk = { workspace = true, features = ["testutils", "alloc"] }
+hex = { workspace = true }
 
 [features]
 testutils = ["soroban-sdk/testutils"]

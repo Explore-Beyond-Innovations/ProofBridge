@@ -10,15 +10,7 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-
-# UltraHonk verifier
-ultrahonk_rust_verifier = { git = "https://github.com/yugocabrio/ultrahonk-rust-verifier.git", branch = "main", default-features = false, features = ["alloc", "soroban-precompile", "serde_json", "serde"] }
-
-# Ark curves for BN254 operations
-ark-bn254 = { version = "0.5", default-features = false }
-ark-ff = { version = "0.5", default-features = false }
-ark-ec = { version = "0.5", default-features = false }
-ark-serialize = { version = "0.5", default-features = false }
+ultrahonk_soroban_verifier = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

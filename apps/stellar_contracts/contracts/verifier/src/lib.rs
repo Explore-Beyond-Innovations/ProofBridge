@@ -11,16 +11,8 @@
 //! The verification key is stored on-chain at deployment and cannot be updated.
 
 #![no_std]
-
-extern crate alloc;
-
-mod backend;
-
-use alloc::{boxed::Box, vec::Vec as StdVec};
 use soroban_sdk::{contract, contracterror, contractimpl, symbol_short, Bytes, Env, Symbol};
-use ultrahonk_rust_verifier::{ec, hash, utils::load_vk_from_bytes, UltraHonkVerifier, PROOF_BYTES};
-
-use backend::{SorobanBn254, SorobanKeccak};
+use ultrahonk_soroban_verifier::{utils::load_vk_from_bytes, UltraHonkVerifier, PROOF_BYTES};
 
 // =============================================================================
 // Error Types
@@ -48,10 +40,10 @@ pub enum VerifierError {
 ///
 /// Stores an immutable verification key and verifies UltraHonk proofs.
 #[contract]
-pub struct VerifierContract;
+pub struct ProofBridgeVerifierContract;
 
 #[contractimpl]
-impl VerifierContract {
+impl ProofBridgeVerifierContract {
     // =========================================================================
     // Storage Keys
     // =========================================================================
@@ -75,9 +67,7 @@ impl VerifierContract {
     /// # Panics
     /// * If the verification key cannot be parsed
     pub fn __constructor(env: Env, vk_bytes: Bytes) {
-        // Validate the verification key can be parsed
-        let vk_vec: StdVec<u8> = vk_bytes.to_alloc_vec();
-        if load_vk_from_bytes(&vk_vec).is_none() {
+        if load_vk_from_bytes(&vk_bytes).is_none() {
             panic!("Invalid verification key bytes");
         }
 
@@ -104,6 +94,11 @@ impl VerifierContract {
         public_inputs: Bytes,
         proof_bytes: Bytes,
     ) -> Result<(), VerifierError> {
+        // Validate proof size
+        if proof_bytes.len() as usize != PROOF_BYTES {
+            return Err(VerifierError::ProofParseError);
+        }
+
         // Get stored verification key
         let vk_bytes: Bytes = env
             .storage()
@@ -111,29 +106,13 @@ impl VerifierContract {
             .get(&Self::key_vk())
             .ok_or(VerifierError::VkNotSet)?;
 
-        // Set up crypto backends
-        hash::set_soroban_hash_backend(Box::new(SorobanKeccak::new(&env)));
-        ec::set_soroban_bn254_backend(Box::new(SorobanBn254::new(&env)));
-
-        // Validate proof size
-        let proof_vec: StdVec<u8> = proof_bytes.to_alloc_vec();
-        if proof_vec.len() != PROOF_BYTES {
-            return Err(VerifierError::ProofParseError);
-        }
-
-        // Parse verification key
-        let vk_vec: StdVec<u8> = vk_bytes.to_alloc_vec();
-        let vk = load_vk_from_bytes(&vk_vec).ok_or(VerifierError::VkParseError)?;
-
-        // Create verifier with the stored VK
-        let verifier = UltraHonkVerifier::new_with_vk(vk);
-
-        // Get public inputs
-        let pub_inputs_bytes = public_inputs.to_alloc_vec();
+        // Deserialize verification key bytes
+        let verifier =
+            UltraHonkVerifier::new(&env, &vk_bytes).map_err(|_| VerifierError::VkParseError)?;
 
         // Verify the proof
         verifier
-            .verify(&proof_vec, &pub_inputs_bytes)
+            .verify(&proof_bytes, &public_inputs)
             .map_err(|_| VerifierError::VerificationFailed)?;
 
         Ok(())

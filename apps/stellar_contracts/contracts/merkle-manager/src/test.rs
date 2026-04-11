@@ -4,19 +4,21 @@ extern crate std;
 
 use soroban_sdk::{testutils::Address as _, Address, BytesN, Env};
 
-use crate::{mmr, MerkleManagerContract, MerkleManagerContractClient};
+use crate::{mmr, ProofBridgeMerkleManagerContract, ProofBridgeMerkleManagerContractClient};
 
 // =============================================================================
 // Helper Functions
 // =============================================================================
 
-fn setup_contract(env: &Env) -> (MerkleManagerContractClient, Address, Address) {
-    let contract_id = env.register(MerkleManagerContract, ());
-    let client = MerkleManagerContractClient::new(env, &contract_id);
-    
+fn setup_contract<'a>(
+    env: &'a Env,
+) -> (ProofBridgeMerkleManagerContractClient<'a>, Address, Address) {
+    let contract_id = env.register(ProofBridgeMerkleManagerContract, ());
+    let client = ProofBridgeMerkleManagerContractClient::new(env, &contract_id);
+
     let admin = Address::generate(env);
     let manager = Address::generate(env);
-    
+
     (client, admin, manager)
 }
 
@@ -29,11 +31,11 @@ fn test_calc_size() {
     // Test calc_size matches EVM implementation
     // size = (width << 1) - popcount(width)
     assert_eq!(mmr::calc_size(0), 0);
-    assert_eq!(mmr::calc_size(1), 1);  // 2 - 1 = 1
-    assert_eq!(mmr::calc_size(2), 3);  // 4 - 1 = 3
-    assert_eq!(mmr::calc_size(3), 4);  // 6 - 2 = 4
-    assert_eq!(mmr::calc_size(4), 7);  // 8 - 1 = 7
-    assert_eq!(mmr::calc_size(5), 8);  // 10 - 2 = 8
+    assert_eq!(mmr::calc_size(1), 1); // 2 - 1 = 1
+    assert_eq!(mmr::calc_size(2), 3); // 4 - 1 = 3
+    assert_eq!(mmr::calc_size(3), 4); // 6 - 2 = 4
+    assert_eq!(mmr::calc_size(4), 7); // 8 - 1 = 7
+    assert_eq!(mmr::calc_size(5), 8); // 10 - 2 = 8
     assert_eq!(mmr::calc_size(6), 10); // 12 - 2 = 10
     assert_eq!(mmr::calc_size(7), 11); // 14 - 3 = 11
     assert_eq!(mmr::calc_size(8), 15); // 16 - 1 = 15
@@ -43,14 +45,14 @@ fn test_calc_size() {
 fn test_num_of_peaks() {
     // Popcount of width
     assert_eq!(mmr::num_of_peaks(0), 0);
-    assert_eq!(mmr::num_of_peaks(1), 1);  // 0b0001
-    assert_eq!(mmr::num_of_peaks(2), 1);  // 0b0010
-    assert_eq!(mmr::num_of_peaks(3), 2);  // 0b0011
-    assert_eq!(mmr::num_of_peaks(4), 1);  // 0b0100
-    assert_eq!(mmr::num_of_peaks(5), 2);  // 0b0101
-    assert_eq!(mmr::num_of_peaks(6), 2);  // 0b0110
-    assert_eq!(mmr::num_of_peaks(7), 3);  // 0b0111
-    assert_eq!(mmr::num_of_peaks(8), 1);  // 0b1000
+    assert_eq!(mmr::num_of_peaks(1), 1); // 0b0001
+    assert_eq!(mmr::num_of_peaks(2), 1); // 0b0010
+    assert_eq!(mmr::num_of_peaks(3), 2); // 0b0011
+    assert_eq!(mmr::num_of_peaks(4), 1); // 0b0100
+    assert_eq!(mmr::num_of_peaks(5), 2); // 0b0101
+    assert_eq!(mmr::num_of_peaks(6), 2); // 0b0110
+    assert_eq!(mmr::num_of_peaks(7), 3); // 0b0111
+    assert_eq!(mmr::num_of_peaks(8), 1); // 0b1000
 }
 
 #[test]
@@ -69,28 +71,28 @@ fn test_get_leaf_index() {
 #[test]
 fn test_get_peak_indexes() {
     let env = Env::default();
-    
+
     // Width 1: peak at 1
     let peaks1 = mmr::get_peak_indexes(&env, 1);
     assert_eq!(peaks1.len(), 1);
     assert_eq!(peaks1.get(0).unwrap(), 1);
-    
+
     // Width 2: peak at 3
     let peaks2 = mmr::get_peak_indexes(&env, 2);
     assert_eq!(peaks2.len(), 1);
     assert_eq!(peaks2.get(0).unwrap(), 3);
-    
+
     // Width 3: peaks at 3, 4
     let peaks3 = mmr::get_peak_indexes(&env, 3);
     assert_eq!(peaks3.len(), 2);
     assert_eq!(peaks3.get(0).unwrap(), 3);
     assert_eq!(peaks3.get(1).unwrap(), 4);
-    
+
     // Width 4: peak at 7
     let peaks4 = mmr::get_peak_indexes(&env, 4);
     assert_eq!(peaks4.len(), 1);
     assert_eq!(peaks4.get(0).unwrap(), 7);
-    
+
     // Width 5: peaks at 7, 8
     let peaks5 = mmr::get_peak_indexes(&env, 5);
     assert_eq!(peaks5.len(), 2);
@@ -129,10 +131,10 @@ fn test_is_leaf() {
 fn test_initialize() {
     let env = Env::default();
     let (client, admin, _) = setup_contract(&env);
-    
+
     // Initialize
     client.initialize(&admin);
-    
+
     // Check state
     assert!(client.is_initialized());
     assert_eq!(client.get_admin(), Some(admin));
@@ -157,17 +159,17 @@ fn test_double_initialize_fails() {
 fn test_set_manager() {
     let env = Env::default();
     env.mock_all_auths();
-    
+
     let (client, admin, manager) = setup_contract(&env);
-    
+
     client.initialize(&admin);
-    
+
     // Set manager
     client.set_manager(&manager, &true);
-    
+
     // Check
     assert!(client.is_manager(&manager));
-    
+
     // Unset manager
     client.set_manager(&manager, &false);
     assert!(!client.is_manager(&manager));
@@ -272,15 +274,22 @@ fn padded_int_to_bytes32(env: &Env, n: u64) -> BytesN<32> {
     BytesN::from_array(env, &arr)
 }
 
-/// Test BN254 scalar prime is correctly defined
+/// Test BN254 scalar field reduction via Fr
 #[test]
-fn test_bn254_prime() {
-    // BN254 scalar field prime:
-    // 21888242871839275222246405745257275088548364400416034343698204186575808495617
-    // In hex: 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001
-    let expected_hex = "30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001";
-    let prime_hex = hex::encode(mmr::BN254_SCALAR_PRIME);
-    assert_eq!(prime_hex, expected_hex, "BN254 prime mismatch");
+fn test_bn254_field_reduction() {
+    // Verify that Fr reduces the BN254 scalar field modulus r to 0.
+    // r = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001
+    let env = Env::default();
+    let prime = hex_to_bytes32(
+        &env,
+        "30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001",
+    );
+    let reduced = mmr::field_mod(&env, &prime);
+    assert_eq!(
+        reduced,
+        BytesN::from_array(&env, &[0u8; 32]),
+        "Prime should reduce to 0"
+    );
 }
 
 /// Test field_mod with known EVM values
@@ -291,20 +300,32 @@ fn test_field_mod_cross_chain() {
     client.initialize(&admin);
 
     // Test 1: Value less than prime should stay the same
-    let small = hex_to_bytes32(&env, "0000000000000000000000000000000000000000000000000000000000000001");
+    let small = hex_to_bytes32(
+        &env,
+        "0000000000000000000000000000000000000000000000000000000000000001",
+    );
     let result1 = client.field_mod(&small);
     assert_eq!(result1, small, "Small value should not change");
 
     // Test 2: Value equal to prime should become 0
-    let prime = hex_to_bytes32(&env, "30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001");
+    let prime = hex_to_bytes32(
+        &env,
+        "30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001",
+    );
     let result2 = client.field_mod(&prime);
     let zero = BytesN::from_array(&env, &[0u8; 32]);
     assert_eq!(result2, zero, "Prime should reduce to 0");
 
     // Test 3: Value = prime + 1 should become 1
-    let prime_plus_1 = hex_to_bytes32(&env, "30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000002");
+    let prime_plus_1 = hex_to_bytes32(
+        &env,
+        "30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000002",
+    );
     let result3 = client.field_mod(&prime_plus_1);
-    let one = hex_to_bytes32(&env, "0000000000000000000000000000000000000000000000000000000000000001");
+    let one = hex_to_bytes32(
+        &env,
+        "0000000000000000000000000000000000000000000000000000000000000001",
+    );
     assert_eq!(result3, one, "Prime + 1 should reduce to 1");
 
     // Test 4: Max value (all 0xFF) should be reduced
@@ -323,15 +344,15 @@ fn test_mmr_structure_cross_chain() {
 
     // Test 1: Size calculation for various widths
     let test_cases = [
-        (0u128, 0u128),   // empty tree
-        (1, 1),           // single leaf
-        (2, 3),           // 2 leaves + 1 parent
-        (3, 4),           // 3 leaves + 1 parent (2 peaks)
-        (4, 7),           // 4 leaves in a complete binary tree
-        (7, 11),          // 7 leaves (3 peaks)
-        (8, 15),          // 8 leaves in complete binary tree
-        (15, 26),         // 15 leaves (4 peaks)
-        (16, 31),         // 16 leaves in complete binary tree
+        (0u128, 0u128), // empty tree
+        (1, 1),         // single leaf
+        (2, 3),         // 2 leaves + 1 parent
+        (3, 4),         // 3 leaves + 1 parent (2 peaks)
+        (4, 7),         // 4 leaves in a complete binary tree
+        (7, 11),        // 7 leaves (3 peaks)
+        (8, 15),        // 8 leaves in complete binary tree
+        (15, 26),       // 15 leaves (4 peaks)
+        (16, 31),       // 16 leaves in complete binary tree
     ];
 
     for (width, expected_size) in test_cases {
@@ -380,16 +401,16 @@ fn test_multiple_appends_cross_chain() {
         client.append_order_hash(&manager, &hash);
 
         let root = client.get_root();
-        assert_ne!(root, zero_root, "Root should not be zero after append {}", i);
+        assert_ne!(
+            root, zero_root,
+            "Root should not be zero after append {}",
+            i
+        );
 
         // Each root should be different from previous
         if !roots.is_empty() {
             let last_root = roots.last().unwrap();
-            assert_ne!(
-                root, *last_root,
-                "Root should change after append {}",
-                i
-            );
+            assert_ne!(root, *last_root, "Root should change after append {}", i);
         }
 
         roots.push(root);
@@ -403,7 +424,8 @@ fn test_multiple_appends_cross_chain() {
     for (i, expected_root) in roots.iter().enumerate() {
         let stored_root = client.get_root_at_index(&((i + 1) as u128));
         assert_eq!(
-            stored_root, *expected_root,
+            stored_root,
+            *expected_root,
             "Root history mismatch at width {}",
             i + 1
         );
@@ -440,7 +462,11 @@ fn test_deterministic_roots() {
     let root2 = client2.get_root();
 
     // Convert to arrays for comparison (different Env instances)
-    assert_eq!(root1.to_array(), root2.to_array(), "Roots should be identical for same inputs");
+    assert_eq!(
+        root1.to_array(),
+        root2.to_array(),
+        "Roots should be identical for same inputs"
+    );
 }
 
 /// Test that different input order produces different roots
@@ -559,4 +585,72 @@ fn test_cross_chain_mmr_evm_compatibility() {
     assert_eq!(mmr::get_leaf_index(3), 4);
     assert_eq!(mmr::get_leaf_index(4), 5);
     assert_eq!(mmr::get_leaf_index(5), 8);
+}
+
+// =============================================================================
+// Proof Verification Tests
+// =============================================================================
+
+/// Test proof generation and verification round-trip.
+/// Mirrors the EVM TestMMRPoseidon.sol pattern: append items, get proof, verify.
+#[test]
+fn test_merkle_proof_round_trip() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, admin, manager) = setup_contract(&env);
+    client.initialize(&admin);
+    client.set_manager(&manager, &true);
+
+    // Append 10 items (matching EVM TestMMRPoseidon structure)
+    //              15
+    //       7             14
+    //    3      6     10       13       18
+    //  1  2   4  5   8  9    11  12   16  17
+    let hashes: std::vec::Vec<BytesN<32>> =
+        (0..10u64).map(|i| padded_int_to_bytes32(&env, i)).collect();
+
+    for hash in &hashes {
+        client.append_order_hash(&manager, hash);
+    }
+
+    assert_eq!(client.get_width(), 10);
+
+    // Verify proof for every leaf
+    let leaf_indexes: [u128; 10] = [1, 2, 4, 5, 8, 9, 11, 12, 16, 17];
+    for (i, &leaf_idx) in leaf_indexes.iter().enumerate() {
+        let (root, width, peak_bag, siblings) = client.get_merkle_proof(&leaf_idx);
+
+        // The value_hash is field_mod(original_hash) since append applies field_mod
+        let value_hash = client.field_mod(&hashes[i]);
+
+        let valid =
+            client.verify_inclusion(&root, &width, &leaf_idx, &value_hash, &peak_bag, &siblings);
+        assert!(
+            valid,
+            "Proof verification failed for leaf index {}",
+            leaf_idx
+        );
+    }
+}
+
+/// Test proof verification fails with wrong value hash.
+#[test]
+#[should_panic(expected = "MMR: bad peak hash")]
+fn test_proof_fails_with_wrong_value() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, admin, manager) = setup_contract(&env);
+    client.initialize(&admin);
+    client.set_manager(&manager, &true);
+
+    let hash = padded_int_to_bytes32(&env, 42);
+    client.append_order_hash(&manager, &hash);
+
+    let (root, width, peak_bag, siblings) = client.get_merkle_proof(&1);
+
+    // Use wrong value (must be a valid field element, i.e. < BN254 modulus)
+    let wrong_value = padded_int_to_bytes32(&env, 999);
+    client.verify_inclusion(&root, &width, &1, &wrong_value, &peak_bag, &siblings);
 }

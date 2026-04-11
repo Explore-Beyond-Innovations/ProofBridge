@@ -89,3 +89,13 @@ pub enum AdManagerError {
     /// Signature verification failed
     SignatureVerificationFailed = 33,
 }
+
+impl proofbridge_core::errors::ProofBridgeError for AdManagerError {
+    fn token_zero_address() -> Self { Self::TokenZeroAddress }
+    fn merkle_append_failed() -> Self { Self::MerkleAppendFailed }
+    fn invalid_proof() -> Self { Self::InvalidProof }
+    fn invalid_message() -> Self { Self::InvalidMessage }
+    fn token_already_used() -> Self { Self::TokenAlreadyUsed }
+    fn request_token_expired() -> Self { Self::RequestTokenExpired }
+    fn invalid_signer() -> Self { Self::InvalidSigner }
+}
