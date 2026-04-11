@@ -122,6 +122,7 @@ usage() {
 
 [[ $# -lt 1 ]] && usage
 
+[[ -d "$1" ]] || { echo "error: path '$1' does not exist or is not a directory"; exit 1; }
 TARGET_PATH="$(cd "$1" && pwd)"
 PROVE="false"
 shift
