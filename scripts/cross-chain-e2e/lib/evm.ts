@@ -178,12 +178,3 @@ export function getContract(
   const { abi } = loadArtifact(contractFileName, contractName);
   return new ethers.Contract(address, abi, signer);
 }
-
-/** Create a signer for EVM interactions. */
-export function createSigner(
-  rpcUrl: string,
-  privateKey: string,
-): ethers.Wallet {
-  const provider = new ethers.JsonRpcProvider(rpcUrl);
-  return new ethers.Wallet(privateKey, provider);
-}

@@ -20,6 +20,7 @@ import { getAddress } from 'viem';
 import { AdStatus, Prisma } from '@prisma/client';
 import { Request } from 'express';
 import { ViemService } from '../../providers/viem/viem.service';
+import { toBytes32 } from '../../providers/viem/ethers/typedData';
 import { randomUUID } from 'crypto';
 
 type AdQueryInput = {
@@ -395,7 +396,7 @@ export class AdsService {
           orderChainId: route.orderToken.chain.chainId,
           adToken: route.adToken.address as `0x${string}`,
           initialAmount: fundAmount.toFixed(0),
-          adRecipient: dto.creatorDstAddress as `0x${string}`,
+          adRecipient: toBytes32(dto.creatorDstAddress),
         });
 
       const requestDetails = await this.prisma.$transaction(async (prisma) => {

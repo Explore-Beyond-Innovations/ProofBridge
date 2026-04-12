@@ -22,7 +22,7 @@ import { ProofService } from '../../providers/noir/proof.service';
 import { randomUUID } from 'crypto';
 import { Prisma, TradeStatus } from '@prisma/client';
 import { EncryptionService } from '@libs/encryption.service';
-import { uuidToBigInt } from '../../providers/viem/ethers/typedData';
+import { toBytes32, uuidToBigInt } from '../../providers/viem/ethers/typedData';
 
 @Injectable()
 export class TradesService {
@@ -369,19 +369,23 @@ export class TradesService {
       const reqContractDetails =
         await this.viemService.getCreateOrderRequestContractDetails({
           orderChainId: ad.route.orderToken.chain.chainId,
+          orderContractAddress: ad.route.orderToken.chain
+            .orderPortalAddress as `0x${string}`,
           orderParams: {
-            orderChainToken: ad.route.orderToken.address,
-            adChainToken: ad.route.adToken.address,
+            orderChainToken: toBytes32(ad.route.orderToken.address),
+            adChainToken: toBytes32(ad.route.adToken.address),
             amount: amount.toFixed(0),
-            bridger: getAddress(user.walletAddress),
+            bridger: toBytes32(user.walletAddress),
             orderChainId: ad.route.orderToken.chain.chainId.toString(),
-            orderPortal: ad.route.orderToken.chain.orderPortalAddress,
-            orderRecipient: getAddress(dto.bridgerDstAddress),
+            orderPortal: toBytes32(
+              ad.route.orderToken.chain.orderPortalAddress,
+            ),
+            orderRecipient: toBytes32(dto.bridgerDstAddress),
             adChainId: ad.route.adToken.chain.chainId.toString(),
-            adManager: ad.route.adToken.chain.adManagerAddress,
+            adManager: toBytes32(ad.route.adToken.chain.adManagerAddress),
             adId: ad.id,
-            adCreator: getAddress(ad.creatorAddress),
-            adRecipient: getAddress(ad.creatorDstAddress),
+            adCreator: toBytes32(ad.creatorAddress),
+            adRecipient: toBytes32(ad.creatorDstAddress),
             salt: tradeId,
           },
         });
@@ -642,21 +646,23 @@ export class TradesService {
       const reqContractDetails =
         await this.viemService.getLockForOrderRequestContractDetails({
           adChainId: trade.route.adToken.chain.chainId,
+          adContractAddress: trade.route.adToken.chain
+            .adManagerAddress as `0x${string}`,
           orderParams: {
-            orderChainToken: getAddress(trade.route.orderToken.address),
-            adChainToken: getAddress(trade.route.adToken.address),
+            orderChainToken: toBytes32(trade.route.orderToken.address),
+            adChainToken: toBytes32(trade.route.adToken.address),
             amount: trade.amount.toFixed(0),
-            bridger: getAddress(trade.bridgerAddress),
+            bridger: toBytes32(trade.bridgerAddress),
             orderChainId: trade.route.orderToken.chain.chainId.toString(),
-            orderPortal: getAddress(
+            orderPortal: toBytes32(
               trade.route.orderToken.chain.orderPortalAddress,
             ),
-            orderRecipient: getAddress(trade.bridgerDstAddress),
+            orderRecipient: toBytes32(trade.bridgerDstAddress),
             adChainId: trade.route.adToken.chain.chainId.toString(),
-            adManager: getAddress(trade.route.adToken.chain.adManagerAddress),
+            adManager: toBytes32(trade.route.adToken.chain.adManagerAddress),
             adId: trade.adId,
-            adCreator: getAddress(trade.adCreatorAddress),
-            adRecipient: getAddress(trade.adCreatorDstAddress),
+            adCreator: toBytes32(trade.adCreatorAddress),
+            adRecipient: toBytes32(trade.adCreatorDstAddress),
             salt: trade.id,
           },
         });
@@ -872,20 +878,20 @@ export class TradesService {
             : (trade.route.adToken.chain.adManagerAddress as `0x${string}`),
           isAdCreator,
           orderParams: {
-            orderChainToken: trade.route.orderToken.address as `0x${string}`,
-            adChainToken: trade.route.adToken.address as `0x${string}`,
+            orderChainToken: toBytes32(trade.route.orderToken.address),
+            adChainToken: toBytes32(trade.route.adToken.address),
             amount: trade.amount.toFixed(0),
-            bridger: getAddress(trade.bridgerAddress),
+            bridger: toBytes32(trade.bridgerAddress),
             orderChainId: trade.route.orderToken.chain.chainId.toString(),
-            orderPortal: trade.route.orderToken.chain
-              .orderPortalAddress as `0x${string}`,
-            orderRecipient: getAddress(trade.bridgerDstAddress),
+            orderPortal: toBytes32(
+              trade.route.orderToken.chain.orderPortalAddress,
+            ),
+            orderRecipient: toBytes32(trade.bridgerDstAddress),
             adChainId: trade.route.adToken.chain.chainId.toString(),
-            adManager: trade.route.adToken.chain
-              .adManagerAddress as `0x${string}`,
+            adManager: toBytes32(trade.route.adToken.chain.adManagerAddress),
             adId: trade.adId,
-            adCreator: getAddress(trade.adCreatorAddress),
-            adRecipient: getAddress(trade.adCreatorDstAddress),
+            adCreator: toBytes32(trade.adCreatorAddress),
+            adRecipient: toBytes32(trade.adCreatorDstAddress),
             salt: trade.id,
           },
           nullifierHash: nullifierHash,

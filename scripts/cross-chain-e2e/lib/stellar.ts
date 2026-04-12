@@ -63,24 +63,6 @@ export function getAddress(name: string = SOURCE): string {
 }
 
 /**
- * Idempotently generate a Stellar key under `name` and fund it via friendbot.
- * Safe to call repeatedly — existing keys / accounts are left alone.
- */
-export function generateAndFundKey(name: string): string {
-  try {
-    stellar(`keys generate "${name}"`);
-  } catch {
-    // Already exists — leave it alone.
-  }
-  try {
-    stellar(`keys fund "${name}" --network "${NETWORK}"`);
-  } catch {
-    // Already funded — fine.
-  }
-  return getAddress(name);
-}
-
-/**
  * Deploy a Stellar Asset Contract (SAC) for a classic asset, returning its
  * C... contract ID. If the SAC is already deployed, falls back to looking up
  * the id via `contract id asset`. Use `--asset native` for XLM.
@@ -106,24 +88,6 @@ export function getSecret(name: string = SOURCE): string {
 
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
-function base32Encode(data: Uint8Array): string {
-  let bits = 0;
-  let value = 0;
-  let result = "";
-  for (const byte of data) {
-    value = (value << 8) | byte;
-    bits += 8;
-    while (bits >= 5) {
-      result += BASE32_ALPHABET[(value >>> (bits - 5)) & 0x1f];
-      bits -= 5;
-    }
-  }
-  if (bits > 0) {
-    result += BASE32_ALPHABET[(value << (5 - bits)) & 0x1f];
-  }
-  return result;
-}
-
 export function base32Decode(str: string): Uint8Array {
   const lookup: Record<string, number> = {};
   for (let i = 0; i < BASE32_ALPHABET.length; i++) {
@@ -143,57 +107,12 @@ export function base32Decode(str: string): Uint8Array {
   return new Uint8Array(bytes);
 }
 
-function crc16xmodem(data: Uint8Array): number {
-  let crc = 0x0000;
-  for (const byte of data) {
-    crc ^= byte << 8;
-    for (let i = 0; i < 8; i++) {
-      if (crc & 0x8000) {
-        crc = ((crc << 1) ^ 0x1021) & 0xffff;
-      } else {
-        crc = (crc << 1) & 0xffff;
-      }
-    }
-  }
-  return crc;
-}
-
-const STRKEY_ED25519 = 6 << 3; // 48 → G prefix
-const STRKEY_CONTRACT = 2 << 3; // 16 → C prefix
-
-function encodeStrkey(versionByte: number, payload: Buffer): string {
-  const body = Buffer.concat([Buffer.from([versionByte]), payload]);
-  const checksum = crc16xmodem(body);
-  const full = Buffer.concat([
-    body,
-    Buffer.from([checksum & 0xff, (checksum >> 8) & 0xff]),
-  ]);
-  return base32Encode(full);
-}
-
 /** Decode a Stellar strkey address (C.../G...) to 32-byte hex. */
 export function strkeyToHex(strkey: string): string {
   const decoded = base32Decode(strkey);
   // Skip version byte (1), take 32 bytes, skip checksum (2)
   const payload = decoded.slice(1, 33);
   return "0x" + Buffer.from(payload).toString("hex");
-}
-
-/** Encode 32-byte hex as C... (contract) address. */
-export function hexToContractAddress(hex: string): string {
-  const buf = Buffer.from(hex.replace(/^0x/i, ""), "hex");
-  return encodeStrkey(STRKEY_CONTRACT, buf);
-}
-
-/** Encode 32-byte hex as G... (account) address. */
-export function hexToAccountAddress(hex: string): string {
-  const buf = Buffer.from(hex.replace(/^0x/i, ""), "hex");
-  return encodeStrkey(STRKEY_ED25519, buf);
-}
-
-/** Convert an ed25519 public key (32-byte Buffer) to a Stellar G... address. */
-export function pubkeyToAddress(pubkey: Buffer): string {
-  return encodeStrkey(STRKEY_ED25519, pubkey);
 }
 
 /**

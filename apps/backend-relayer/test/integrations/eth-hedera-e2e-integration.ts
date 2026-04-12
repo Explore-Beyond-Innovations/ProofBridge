@@ -151,7 +151,7 @@ describe('Integrations E2E — (ETH → Hedera)', () => {
       ethClient,
       account1,
       req.signature,
-      req.authToken,
+      req.authToken as `0x${string}`,
       req.timeToExpire,
       req.adId,
       req.adToken,
@@ -328,7 +328,7 @@ describe('Integrations E2E — (ETH → Hedera)', () => {
       ethClient,
       account1,
       req.signature,
-      req.authToken,
+      req.authToken as `0x${string}`,
       req.timeToExpire,
       req.adId,
       req.adToken,
@@ -422,9 +422,9 @@ describe('Integrations E2E — (ETH → Hedera)', () => {
       hederaClient,
       account2,
       orderReq.signature,
-      orderReq.authToken,
+      orderReq.authToken as `0x${string}`,
       orderReq.timeToExpire,
-      orderReq.orderParams,
+      orderReq.orderParams as T_OrderPortalParams,
       hederaChain.orderPortalAddress,
     );
 
@@ -458,10 +458,10 @@ describe('Integrations E2E — (ETH → Hedera)', () => {
     const lockTxn = await lockForOrder(
       ethClient,
       account1,
-      lockOrderReq.signature,
-      lockOrderReq.authToken,
+      lockOrderReq.signature as `0x${string}`,
+      lockOrderReq.authToken as `0x${string}`,
       lockOrderReq.timeToExpire,
-      lockOrderReq.orderParams,
+      lockOrderReq.orderParams as T_AdManagerOrderParams,
       getAddress(lockOrderReq.contractAddress),
     );
 
@@ -504,12 +504,12 @@ describe('Integrations E2E — (ETH → Hedera)', () => {
       hederaClient,
       account1,
       unlockReq.signature,
-      unlockReq.authToken,
+      unlockReq.authToken as `0x${string}`,
       unlockReq.timeToExpire,
       unlockReq.orderParams as T_OrderPortalParams,
-      unlockReq.nullifierHash,
-      unlockReq.targetRoot,
-      unlockReq.proof,
+      unlockReq.nullifierHash as `0x${string}`,
+      unlockReq.targetRoot as `0x${string}`,
+      unlockReq.proof as `0x${string}`,
       unlockReq.contractAddress,
     );
 
@@ -563,12 +563,12 @@ describe('Integrations E2E — (ETH → Hedera)', () => {
       ethClient,
       account1,
       unlockReqBridger.signature,
-      unlockReqBridger.authToken,
+      unlockReqBridger.authToken as `0x${string}`,
       unlockReqBridger.timeToExpire,
       unlockReqBridger.orderParams as T_AdManagerOrderParams,
-      unlockReqBridger.nullifierHash,
-      unlockReqBridger.targetRoot,
-      unlockReqBridger.proof,
+      unlockReqBridger.nullifierHash as `0x${string}`,
+      unlockReqBridger.targetRoot as `0x${string}`,
+      unlockReqBridger.proof as `0x${string}`,
       unlockReqBridger.contractAddress,
     );
 

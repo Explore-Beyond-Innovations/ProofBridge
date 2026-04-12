@@ -3,11 +3,11 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { hederaTestnet as hederaLocalnet } from 'viem/chains';
 
-import MerkleManagerArtifact from '../../../contracts/out/MerkleManager.sol/MerkleManager.json';
-import VerifierArtifact from '../../../contracts/out/Verifier.sol/HonkVerifier.json';
-import AdManagerArtifact from '../../../contracts/out/AdManager.sol/AdManager.json';
-import OrderPortalArtifact from '../../../contracts/out/OrderPortal.sol/OrderPortal.json';
-import Erc20MockArtifact from '../../../contracts/out/ERC20Mock.sol/ERC20Mock.json';
+import MerkleManagerArtifact from '../../../../contracts/evm/out/MerkleManager.sol/MerkleManager.json';
+import VerifierArtifact from '../../../../contracts/evm/out/Verifier.sol/HonkVerifier.json';
+import AdManagerArtifact from '../../../../contracts/evm/out/AdManager.sol/AdManager.json';
+import OrderPortalArtifact from '../../../../contracts/evm/out/OrderPortal.sol/OrderPortal.json';
+import Erc20MockArtifact from '../../../../contracts/evm/out/ERC20Mock.sol/ERC20Mock.json';
 
 import { createPublicClient, createWalletClient, http } from 'viem';
 import { ethLocalnet } from '../../src/providers/viem/localnet';
