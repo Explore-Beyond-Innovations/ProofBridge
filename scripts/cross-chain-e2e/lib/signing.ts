@@ -66,24 +66,6 @@ export function hashStringField(s: string): Buffer {
 
 // ── request hash builders for specific actions ──────────────────────
 
-export function setChainRequestHash(
-  authToken: Buffer,
-  timeToExpire: bigint,
-  chainId: bigint,
-  contractAddress: Buffer
-): Buffer {
-  return hashRequest(authToken, timeToExpire, "setChain", Buffer.alloc(0), chainId, contractAddress);
-}
-
-export function setTokenRouteRequestHash(
-  authToken: Buffer,
-  timeToExpire: bigint,
-  chainId: bigint,
-  contractAddress: Buffer
-): Buffer {
-  return hashRequest(authToken, timeToExpire, "setTokenRoute", Buffer.alloc(0), chainId, contractAddress);
-}
-
 export function createAdRequestHash(
   authToken: Buffer,
   timeToExpire: bigint,
