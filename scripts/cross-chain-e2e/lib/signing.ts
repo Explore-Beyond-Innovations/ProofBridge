@@ -8,7 +8,6 @@
 import * as ed from "@noble/ed25519";
 import { sha512 } from "@noble/hashes/sha512";
 import { ethers, keccak256 } from "ethers";
-import { randomBytes } from "crypto";
 
 // noble/ed25519 v2 needs sha512 configured
 ed.etc.sha512Sync = (...m: Uint8Array[]) => {
@@ -128,16 +127,6 @@ export function unlockOrderRequestHash(
 
 // ── ed25519 signing ─────────────────────────────────────────────────
 
-/** Generate an ed25519 keypair. Returns { publicKey (32), secretKey (32) }. */
-export function generateEd25519Keypair(): {
-  publicKey: Buffer;
-  secretKey: Buffer;
-} {
-  const secretKey = Buffer.from(randomBytes(32));
-  const publicKey = Buffer.from(ed.getPublicKey(secretKey));
-  return { publicKey, secretKey };
-}
-
 /** Sign a 32-byte message hash with ed25519. Returns 64-byte signature. */
 export function signEd25519(message: Buffer, secretKey: Buffer): Buffer {
   const sig = ed.sign(message, secretKey);
@@ -155,12 +144,6 @@ export class AuthTokenCounter {
     const buf = Buffer.alloc(32, 0);
     buf.writeUInt32BE(this.counter, 28);
     return buf;
-  }
-
-  /** Return as bytes32 hex string for EVM calls. */
-  nextHex(): string {
-    this.counter++;
-    return "0x" + this.counter.toString(16).padStart(64, "0");
   }
 }
 
