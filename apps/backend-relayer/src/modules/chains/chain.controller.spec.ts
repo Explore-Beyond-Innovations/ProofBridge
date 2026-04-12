@@ -43,6 +43,7 @@ describe('ChainController (unit)', () => {
     const mockChain = {
       name: 'Base',
       chainId: '8453',
+      kind: 'EVM' as const,
       adManagerAddress: '0xAM',
       orderPortalAddress: '0xOP',
       createdAt: new Date().toString(),

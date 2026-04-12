@@ -3,18 +3,12 @@ import { JwtModule, JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@prisma/prisma.service';
 import { FaucetController } from './faucet.controller';
 import { FaucetService } from './faucet.service';
-import { ViemService } from '../../providers/viem/viem.service';
+import { ChainProvidersModule } from '../../providers/chain/chain.module';
 import { UserJwtGuard } from '../../common/guards/user-jwt.guard';
 
 @Module({
-  imports: [JwtModule.register({})],
+  imports: [JwtModule.register({}), ChainProvidersModule],
   controllers: [FaucetController],
-  providers: [
-    FaucetService,
-    PrismaService,
-    ViemService,
-    UserJwtGuard,
-    JwtService,
-  ],
+  providers: [FaucetService, PrismaService, UserJwtGuard, JwtService],
 })
 export class FaucetModule {}

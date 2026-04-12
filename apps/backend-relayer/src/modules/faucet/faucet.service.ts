@@ -7,7 +7,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { PrismaService } from '@prisma/prisma.service';
-import { ViemService } from '../../providers/viem/viem.service';
+import { ChainProviderService } from '../../providers/chain/chain-provider.service';
 import { RequestFaucetDto, FaucetResponseDto } from './dto/faucet.dto';
 import { Request } from 'express';
 
@@ -15,7 +15,7 @@ import { Request } from 'express';
 export class FaucetService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly viemService: ViemService,
+    private readonly chainProviders: ChainProviderService,
   ) {}
 
   async requestFaucet(
@@ -42,6 +42,7 @@ export class FaucetService {
           chain: {
             select: {
               chainId: true,
+              kind: true,
             },
           },
         },
@@ -51,8 +52,10 @@ export class FaucetService {
         throw new NotFoundException(`Token with ID ${dto.tokenId} not found`);
       }
 
+      const provider = this.chainProviders.forChain(token.chain.kind);
+
       // Check user's token balance
-      const balance = await this.viemService.checkTokenBalance({
+      const balance = await provider.checkTokenBalance({
         chainId: token.chain.chainId.toString(),
         tokenAddress: token.address as `0x${string}`,
         account: user.walletAddress as `0x${string}`,
@@ -67,7 +70,7 @@ export class FaucetService {
         );
       }
 
-      const result = await this.viemService.mintToken({
+      const result = await provider.mintToken({
         chainId: token.chain.chainId.toString(),
         tokenAddress: token.address as `0x${string}`,
         receiver: user.walletAddress as `0x${string}`,

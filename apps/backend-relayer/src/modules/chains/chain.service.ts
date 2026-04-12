@@ -66,6 +66,7 @@ export class ChainService {
           id: true,
           name: true,
           chainId: true,
+          kind: true,
           mmrId: true,
           adManagerAddress: true,
           orderPortalAddress: true,
@@ -107,6 +108,7 @@ export class ChainService {
           name: true,
           mmrId: true,
           chainId: true,
+          kind: true,
           adManagerAddress: true,
           orderPortalAddress: true,
           createdAt: true,
@@ -141,6 +143,7 @@ export class ChainService {
           chainId: BigInt(dto.chainId),
           adManagerAddress: dto.adManagerAddress,
           orderPortalAddress: dto.orderPortalAddress,
+          ...(dto.kind ? { kind: dto.kind } : {}),
           mmr: {
             create: {
               chainId: dto.chainId,
@@ -151,6 +154,7 @@ export class ChainService {
           id: true,
           name: true,
           chainId: true,
+          kind: true,
           adManagerAddress: true,
           orderPortalAddress: true,
           createdAt: true,
@@ -180,6 +184,7 @@ export class ChainService {
         data: {
           ...(dto.name ? { name: dto.name } : {}),
           ...(dto.chainId ? { chainId: BigInt(dto.chainId) } : {}),
+          ...(dto.kind ? { kind: dto.kind } : {}),
           ...(dto.adManagerAddress
             ? { adManagerAddress: dto.adManagerAddress }
             : {}),
@@ -191,6 +196,7 @@ export class ChainService {
           id: true,
           name: true,
           chainId: true,
+          kind: true,
           adManagerAddress: true,
           orderPortalAddress: true,
           createdAt: true,
@@ -227,6 +233,7 @@ export class ChainService {
     return {
       name: c.name,
       chainId: c.chainId.toString(),
+      kind: c.kind,
       adManagerAddress: c.adManagerAddress,
       orderPortalAddress: c.orderPortalAddress,
       createdAt: c.createdAt.toISOString(),
