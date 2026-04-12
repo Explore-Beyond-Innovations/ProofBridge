@@ -3,10 +3,10 @@ import { AdsController } from './ad.controller';
 import { AdsService } from './ad.service';
 import { PrismaService } from '@prisma/prisma.service';
 import { JwtModule, JwtService } from '@nestjs/jwt';
-import { ViemModule } from '../../providers/viem/viem.module';
+import { ChainProvidersModule } from '../../providers/chain/chain.module';
 
 @Module({
-  imports: [JwtModule.register({}), ViemModule],
+  imports: [JwtModule.register({}), ChainProvidersModule],
   controllers: [AdsController],
   providers: [AdsService, PrismaService, JwtService],
 })

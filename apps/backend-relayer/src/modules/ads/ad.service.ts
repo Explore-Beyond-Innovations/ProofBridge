@@ -19,7 +19,7 @@ import {
 import { getAddress } from 'viem';
 import { AdStatus, Prisma } from '@prisma/client';
 import { Request } from 'express';
-import { ViemService } from '../../providers/viem/viem.service';
+import { ChainProviderService } from '../../providers/chain/chain-provider.service';
 import { toBytes32 } from '../../providers/viem/ethers/typedData';
 import { randomUUID } from 'crypto';
 
@@ -49,7 +49,7 @@ type AdUpdateLogInput = {
 export class AdsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly viemService: ViemService,
+    private readonly chainProviders: ChainProviderService,
   ) {}
 
   async list(query: QueryAdsDto) {
@@ -333,7 +333,9 @@ export class AdsService {
             select: {
               id: true,
               symbol: true,
-              chain: { select: { chainId: true, adManagerAddress: true } },
+              chain: {
+                select: { chainId: true, adManagerAddress: true, kind: true },
+              },
               address: true,
             },
           },
@@ -387,8 +389,9 @@ export class AdsService {
 
       const adId = randomUUID();
 
-      const reqContractDetails =
-        await this.viemService.getCreateAdRequestContractDetails({
+      const reqContractDetails = await this.chainProviders
+        .forChain(route.adToken.chain.kind)
+        .getCreateAdRequestContractDetails({
           adChainId: route.adToken.chain.chainId,
           adContractAddress: route.adToken.chain
             .adManagerAddress as `0x${string}`,
@@ -489,7 +492,13 @@ export class AdsService {
             select: {
               adToken: {
                 select: {
-                  chain: { select: { adManagerAddress: true, chainId: true } },
+                  chain: {
+                    select: {
+                      adManagerAddress: true,
+                      chainId: true,
+                      kind: true,
+                    },
+                  },
                 },
               },
             },
@@ -513,8 +522,9 @@ export class AdsService {
 
       const effectiveStatus = ad.status == 'EXHAUSTED' ? 'ACTIVE' : ad.status;
 
-      const reqContractDetails =
-        await this.viemService.getFundAdRequestContractDetails({
+      const reqContractDetails = await this.chainProviders
+        .forChain(ad.route.adToken.chain.kind)
+        .getFundAdRequestContractDetails({
           adContractAddress: ad.route.adToken.chain
             .adManagerAddress as `0x${string}`,
           adChainId: ad.route.adToken.chain.chainId,
@@ -601,7 +611,13 @@ export class AdsService {
             select: {
               adToken: {
                 select: {
-                  chain: { select: { adManagerAddress: true, chainId: true } },
+                  chain: {
+                    select: {
+                      adManagerAddress: true,
+                      chainId: true,
+                      kind: true,
+                    },
+                  },
                 },
               },
             },
@@ -641,8 +657,9 @@ export class AdsService {
         ? 'EXHAUSTED'
         : ad.status;
 
-      const reqContractDetails =
-        await this.viemService.getWithdrawFromAdRequestContractDetails({
+      const reqContractDetails = await this.chainProviders
+        .forChain(ad.route.adToken.chain.kind)
+        .getWithdrawFromAdRequestContractDetails({
           adContractAddress: ad.route.adToken.chain
             .adManagerAddress as `0x${string}`,
           adChainId: ad.route.adToken.chain.chainId,
@@ -805,7 +822,13 @@ export class AdsService {
             select: {
               adToken: {
                 select: {
-                  chain: { select: { adManagerAddress: true, chainId: true } },
+                  chain: {
+                    select: {
+                      adManagerAddress: true,
+                      chainId: true,
+                      kind: true,
+                    },
+                  },
                 },
               },
             },
@@ -838,8 +861,9 @@ export class AdsService {
         throw new BadRequestException('Ad is already closed');
       }
 
-      const reqContractDetails =
-        await this.viemService.getCloseAdRequestContractDetails({
+      const reqContractDetails = await this.chainProviders
+        .forChain(ad.route.adToken.chain.kind)
+        .getCloseAdRequestContractDetails({
           adContractAddress: ad.route.adToken.chain
             .adManagerAddress as `0x${string}`,
           adChainId: ad.route.adToken.chain.chainId,
@@ -939,7 +963,13 @@ export class AdsService {
             select: {
               adToken: {
                 select: {
-                  chain: { select: { adManagerAddress: true, chainId: true } },
+                  chain: {
+                    select: {
+                      adManagerAddress: true,
+                      chainId: true,
+                      kind: true,
+                    },
+                  },
                 },
               },
             },
@@ -950,12 +980,14 @@ export class AdsService {
       if (!ad) throw new NotFoundException('Ad for Ad Id not found');
 
       // // verify adLog
-      const isValidated = await this.viemService.validateAdManagerRequest({
-        chainId: ad.route.adToken.chain.chainId,
-        contractAddress: ad.route.adToken.chain
-          .adManagerAddress as `0x${string}`,
-        reqHash: adLogUpdate.reqHash as `0x${string}`,
-      });
+      const isValidated = await this.chainProviders
+        .forChain(ad.route.adToken.chain.kind)
+        .validateAdManagerRequest({
+          chainId: ad.route.adToken.chain.chainId,
+          contractAddress: ad.route.adToken.chain
+            .adManagerAddress as `0x${string}`,
+          reqHash: adLogUpdate.reqHash as `0x${string}`,
+        });
 
       if (!isValidated)
         throw new BadRequestException('Invalid request; please try again');

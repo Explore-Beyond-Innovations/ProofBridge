@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, ChainKind } from '@prisma/client';
 
 export type HealthStatus = 'ok' | 'degraded' | 'error';
 export interface HealthResponse {
@@ -14,6 +14,7 @@ export interface HealthResponse {
 type PublicChain = {
   name: string;
   chainId: string;
+  kind: ChainKind;
   adManagerAddress: string;
   orderPortalAddress: string;
   createdAt: string;

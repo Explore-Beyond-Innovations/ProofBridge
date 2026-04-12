@@ -47,10 +47,16 @@ enum TokenKind {
   ERC20
 }
 
+enum ChainKind {
+  EVM
+  STELLAR
+}
+
 model Chain {
-  id                 String @id @default(uuid())
+  id                 String    @id @default(uuid())
   name               String
-  chainId            BigInt @unique
+  chainId            BigInt    @unique
+  kind               ChainKind @default(EVM)
   adManagerAddress   String
   orderPortalAddress String
 

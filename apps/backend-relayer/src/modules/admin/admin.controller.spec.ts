@@ -90,6 +90,7 @@ describe('AdminController (unit)', () => {
     const mockRes = {
       id: 'uuid',
       ...dto,
+      kind: 'EVM' as const,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -107,6 +108,7 @@ describe('AdminController (unit)', () => {
     const mockRes = {
       id: 'uuid',
       chainId: '8453',
+      kind: 'EVM' as const,
       adManagerAddress: '0xAM',
       orderPortalAddress: '0xOP',
       createdAt: new Date(),

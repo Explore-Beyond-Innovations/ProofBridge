@@ -6,9 +6,11 @@ import {
   Min,
   Max,
   IsNotEmpty,
+  IsEnum,
   Matches,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ChainKind } from '@prisma/client';
 
 export class QueryChainsDto {
   @ApiPropertyOptional({
@@ -58,6 +60,15 @@ export class CreateChainDto {
   @Matches(/^\d+$/)
   chainId!: string;
 
+  @ApiPropertyOptional({
+    description: 'Chain kind (defaults to EVM)',
+    enum: ChainKind,
+    example: ChainKind.EVM,
+  })
+  @IsOptional()
+  @IsEnum(ChainKind)
+  kind?: ChainKind;
+
   @ApiProperty({
     description: 'Ad Manager contract address',
     example: '0x1234567890abcdef1234567890abcdef12345678',
@@ -101,6 +112,15 @@ export class UpdateChainDto {
   chainId?: string;
 
   @ApiPropertyOptional({
+    description: 'Chain kind',
+    enum: ChainKind,
+    example: ChainKind.EVM,
+  })
+  @IsOptional()
+  @IsEnum(ChainKind)
+  kind?: ChainKind;
+
+  @ApiPropertyOptional({
     description: 'Ad Manager contract address',
     example: '0x1234567890abcdef1234567890abcdef12345678',
   })
@@ -123,6 +143,13 @@ export class ChainResponseDto {
 
   @ApiProperty({ description: 'Chain ID', example: '1' })
   chainId!: string;
+
+  @ApiProperty({
+    description: 'Chain kind',
+    enum: ChainKind,
+    example: ChainKind.EVM,
+  })
+  kind!: ChainKind;
 
   @ApiProperty({
     description: 'Ad Manager contract address',

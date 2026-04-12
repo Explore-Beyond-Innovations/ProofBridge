@@ -16,7 +16,7 @@ import {
 } from './dto/trade.dto';
 import { getAddress, isAddress } from 'viem';
 import { Request, Response } from 'express';
-import { ViemService } from '../../providers/viem/viem.service';
+import { ChainProviderService } from '../../providers/chain/chain-provider.service';
 import { MMRService } from '../mmr/mmr.service';
 import { ProofService } from '../../providers/noir/proof.service';
 import { randomUUID } from 'crypto';
@@ -28,7 +28,7 @@ import { toBytes32, uuidToBigInt } from '../../providers/viem/ethers/typedData';
 export class TradesService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly viemService: ViemService,
+    private readonly chainProviders: ChainProviderService,
     private readonly merkleService: MMRService,
     private readonly proofService: ProofService,
     private readonly encryptionService: EncryptionService,
@@ -293,6 +293,7 @@ export class TradesService {
                         orderPortalAddress: true,
                         chainId: true,
                         mmrId: true,
+                        kind: true,
                       },
                     },
                   },
@@ -366,8 +367,9 @@ export class TradesService {
       const secret = this.proofService.generateSecret();
       const tradeId = randomUUID();
 
-      const reqContractDetails =
-        await this.viemService.getCreateOrderRequestContractDetails({
+      const reqContractDetails = await this.chainProviders
+        .forChain(ad.route.orderToken.chain.kind)
+        .getCreateOrderRequestContractDetails({
           orderChainId: ad.route.orderToken.chain.chainId,
           orderContractAddress: ad.route.orderToken.chain
             .orderPortalAddress as `0x${string}`,
@@ -602,6 +604,7 @@ export class TradesService {
                       chainId: true,
                       adManagerAddress: true,
                       mmrId: true,
+                      kind: true,
                     },
                   },
                 },
@@ -643,8 +646,9 @@ export class TradesService {
         throw new BadRequestException('AdLock amount mismatch');
       }
 
-      const reqContractDetails =
-        await this.viemService.getLockForOrderRequestContractDetails({
+      const reqContractDetails = await this.chainProviders
+        .forChain(trade.route.adToken.chain.kind)
+        .getLockForOrderRequestContractDetails({
           adChainId: trade.route.adToken.chain.chainId,
           adContractAddress: trade.route.adToken.chain
             .adManagerAddress as `0x${string}`,
@@ -747,6 +751,7 @@ export class TradesService {
                       adManagerAddress: true,
                       chainId: true,
                       mmrId: true,
+                      kind: true,
                     },
                   },
                 },
@@ -759,6 +764,7 @@ export class TradesService {
                       orderPortalAddress: true,
                       chainId: true,
                       mmrId: true,
+                      kind: true,
                     },
                   },
                 },
@@ -785,17 +791,23 @@ export class TradesService {
         );
       }
 
-      const isAuthorized = this.viemService.verifyOrderSignature(
-        caller,
-        trade.orderHash as `0x${string}`,
-        dto.signature as `0x${string}`,
-      );
+      const isAdCreator = caller === getAddress(trade.adCreatorAddress);
+
+      const unlockChain = isAdCreator
+        ? trade.route.orderToken.chain
+        : trade.route.adToken.chain;
+
+      const isAuthorized = this.chainProviders
+        .forChain(unlockChain.kind)
+        .verifyOrderSignature(
+          caller,
+          trade.orderHash as `0x${string}`,
+          dto.signature as `0x${string}`,
+        );
 
       if (!isAuthorized) {
         throw new BadRequestException('Invalid User Signature');
       }
-
-      const isAdCreator = caller === getAddress(trade.adCreatorAddress);
 
       if (trade.adCreatorClaimed && isAdCreator) {
         throw new BadRequestException('Ad Creator has already authorized');
@@ -829,18 +841,14 @@ export class TradesService {
 
       const localRoot = await this.merkleService.getRoot(mmrId);
 
-      const rootExists = await this.viemService.checkLocalRootExist(
-        localRoot,
-        isAdCreator,
-        {
-          chainId: isAdCreator
-            ? trade.route.orderToken.chain.chainId
-            : trade.route.adToken.chain.chainId,
+      const rootExists = await this.chainProviders
+        .forChain(unlockChain.kind)
+        .checkLocalRootExist(localRoot, isAdCreator, {
+          chainId: unlockChain.chainId,
           contractAddress: isAdCreator
             ? (trade.route.orderToken.chain.orderPortalAddress as `0x${string}`)
             : (trade.route.adToken.chain.adManagerAddress as `0x${string}`),
-        },
-      );
+        });
 
       if (!rootExists) {
         throw new BadRequestException(
@@ -868,11 +876,10 @@ export class TradesService {
         trade.orderHash,
       );
 
-      const requestContractDetails =
-        await this.viemService.getUnlockOrderContractDetails({
-          chainId: isAdCreator
-            ? trade.route.orderToken.chain.chainId
-            : trade.route.adToken.chain.chainId,
+      const requestContractDetails = await this.chainProviders
+        .forChain(unlockChain.kind)
+        .getUnlockOrderContractDetails({
+          chainId: unlockChain.chainId,
           contractAddress: isAdCreator
             ? (trade.route.orderToken.chain.orderPortalAddress as `0x${string}`)
             : (trade.route.adToken.chain.adManagerAddress as `0x${string}`),
@@ -977,6 +984,7 @@ export class TradesService {
                       adManagerAddress: true,
                       chainId: true,
                       mmrId: true,
+                      kind: true,
                     },
                   },
                 },
@@ -988,6 +996,7 @@ export class TradesService {
                       orderPortalAddress: true,
                       chainId: true,
                       mmrId: true,
+                      kind: true,
                     },
                   },
                 },
@@ -1001,24 +1010,28 @@ export class TradesService {
 
       if (tradeLogUpdate.origin === 'AD_MANAGER') {
         // verify adLog
-        const isValidated = await this.viemService.validateAdManagerRequest({
-          chainId: trade.route.adToken.chain.chainId,
-          contractAddress: trade.route.adToken.chain
-            .adManagerAddress as `0x${string}`,
-          reqHash: tradeLogUpdate.reqHash as `0x${string}`,
-        });
+        const isValidated = await this.chainProviders
+          .forChain(trade.route.adToken.chain.kind)
+          .validateAdManagerRequest({
+            chainId: trade.route.adToken.chain.chainId,
+            contractAddress: trade.route.adToken.chain
+              .adManagerAddress as `0x${string}`,
+            reqHash: tradeLogUpdate.reqHash as `0x${string}`,
+          });
 
         if (!isValidated) {
           throw new BadRequestException('AdManager request not validated');
         }
       } else {
         // verify orderPortal
-        const isValidated = await this.viemService.validateOrderPortalRequest({
-          chainId: trade.route.orderToken.chain.chainId,
-          contractAddress: trade.route.orderToken.chain
-            .orderPortalAddress as `0x${string}`,
-          reqHash: tradeLogUpdate.reqHash as `0x${string}`,
-        });
+        const isValidated = await this.chainProviders
+          .forChain(trade.route.orderToken.chain.kind)
+          .validateOrderPortalRequest({
+            chainId: trade.route.orderToken.chain.chainId,
+            contractAddress: trade.route.orderToken.chain
+              .orderPortalAddress as `0x${string}`,
+            reqHash: tradeLogUpdate.reqHash as `0x${string}`,
+          });
 
         if (!isValidated) {
           throw new BadRequestException('OrderPortal request not validated');
@@ -1136,6 +1149,7 @@ export class TradesService {
                     select: {
                       adManagerAddress: true,
                       chainId: true,
+                      kind: true,
                     },
                   },
                 },
@@ -1146,6 +1160,7 @@ export class TradesService {
                     select: {
                       orderPortalAddress: true,
                       chainId: true,
+                      kind: true,
                     },
                   },
                 },
@@ -1159,24 +1174,28 @@ export class TradesService {
 
       if (authorizationLog.origin === 'AD_MANAGER') {
         // verify log
-        const isValidated = await this.viemService.validateAdManagerRequest({
-          chainId: trade.route.adToken.chain.chainId,
-          contractAddress: trade.route.adToken.chain
-            .adManagerAddress as `0x${string}`,
-          reqHash: authorizationLog.reqHash as `0x${string}`,
-        });
+        const isValidated = await this.chainProviders
+          .forChain(trade.route.adToken.chain.kind)
+          .validateAdManagerRequest({
+            chainId: trade.route.adToken.chain.chainId,
+            contractAddress: trade.route.adToken.chain
+              .adManagerAddress as `0x${string}`,
+            reqHash: authorizationLog.reqHash as `0x${string}`,
+          });
 
         if (!isValidated) {
           throw new BadRequestException('AdManager request not validated');
         }
       } else {
         // verify log
-        const isValidated = await this.viemService.validateOrderPortalRequest({
-          chainId: trade.route.orderToken.chain.chainId,
-          contractAddress: trade.route.orderToken.chain
-            .orderPortalAddress as `0x${string}`,
-          reqHash: authorizationLog.reqHash as `0x${string}`,
-        });
+        const isValidated = await this.chainProviders
+          .forChain(trade.route.orderToken.chain.kind)
+          .validateOrderPortalRequest({
+            chainId: trade.route.orderToken.chain.chainId,
+            contractAddress: trade.route.orderToken.chain
+              .orderPortalAddress as `0x${string}`,
+            reqHash: authorizationLog.reqHash as `0x${string}`,
+          });
 
         if (!isValidated) {
           throw new BadRequestException('OrderPortal request not validated');
