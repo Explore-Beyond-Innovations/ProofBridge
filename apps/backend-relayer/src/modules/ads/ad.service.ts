@@ -16,11 +16,13 @@ import {
   ConfirmAdActionDto,
   CloseAdDto,
 } from './dto/ad.dto';
-import { getAddress } from 'viem';
 import { AdStatus, Prisma } from '@prisma/client';
 import { Request } from 'express';
 import { ChainAdapterService } from '../../chain-adapters/chain-adapter.service';
-import { toBytes32 } from '../../providers/viem/ethers/typedData';
+import {
+  normalizeChainAddress,
+  toBytes32,
+} from '../../providers/viem/ethers/typedData';
 import { randomUUID } from 'crypto';
 
 type AdQueryInput = {
@@ -343,7 +345,7 @@ export class AdsService {
             select: {
               id: true,
               symbol: true,
-              chain: { select: { chainId: true } },
+              chain: { select: { chainId: true, kind: true } },
             },
           },
         },
@@ -387,6 +389,18 @@ export class AdsService {
         );
       }
 
+      // creatorDstAddress lives on the order chain (where the ad creator
+      // receives proceeds on unlock), so validate against that chain's kind.
+      let normalizedCreatorDst: string;
+      try {
+        normalizedCreatorDst = normalizeChainAddress(
+          dto.creatorDstAddress,
+          route.orderToken.chain.kind,
+        );
+      } catch {
+        throw new BadRequestException('Invalid creatorDstAddress');
+      }
+
       const adId = randomUUID();
 
       const reqContractDetails = await this.chainAdapters
@@ -399,15 +413,15 @@ export class AdsService {
           orderChainId: route.orderToken.chain.chainId,
           adToken: route.adToken.address as `0x${string}`,
           initialAmount: fundAmount.toFixed(0),
-          adRecipient: toBytes32(dto.creatorDstAddress),
+          adRecipient: toBytes32(normalizedCreatorDst),
         });
 
       const requestDetails = await this.prisma.$transaction(async (prisma) => {
         const ad = await prisma.ad.create({
           data: {
             id: adId,
-            creatorAddress: getAddress(user.walletAddress),
-            creatorDstAddress: getAddress(dto.creatorDstAddress),
+            creatorAddress: normalizeChainAddress(user.walletAddress),
+            creatorDstAddress: normalizedCreatorDst,
             routeId: route.id,
             adTokenId: route.adToken.id,
             orderTokenId: route.orderToken.id,
@@ -482,7 +496,10 @@ export class AdsService {
       if (!user) throw new ForbiddenException('Unauthorized');
 
       const ad = await this.prisma.ad.findUnique({
-        where: { id, creatorAddress: getAddress(user.walletAddress) },
+        where: {
+          id,
+          creatorAddress: normalizeChainAddress(user.walletAddress),
+        },
         select: {
           id: true,
           creatorAddress: true,
@@ -601,7 +618,10 @@ export class AdsService {
       if (!user) throw new ForbiddenException('Unauthorized');
 
       const ad = await this.prisma.ad.findUnique({
-        where: { id, creatorAddress: getAddress(user.walletAddress) },
+        where: {
+          id,
+          creatorAddress: normalizeChainAddress(user.walletAddress),
+        },
         select: {
           id: true,
           creatorAddress: true,
@@ -648,14 +668,22 @@ export class AdsService {
       const locked = lockSum._sum.amount ?? new Prisma.Decimal(0);
       const available = ad.poolAmount.sub(locked);
 
-      console.log(available, withdrawAmt);
-
       if (withdrawAmt.gt(available))
         throw new BadRequestException('Insufficient available balance');
 
       const effectiveStatus = available.sub(withdrawAmt).eq(0)
         ? 'EXHAUSTED'
         : ad.status;
+
+      let normalizedTo: string;
+      try {
+        normalizedTo = normalizeChainAddress(
+          dto.to,
+          ad.route.adToken.chain.kind,
+        );
+      } catch {
+        throw new BadRequestException('Invalid withdraw destination');
+      }
 
       const reqContractDetails = await this.chainAdapters
         .forChain(ad.route.adToken.chain.kind)
@@ -665,7 +693,7 @@ export class AdsService {
           adChainId: ad.route.adToken.chain.chainId,
           adId: ad.id,
           amount: withdrawAmt.toFixed(0),
-          to: dto.to as `0x${string}`,
+          to: normalizedTo as `0x${string}`,
         });
 
       const finalValue = ad.poolAmount.sub(withdrawAmt);
@@ -812,7 +840,10 @@ export class AdsService {
       if (!user) throw new ForbiddenException('Unauthorized');
 
       const ad = await this.prisma.ad.findFirst({
-        where: { id, creatorAddress: getAddress(user.walletAddress) },
+        where: {
+          id,
+          creatorAddress: normalizeChainAddress(user.walletAddress),
+        },
         select: {
           id: true,
           creatorAddress: true,
@@ -861,6 +892,16 @@ export class AdsService {
         throw new BadRequestException('Ad is already closed');
       }
 
+      let normalizedTo: string;
+      try {
+        normalizedTo = normalizeChainAddress(
+          dto.to,
+          ad.route.adToken.chain.kind,
+        );
+      } catch {
+        throw new BadRequestException('Invalid close destination');
+      }
+
       const reqContractDetails = await this.chainAdapters
         .forChain(ad.route.adToken.chain.kind)
         .getCloseAdRequestContractDetails({
@@ -868,7 +909,7 @@ export class AdsService {
             .adManagerAddress as `0x${string}`,
           adChainId: ad.route.adToken.chain.chainId,
           adId: ad.id,
-          to: dto.to as `0x${string}`,
+          to: normalizedTo as `0x${string}`,
         });
 
       await this.prisma.$transaction(async (prisma) => {
@@ -947,8 +988,8 @@ export class AdsService {
       if (!adLogUpdate) throw new NotFoundException('Ad update log not found');
 
       if (
-        getAddress(adLogUpdate.ad.creatorAddress) !==
-        getAddress(user.walletAddress)
+        normalizeChainAddress(adLogUpdate.ad.creatorAddress) !==
+        normalizeChainAddress(user.walletAddress)
       ) {
         throw new ForbiddenException('Unauthorized');
       }
@@ -1015,11 +1056,10 @@ export class AdsService {
         this.prisma.adUpdateLog.delete({ where: { id: adLogUpdate.id } }),
       ]);
 
-      console.log(dto);
-
       return {
         adId: adId,
         success: true,
+        dto: dto,
       };
     } catch (e) {
       if (e instanceof Error) {

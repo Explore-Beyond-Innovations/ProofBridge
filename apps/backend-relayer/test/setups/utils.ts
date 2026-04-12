@@ -5,38 +5,11 @@ import { SiweMessage } from 'siwe';
 import { PrismaClient, ChainKind } from '@prisma/client';
 import { hash } from '@node-rs/argon2';
 import { privateKeyToAddress, signMessage } from 'viem/accounts';
-import {
-  createPublicClient,
-  createWalletClient,
-  http,
-  PublicClient,
-} from 'viem';
-import { parseEther } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
-import {
-  Keypair,
-  Networks,
-  TransactionBuilder,
-} from '@stellar/stellar-sdk';
-import { ethLocalnet } from '../../src/providers/viem/ethers/localnet';
-
-export type AddressLike = `0x${string}`;
-
-export interface ChainData {
-  adManagerAddress: AddressLike;
-  orderPortalAddress: AddressLike;
-  merkleManagerAddress: AddressLike;
-  verifierAddress: AddressLike;
-  chainId: string;
-  name: string;
-  tokenName: string;
-  tokenSymbol: string;
-  tokenAddress: AddressLike;
-}
+import { Keypair, Networks, TransactionBuilder } from '@stellar/stellar-sdk';
 
 export interface ChallengeResponse {
   nonce: string;
-  address: AddressLike;
+  address: `0x${string}`;
   expiresAt: string;
   domain: string;
   uri: string;
@@ -248,65 +221,6 @@ export const seedAd = async (
 export function randomAddress() {
   const wallet = ethers.Wallet.createRandom();
   return wallet.address;
-}
-
-export const makeEthClient = () =>
-  createPublicClient({ chain: ethLocalnet, transport: http() });
-
-async function tryTopUpViaRpc(addr: AddressLike, hexWei: string) {
-  const ethRpc = process.env.ETHEREUM_RPC_URL ?? 'http://localhost:9545';
-
-  const provider = new ethers.JsonRpcProvider(ethRpc);
-  try {
-    await provider.send('anvil_setBalance', [addr, hexWei]);
-    return true;
-  } catch {
-    // ignore
-  }
-
-  try {
-    await provider.send('hardhat_setBalance', [addr, hexWei]);
-    return true;
-  } catch {
-    // ignore
-  }
-
-  return false;
-}
-
-export async function fundEthAddress(
-  client: PublicClient,
-  to: AddressLike,
-  minBalanceEther = '1.0',
-): Promise<void> {
-  const needed = parseEther(minBalanceEther);
-  const current = await client.getBalance({ address: to });
-  if (current >= needed) return;
-
-  const funderKey = process.env.FUNDER_KEY as `0x${string}` | undefined;
-
-  if (funderKey) {
-    const wallet = createWalletClient({
-      chain: client.chain ?? ethLocalnet,
-      transport: http(),
-      account: privateKeyToAccount(funderKey),
-    });
-
-    const hash = await wallet.sendTransaction({
-      to,
-      value: parseEther('10'), // send 10 ETH
-    });
-    await client.waitForTransactionReceipt({ hash });
-    return;
-  }
-
-  // No FUNDER_KEY; attempt node-specific balance set
-  const ok = await tryTopUpViaRpc(to, '0x8AC7230489E80000'); // 10 ETH
-  if (!ok) {
-    throw new Error(
-      'Unable to fund address. Set FUNDER_KEY in env, or run against Anvil/Hardhat and allow *_setBalance.',
-    );
-  }
 }
 
 export const expectObject = (

@@ -4,15 +4,26 @@ import { AppModule } from '../../src/app.module';
 import { ChainAdapterService } from '../../src/chain-adapters/chain-adapter.service';
 import { MockChainAdapter } from './mock-chain-adapter';
 
-export async function createTestingApp(): Promise<INestApplication> {
-  const mockAdapter = new MockChainAdapter();
+export interface CreateTestingAppOptions {
+  // When true, bypass the MockChainAdapter override so the real chain-adapter
+  // service is used. Required for `test:integrations` which drives real
+  // on-chain EVM + Stellar contracts.
+  useRealChainAdapters?: boolean;
+}
 
-  const moduleFixture: TestingModule = await Test.createTestingModule({
-    imports: [AppModule],
-  })
-    .overrideProvider(ChainAdapterService)
-    .useValue({ forChain: () => mockAdapter })
-    .compile();
+export async function createTestingApp(
+  opts: CreateTestingAppOptions = {},
+): Promise<INestApplication> {
+  const builder = Test.createTestingModule({ imports: [AppModule] });
+
+  if (!opts.useRealChainAdapters) {
+    const mockAdapter = new MockChainAdapter();
+    builder
+      .overrideProvider(ChainAdapterService)
+      .useValue({ forChain: () => mockAdapter });
+  }
+
+  const moduleFixture: TestingModule = await builder.compile();
 
   const app = moduleFixture.createNestApplication();
   app.useGlobalPipes(
