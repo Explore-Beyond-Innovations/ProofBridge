@@ -1,0 +1,23 @@
+{
+  "name": "relayer-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "cli": "tsx cli.ts",
+    "e2e": "bash e2e.sh"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
+    "@prisma/client": "6.16.1",
+    "@stellar/stellar-sdk": "^15.0.1",
+    "cross-chain-e2e": "workspace:*",
+    "ethers": "^6.15.0",
+    "siwe": "^3.0.0",
+    "viem": "^2.37.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.3"
+  }
+}

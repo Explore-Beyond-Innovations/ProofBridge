@@ -1,29 +1,37 @@
-name: Cross-Chain E2E
+name: Backend Relayer E2E
 
 on:
   push:
     branches: [main]
     paths:
+      - "apps/backend-relayer/**"
       - "contracts/**"
       - "proof_circuits/**"
       - "scripts/**"
-      - ".github/workflows/cross-chain-e2e.yml"
+      - "packages/**"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/backend-relayer-e2e.yml"
   pull_request:
     paths:
+      - "apps/backend-relayer/**"
       - "contracts/**"
       - "proof_circuits/**"
       - "scripts/**"
-      - ".github/workflows/cross-chain-e2e.yml"
+      - "packages/**"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/backend-relayer-e2e.yml"
   workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  cross-chain-e2e:
-    name: Cross-Chain E2E Test
+  backend-relayer-e2e:
+    name: Backend Relayer E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +60,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20"
           cache: "pnpm"
 
       - name: Install Node dependencies
@@ -65,14 +73,21 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             contracts/stellar/target
-          key: ${{ runner.os }}-cargo-e2e-${{ hashFiles('contracts/stellar/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-relayer-e2e-${{ hashFiles('contracts/stellar/Cargo.lock') }}
 
-      - name: Start chains (Stellar + Anvil) and build contracts
-        run: bash scripts/start_chains.sh
+      - name: Generate Prisma client
+        run: pnpm --filter backend-relayer exec prisma generate
 
-      - name: Run cross-chain E2E test
-        run: npx tsx scripts/cross-chain-e2e/run.ts
+      - name: Run backend-relayer e2e
+        run: bash scripts/relayer-e2e/e2e.sh
 
-      - name: Stop chains
-        if: always()
-        run: bash scripts/stop_chains.sh
+      - name: Upload relayer logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relayer-logs
+          path: |
+            .relayer.log
+            .chains.anvil.log
+            scripts/relayer-e2e/deployed.json
+          if-no-files-found: ignore
