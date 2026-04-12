@@ -2,10 +2,12 @@
   "moduleFileExtensions": ["js", "json", "ts"],
   "rootDir": "../",
   "testEnvironment": "node",
+  "maxWorkers": 1,
   "testRegex": ".e2e-spec.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
+  "transformIgnorePatterns": ["node_modules/(?!(?:\\.pnpm/)?@noble)"],
   "setupFilesAfterEnv": [],
   "globalSetup": "<rootDir>/setups/jest-e2e.setup.ts",
   "globalTeardown": "<rootDir>/setups/jest.teardown.ts",

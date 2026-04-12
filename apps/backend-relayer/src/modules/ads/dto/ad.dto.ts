@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { JsonObject, JsonArray } from '@prisma/client/runtime/library';
@@ -26,12 +26,18 @@ export class QueryAdsDto {
     description: 'Chain ID of the ad token',
     example: 1,
   })
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
   adChainId?: number;
 
   @ApiPropertyOptional({
     description: 'Chain ID of the order token',
     example: 298,
   })
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
   orderChainId?: number;
 
   @ApiPropertyOptional({

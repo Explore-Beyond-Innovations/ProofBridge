@@ -73,8 +73,9 @@ export class CreateChainDto {
     description: 'Ad Manager contract address',
     example: '0x1234567890abcdef1234567890abcdef12345678',
   })
-  @Matches(/^0x[a-fA-F0-9]{40}$/, {
-    message: 'address must be a 0x-prefixed 20-byte hex address',
+  @Matches(/^0x[a-fA-F0-9]{40}(?:[a-fA-F0-9]{24})?$/, {
+    message:
+      'address must be a 0x-prefixed 20-byte (EVM) or 32-byte (Stellar) hex address',
   })
   @IsString()
   @IsNotEmpty()
@@ -84,8 +85,9 @@ export class CreateChainDto {
     description: 'Order Portal contract address',
     example: '0xabcdef1234567890abcdef1234567890abcdef12',
   })
-  @Matches(/^0x[a-fA-F0-9]{40}$/, {
-    message: 'address must be a 0x-prefixed 20-byte hex address',
+  @Matches(/^0x[a-fA-F0-9]{40}(?:[a-fA-F0-9]{24})?$/, {
+    message:
+      'address must be a 0x-prefixed 20-byte (EVM) or 32-byte (Stellar) hex address',
   })
   @IsString()
   @IsNotEmpty()

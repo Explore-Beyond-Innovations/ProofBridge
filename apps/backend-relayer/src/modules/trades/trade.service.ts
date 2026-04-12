@@ -15,8 +15,8 @@ import {
   UnlockTradeDto,
 } from './dto/trade.dto';
 import { getAddress, isAddress } from 'viem';
-import { Request, Response } from 'express';
-import { ChainProviderService } from '../../providers/chain/chain-provider.service';
+import { Request } from 'express';
+import { ChainAdapterService } from '../../chain-adapters/chain-adapter.service';
 import { MMRService } from '../mmr/mmr.service';
 import { ProofService } from '../../providers/noir/proof.service';
 import { randomUUID } from 'crypto';
@@ -28,7 +28,7 @@ import { toBytes32, uuidToBigInt } from '../../providers/viem/ethers/typedData';
 export class TradesService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly chainProviders: ChainProviderService,
+    private readonly chainAdapters: ChainAdapterService,
     private readonly merkleService: MMRService,
     private readonly proofService: ProofService,
     private readonly encryptionService: EncryptionService,
@@ -367,7 +367,7 @@ export class TradesService {
       const secret = this.proofService.generateSecret();
       const tradeId = randomUUID();
 
-      const reqContractDetails = await this.chainProviders
+      const reqContractDetails = await this.chainAdapters
         .forChain(ad.route.orderToken.chain.kind)
         .getCreateOrderRequestContractDetails({
           orderChainId: ad.route.orderToken.chain.chainId,
@@ -646,7 +646,7 @@ export class TradesService {
         throw new BadRequestException('AdLock amount mismatch');
       }
 
-      const reqContractDetails = await this.chainProviders
+      const reqContractDetails = await this.chainAdapters
         .forChain(trade.route.adToken.chain.kind)
         .getLockForOrderRequestContractDetails({
           adChainId: trade.route.adToken.chain.chainId,
@@ -797,7 +797,7 @@ export class TradesService {
         ? trade.route.orderToken.chain
         : trade.route.adToken.chain;
 
-      const isAuthorized = this.chainProviders
+      const isAuthorized = this.chainAdapters
         .forChain(unlockChain.kind)
         .verifyOrderSignature(
           caller,
@@ -841,7 +841,7 @@ export class TradesService {
 
       const localRoot = await this.merkleService.getRoot(mmrId);
 
-      const rootExists = await this.chainProviders
+      const rootExists = await this.chainAdapters
         .forChain(unlockChain.kind)
         .checkLocalRootExist(localRoot, isAdCreator, {
           chainId: unlockChain.chainId,
@@ -876,7 +876,7 @@ export class TradesService {
         trade.orderHash,
       );
 
-      const requestContractDetails = await this.chainProviders
+      const requestContractDetails = await this.chainAdapters
         .forChain(unlockChain.kind)
         .getUnlockOrderContractDetails({
           chainId: unlockChain.chainId,
@@ -1010,7 +1010,7 @@ export class TradesService {
 
       if (tradeLogUpdate.origin === 'AD_MANAGER') {
         // verify adLog
-        const isValidated = await this.chainProviders
+        const isValidated = await this.chainAdapters
           .forChain(trade.route.adToken.chain.kind)
           .validateAdManagerRequest({
             chainId: trade.route.adToken.chain.chainId,
@@ -1024,7 +1024,7 @@ export class TradesService {
         }
       } else {
         // verify orderPortal
-        const isValidated = await this.chainProviders
+        const isValidated = await this.chainAdapters
           .forChain(trade.route.orderToken.chain.kind)
           .validateOrderPortalRequest({
             chainId: trade.route.orderToken.chain.chainId,
@@ -1174,7 +1174,7 @@ export class TradesService {
 
       if (authorizationLog.origin === 'AD_MANAGER') {
         // verify log
-        const isValidated = await this.chainProviders
+        const isValidated = await this.chainAdapters
           .forChain(trade.route.adToken.chain.kind)
           .validateAdManagerRequest({
             chainId: trade.route.adToken.chain.chainId,
@@ -1188,7 +1188,7 @@ export class TradesService {
         }
       } else {
         // verify log
-        const isValidated = await this.chainProviders
+        const isValidated = await this.chainAdapters
           .forChain(trade.route.orderToken.chain.kind)
           .validateOrderPortalRequest({
             chainId: trade.route.orderToken.chain.chainId,

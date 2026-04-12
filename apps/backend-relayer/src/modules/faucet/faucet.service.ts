@@ -7,7 +7,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { PrismaService } from '@prisma/prisma.service';
-import { ChainProviderService } from '../../providers/chain/chain-provider.service';
+import { ChainAdapterService } from '../../chain-adapters/chain-adapter.service';
 import { RequestFaucetDto, FaucetResponseDto } from './dto/faucet.dto';
 import { Request } from 'express';
 
@@ -15,7 +15,7 @@ import { Request } from 'express';
 export class FaucetService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly chainProviders: ChainProviderService,
+    private readonly chainAdapters: ChainAdapterService,
   ) {}
 
   async requestFaucet(
@@ -52,7 +52,7 @@ export class FaucetService {
         throw new NotFoundException(`Token with ID ${dto.tokenId} not found`);
       }
 
-      const provider = this.chainProviders.forChain(token.chain.kind);
+      const provider = this.chainAdapters.forChain(token.chain.kind);
 
       // Check user's token balance
       const balance = await provider.checkTokenBalance({

@@ -1,4 +1,5 @@
 import {
+  ChainAddress,
   T_CloseAdRequest,
   T_CloseAdRequestContractDetails,
   T_CreatFundAdRequest,
@@ -16,13 +17,10 @@ import {
   T_UnlockOrderContractDetails,
   T_WithdrawFromAdRequest,
   T_WithdrawFromAdRequestContractDetails,
-} from '../viem/types';
+} from '../types';
 
-// Chain-agnostic contract surface. Each underlying chain family (EVM via
-// ViemService, Stellar via StellarService, …) implements this. ad/trade/faucet
-// services never depend on a concrete implementation — they go through
-// ChainProviderService.forChain(chain.kind).
-export abstract class ChainProvider {
+// Chain-agnostic contract surface
+export abstract class ChainAdapter {
   abstract getCreateAdRequestContractDetails(
     data: T_CreateAdRequest,
   ): Promise<T_CreateAdRequestContractDetails>;
@@ -85,20 +83,20 @@ export abstract class ChainProvider {
 
   abstract mintToken(data: {
     chainId: string;
-    tokenAddress: `0x${string}`;
-    receiver: `0x${string}`;
+    tokenAddress: ChainAddress;
+    receiver: ChainAddress;
   }): Promise<{ txHash: string }>;
 
   abstract checkTokenBalance(data: {
     chainId: string;
-    tokenAddress: `0x${string}`;
-    account: `0x${string}`;
+    tokenAddress: ChainAddress;
+    account: ChainAddress;
   }): Promise<string>;
 
   abstract orderTypeHash(orderParams: T_OrderParams): string;
 
   abstract verifyOrderSignature(
-    address: `0x${string}`,
+    address: ChainAddress,
     orderHash: `0x${string}`,
     signature: `0x${string}`,
   ): boolean;

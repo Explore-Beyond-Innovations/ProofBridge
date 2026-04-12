@@ -4,7 +4,7 @@ import {
   T_AdManagerOrderParams,
   T_OrderParams,
   T_OrderPortalParams,
-} from '../types';
+} from '../../../chain-adapters/types';
 
 // Left-pad a 20-byte EVM address to 32 bytes (the cross-chain wire format).
 // Accepts an already-32-byte hex string and returns it unchanged. Throws on

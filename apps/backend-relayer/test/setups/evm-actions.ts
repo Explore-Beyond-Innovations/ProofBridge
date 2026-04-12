@@ -9,7 +9,7 @@ import { ChainData, AddressLike } from './utils';
 import {
   T_AdManagerOrderParams,
   T_OrderPortalParams,
-} from '../../src/providers/viem/types';
+} from '../../src/chain-adapters/types';
 import {
   createWalletClient,
   getAddress,

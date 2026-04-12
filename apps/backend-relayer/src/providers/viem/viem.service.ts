@@ -39,7 +39,7 @@ import {
   T_UnlockOrderContractDetails,
   T_WithdrawFromAdRequest,
   T_WithdrawFromAdRequestContractDetails,
-} from './types';
+} from '../../chain-adapters/types';
 import { AD_MANAGER_ABI } from './abis/adManager.abi';
 import { ORDER_PORTAL_ABI } from './abis/orderPortal.abi';
 import { env } from '@libs/configs';
@@ -48,7 +48,7 @@ import {
   getTypedHash,
   verifyTypedData,
 } from './ethers/typedData';
-import { ethLocalnet, hederaLocalnet } from '../viem/localnet';
+import { ethLocalnet, hederaLocalnet } from './ethers/localnet';
 import { MOCK_ERC20_ABI } from './abis/mockERC20.abi';
 
 @Injectable()

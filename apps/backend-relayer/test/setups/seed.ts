@@ -1,9 +1,10 @@
-import { PrismaClient } from '@prisma/client';
-import { ChainData, seedAdmin, seedChain, seedToken } from './utils';
+import { ChainKind, PrismaClient } from '@prisma/client';
+import { ChainData, seedAdmin, seedChain, seedRoute, seedToken } from './utils';
+import { StellarChainData } from './stellar-setup';
 
 export const seedDB = async (
   ethContracts: ChainData,
-  hederaContracts: ChainData,
+  stellarContracts?: StellarChainData,
 ) => {
   const prisma = new PrismaClient();
 
@@ -12,49 +13,46 @@ export const seedDB = async (
 
     await seedAdmin(prisma, 'admin@x.com', 'ChangeMe123!');
 
-    const chain1 = await seedChain(prisma, {
+    const ethChain = await seedChain(prisma, {
       name: ethContracts.name,
       chainId: BigInt(ethContracts.chainId),
       ad: ethContracts.adManagerAddress,
       op: ethContracts.orderPortalAddress,
+      kind: ChainKind.EVM,
     });
 
-    const chain2 = await seedChain(prisma, {
-      name: hederaContracts.name,
-      chainId: BigInt(hederaContracts.chainId),
-      ad: hederaContracts.adManagerAddress,
-      op: hederaContracts.orderPortalAddress,
-    });
-
-    const token1 = await seedToken(
+    const ethToken = await seedToken(
       prisma,
-      chain1.id,
+      ethChain.id,
       ethContracts.tokenName,
       ethContracts.tokenSymbol,
       ethContracts.tokenAddress,
     );
 
-    const token2 = await seedToken(
-      prisma,
-      chain2.id,
-      hederaContracts.tokenName,
-      hederaContracts.tokenSymbol,
-      hederaContracts.tokenAddress,
-    );
+    if (stellarContracts) {
+      const stellarChain = await seedChain(prisma, {
+        name: stellarContracts.name,
+        chainId: BigInt(stellarContracts.chainId),
+        ad: stellarContracts.adManagerAddress,
+        // Stellar side has no OrderPortal in this direction — reuse the
+        // AdManager address as a non-null placeholder for the schema.
+        op: stellarContracts.adManagerAddress,
+        kind: ChainKind.STELLAR,
+      });
 
-    // Create route in both directions
-    await prisma.route.createMany({
-      data: [
-        {
-          adTokenId: token1.id,
-          orderTokenId: token2.id,
-        },
-        {
-          adTokenId: token2.id,
-          orderTokenId: token1.id,
-        },
-      ],
-    });
+      const stellarToken = await seedToken(
+        prisma,
+        stellarChain.id,
+        stellarContracts.tokenName,
+        stellarContracts.tokenSymbol,
+        stellarContracts.tokenAddress,
+        'NATIVE',
+        7,
+      );
+
+      // Stellar ad token → EVM order token.
+      await seedRoute(prisma, stellarToken.id, ethToken.id);
+    }
 
     await prisma.$disconnect();
 
