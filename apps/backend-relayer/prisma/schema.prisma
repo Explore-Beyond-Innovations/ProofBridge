@@ -45,6 +45,8 @@ model AuthNonce {
 enum TokenKind {
   NATIVE
   ERC20
+  SAC
+  SEP41
 }
 
 enum ChainKind {

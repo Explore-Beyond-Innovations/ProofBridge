@@ -3,13 +3,13 @@ import { PrismaService } from '@prisma/prisma.service';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { TradesService } from './trade.service';
 import { TradesController } from './trade.controller';
-import { ChainProvidersModule } from '../../providers/chain/chain.module';
+import { ChainAdapterModule } from '../../chain-adapters/chain-adapter.module';
 import { MMRService } from '../mmr/mmr.service';
 import { ProofModule } from '../../providers/noir/proof.module';
 import { EncryptionService } from '@libs/encryption.service';
 
 @Module({
-  imports: [JwtModule.register({}), ChainProvidersModule, ProofModule],
+  imports: [JwtModule.register({}), ChainAdapterModule, ProofModule],
   controllers: [TradesController],
   providers: [
     TradesService,

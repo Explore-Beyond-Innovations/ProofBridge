@@ -1,33 +1,71 @@
-import { IsString, MinLength } from 'class-validator';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+import { ChainKind } from '@prisma/client';
 
 export class ChallengeDTO {
   @ApiProperty({
-    description: 'EVM address of the user',
+    description: 'Chain kind the caller is authenticating with',
+    enum: ChainKind,
+    example: ChainKind.EVM,
+  })
+  @IsEnum(ChainKind)
+  chainKind!: ChainKind;
+
+  @ApiProperty({
+    description:
+      'Wallet address — 0x-prefixed 20-byte hex for EVM, G-strkey for Stellar',
     example: '0x1234...',
   })
   @IsString()
-  @Transform(({ value }) => value.trim())
-  address: string;
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  address!: string;
 }
 
 export class LoginDTO {
   @ApiProperty({
-    description: 'Message to be signed',
-    example: 'Login message...',
+    description: 'Chain kind matching the original challenge',
+    enum: ChainKind,
+    example: ChainKind.EVM,
   })
+  @IsEnum(ChainKind)
+  chainKind!: ChainKind;
+
+  // EVM (SIWE) path
+  @ApiProperty({
+    description: 'SIWE message string (EVM path only)',
+    required: false,
+  })
+  @ValidateIf((o: LoginDTO) => o.chainKind === ChainKind.EVM)
   @IsString()
-  @Transform(({ value }) => value.trim())
-  message!: string;
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  message?: string;
 
   @ApiProperty({
-    description: 'Signature of the message',
-    example: '0x1234...',
+    description: 'SIWE signature (EVM path only)',
+    required: false,
   })
+  @ValidateIf((o: LoginDTO) => o.chainKind === ChainKind.EVM)
   @IsString()
-  @Transform(({ value }) => value.trim())
-  signature!: string;
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  signature?: string;
+
+  // Stellar (SEP-10) path
+  @ApiProperty({
+    description:
+      'Co-signed SEP-10 challenge transaction, base64 XDR (Stellar path only)',
+    required: false,
+  })
+  @ValidateIf((o: LoginDTO) => o.chainKind === ChainKind.STELLAR)
+  @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  transaction?: string;
 }
 
 export class RefreshDto {
@@ -38,40 +76,51 @@ export class RefreshDto {
 }
 
 export class ChallengeResponseDto {
-  @ApiProperty({
-    description: 'Unique nonce for the challenge',
-    example: '123456789',
-  })
+  @ApiProperty({ enum: ChainKind })
+  @IsEnum(ChainKind)
+  chainKind!: ChainKind;
+
+  @ApiProperty({ description: 'Echoed wallet address (canonical form)' })
   @IsString()
-  nonce: string;
+  address!: string;
+
+  @ApiProperty({ description: 'Expiration timestamp (ISO8601)' })
+  @IsString()
+  expiresAt!: string;
 
   @ApiProperty({
-    description: 'EVM address of the user',
-    example: '0x1234...',
+    description: 'Unique nonce for SIWE (EVM only)',
+    required: false,
   })
+  @IsOptional()
   @IsString()
-  address: string;
+  nonce?: string;
+
+  @ApiProperty({ description: 'SIWE domain (EVM only)', required: false })
+  @IsOptional()
+  @IsString()
+  domain?: string;
+
+  @ApiProperty({ description: 'SIWE URI (EVM only)', required: false })
+  @IsOptional()
+  @IsString()
+  uri?: string;
 
   @ApiProperty({
-    description: 'Expiration timestamp',
-    example: '2024-01-01T00:00:00Z',
+    description: 'Server-signed SEP-10 challenge transaction (Stellar only)',
+    required: false,
   })
+  @IsOptional()
   @IsString()
-  expiresAt: string;
+  transaction?: string;
 
   @ApiProperty({
-    description: 'Domain for the challenge',
-    example: 'example.com',
+    description: 'Stellar network passphrase (Stellar only)',
+    required: false,
   })
+  @IsOptional()
   @IsString()
-  domain: string;
-
-  @ApiProperty({
-    description: 'URI for the challenge',
-    example: 'https://example.com/auth',
-  })
-  @IsString()
-  uri: string;
+  networkPassphrase?: string;
 }
 
 export class LoginResponseDto {
@@ -82,7 +131,7 @@ export class LoginResponseDto {
       username: 'user123',
     },
   })
-  user: {
+  user!: {
     id: string;
     username: string;
   };
@@ -94,7 +143,7 @@ export class LoginResponseDto {
       refresh: 'eyJhbGciOiJIUzI1...',
     },
   })
-  tokens: {
+  tokens!: {
     access: string;
     refresh: string;
   };
@@ -108,7 +157,7 @@ export class RefreshResponseDto {
       refresh: 'eyJhbGciOiJIUzI1...',
     },
   })
-  tokens: {
+  tokens!: {
     access: string;
     refresh: string;
   };

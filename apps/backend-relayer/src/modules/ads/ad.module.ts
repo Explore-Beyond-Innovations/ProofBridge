@@ -3,10 +3,10 @@ import { AdsController } from './ad.controller';
 import { AdsService } from './ad.service';
 import { PrismaService } from '@prisma/prisma.service';
 import { JwtModule, JwtService } from '@nestjs/jwt';
-import { ChainProvidersModule } from '../../providers/chain/chain.module';
+import { ChainAdapterModule } from '../../chain-adapters/chain-adapter.module';
 
 @Module({
-  imports: [JwtModule.register({}), ChainProvidersModule],
+  imports: [JwtModule.register({}), ChainAdapterModule],
   controllers: [AdsController],
   providers: [AdsService, PrismaService, JwtService],
 })

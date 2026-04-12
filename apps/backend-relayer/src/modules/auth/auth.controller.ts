@@ -23,7 +23,7 @@ export class AuthController {
     type: ChallengeResponseDto,
   })
   async challenge(@Body() dto: ChallengeDTO) {
-    return this.auth.challenge(dto.address);
+    return this.auth.challenge(dto.address, dto.chainKind);
   }
 
   @Post('login')
@@ -35,7 +35,7 @@ export class AuthController {
     type: LoginResponseDto,
   })
   async login(@Body() dto: LoginDTO) {
-    return this.auth.login(dto.message, dto.signature);
+    return this.auth.login(dto);
   }
 
   @Post('refresh')

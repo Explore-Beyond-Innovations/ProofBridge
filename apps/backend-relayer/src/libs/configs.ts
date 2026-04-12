@@ -22,4 +22,16 @@ export const env = {
   secretKey: process.env.SECRET_KEY || '32_byte_secret_key_for_aes!',
   evmRpcApiKey: process.env.EVM_RPC_API_KEY || '',
   rpcUrlHedera: process.env.RPC_URL_HEDERA || '',
+  stellar: {
+    adminSecret: process.env.STELLAR_ADMIN_SECRET || '',
+    rpcUrl:
+      process.env.STELLAR_RPC_URL || 'https://soroban-testnet.stellar.org',
+    networkPassphrase:
+      process.env.STELLAR_NETWORK_PASSPHRASE ||
+      'Test SDF Network ; September 2015',
+    // SEP-10 server signing key. Separate from adminSecret so the auth
+    // surface can't move funds and a compromise is bounded to issuing
+    // challenges.
+    authSecret: process.env.STELLAR_AUTH_SECRET || '',
+  },
 };

@@ -6,6 +6,7 @@
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
+  "transformIgnorePatterns": ["node_modules/(?!(?:\\.pnpm/)?@noble)"],
   "setupFilesAfterEnv": [],
   "globalSetup": "<rootDir>/setups/jest-integrations.setup.ts",
   "globalTeardown": "<rootDir>/setups/jest.teardown.ts",

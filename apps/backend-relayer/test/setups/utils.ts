@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { ethers } from 'ethers';
 import request from 'supertest';
 import { SiweMessage } from 'siwe';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, ChainKind } from '@prisma/client';
 import { hash } from '@node-rs/argon2';
 import { privateKeyToAddress, signMessage } from 'viem/accounts';
 import {
@@ -13,8 +13,12 @@ import {
 } from 'viem';
 import { parseEther } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { ethLocalnet } from '../../src/providers/viem/localnet';
-import { hederaTestnet } from 'viem/chains';
+import {
+  Keypair,
+  Networks,
+  TransactionBuilder,
+} from '@stellar/stellar-sdk';
+import { ethLocalnet } from '../../src/providers/viem/ethers/localnet';
 
 export type AddressLike = `0x${string}`;
 
@@ -47,7 +51,7 @@ export const loginUser = async (
   // make challenge request
   const challenge = await request(app.getHttpServer())
     .post('/v1/auth/challenge')
-    .send({ address })
+    .send({ address, chainKind: ChainKind.EVM })
     .expect(200);
 
   const body = challenge.body as ChallengeResponse;
@@ -76,7 +80,36 @@ export const loginUser = async (
   // send to login
   const res = await request(app.getHttpServer())
     .post('/v1/auth/login')
-    .send({ message, signature })
+    .send({ message, signature, chainKind: ChainKind.EVM })
+    .expect(201);
+
+  return res.body.tokens.access as string;
+};
+
+export const loginStellarUser = async (
+  app: INestApplication<any>,
+  keypair: Keypair,
+): Promise<string> => {
+  const address = keypair.publicKey();
+
+  const challenge = await request(app.getHttpServer())
+    .post('/v1/auth/challenge')
+    .send({ address, chainKind: ChainKind.STELLAR })
+    .expect(200);
+
+  const xdrString = challenge.body.transaction as string;
+  const passphrase =
+    (challenge.body.networkPassphrase as string) ||
+    process.env.STELLAR_NETWORK_PASSPHRASE ||
+    Networks.TESTNET;
+
+  const tx = TransactionBuilder.fromXDR(xdrString, passphrase as Networks);
+  tx.sign(keypair);
+  const signedXdr = tx.toEnvelope().toXDR('base64');
+
+  const res = await request(app.getHttpServer())
+    .post('/v1/auth/login')
+    .send({ transaction: signedXdr, chainKind: ChainKind.STELLAR })
     .expect(201);
 
   return res.body.tokens.access as string;
@@ -107,6 +140,8 @@ export const seedToken = async (
   name: string = 'Ether',
   symbol = 'ETH',
   address?: string,
+  kind: 'NATIVE' | 'ERC20' | 'SAC' | 'SEP41' = 'ERC20',
+  decimals = 18,
 ) => {
   return prisma.token.upsert({
     where: {
@@ -120,14 +155,14 @@ export const seedToken = async (
       symbol,
       name: name,
       address: address ?? randomAddress(),
-      decimals: 18,
-      kind: 'ERC20',
+      decimals,
+      kind,
     },
     update: {
       symbol,
       name: name,
-      decimals: 18,
-      kind: 'ERC20',
+      decimals,
+      kind,
     },
     select: { id: true, symbol: true, chain: true },
   });
@@ -140,12 +175,14 @@ export const seedChain = async (
     chainId: bigint;
     ad: string;
     op: string;
+    kind: ChainKind;
   }>,
 ) => {
   const name = params?.name ?? `Chain-${Math.floor(Math.random() * 10000)}`;
   const chainId = params?.chainId ?? BigInt(Math.floor(Math.random() * 10000));
   const ad = params?.ad ?? randomAddress();
   const op = params?.op ?? randomAddress();
+  const kind = params?.kind ?? ChainKind.EVM;
 
   return prisma.chain.upsert({
     where: {
@@ -154,6 +191,7 @@ export const seedChain = async (
     create: {
       name,
       chainId: chainId,
+      kind,
       adManagerAddress: ad,
       orderPortalAddress: op,
       mmr: {
@@ -164,6 +202,7 @@ export const seedChain = async (
     },
     update: {
       name,
+      kind,
       adManagerAddress: ad,
       orderPortalAddress: op,
     },
@@ -191,6 +230,7 @@ export const seedAd = async (
   adTokenId: string,
   orderTokenId: string,
   pool = 1_000_000,
+  status: 'INACTIVE' | 'ACTIVE' | 'PAUSED' | 'CLOSED' = 'INACTIVE',
 ) =>
   prisma.ad.create({
     data: {
@@ -199,7 +239,7 @@ export const seedAd = async (
       adTokenId,
       orderTokenId,
       poolAmount: pool,
-      status: 'INACTIVE',
+      status,
       creatorDstAddress: creator,
     },
     select: { id: true, creatorAddress: true, routeId: true },
@@ -212,9 +252,6 @@ export function randomAddress() {
 
 export const makeEthClient = () =>
   createPublicClient({ chain: ethLocalnet, transport: http() });
-
-export const makeHederaClient = () =>
-  createPublicClient({ chain: hederaTestnet, transport: http() });
 
 async function tryTopUpViaRpc(addr: AddressLike, hexWei: string) {
   const ethRpc = process.env.ETHEREUM_RPC_URL ?? 'http://localhost:9545';
@@ -270,38 +307,6 @@ export async function fundEthAddress(
       'Unable to fund address. Set FUNDER_KEY in env, or run against Anvil/Hardhat and allow *_setBalance.',
     );
   }
-}
-
-export async function fundHBar(
-  client: PublicClient,
-  to: AddressLike,
-  minBalanceEther = '3.0',
-): Promise<void> {
-  const needed = parseEther(minBalanceEther);
-
-  const current = await client.getBalance({ address: to });
-  if (current >= needed) return;
-
-  const managerKey = process.env.MANAGER_KEY as `0x${string}` | undefined;
-
-  if (!managerKey) {
-    throw new Error('Manager address not set');
-  }
-
-  console.log('funding with hbar', to);
-
-  const wallet = createWalletClient({
-    chain: client.chain ?? hederaTestnet,
-    transport: http(),
-    account: privateKeyToAccount(managerKey),
-  });
-
-  const hash = await wallet.sendTransaction({
-    to,
-    value: parseEther('10'), // send 10 ETH
-  });
-
-  await client.waitForTransactionReceipt({ hash });
 }
 
 export const expectObject = (

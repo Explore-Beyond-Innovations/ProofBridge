@@ -19,7 +19,7 @@ import {
 import { getAddress } from 'viem';
 import { AdStatus, Prisma } from '@prisma/client';
 import { Request } from 'express';
-import { ChainProviderService } from '../../providers/chain/chain-provider.service';
+import { ChainAdapterService } from '../../chain-adapters/chain-adapter.service';
 import { toBytes32 } from '../../providers/viem/ethers/typedData';
 import { randomUUID } from 'crypto';
 
@@ -49,7 +49,7 @@ type AdUpdateLogInput = {
 export class AdsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly chainProviders: ChainProviderService,
+    private readonly chainAdapters: ChainAdapterService,
   ) {}
 
   async list(query: QueryAdsDto) {
@@ -389,7 +389,7 @@ export class AdsService {
 
       const adId = randomUUID();
 
-      const reqContractDetails = await this.chainProviders
+      const reqContractDetails = await this.chainAdapters
         .forChain(route.adToken.chain.kind)
         .getCreateAdRequestContractDetails({
           adChainId: route.adToken.chain.chainId,
@@ -522,7 +522,7 @@ export class AdsService {
 
       const effectiveStatus = ad.status == 'EXHAUSTED' ? 'ACTIVE' : ad.status;
 
-      const reqContractDetails = await this.chainProviders
+      const reqContractDetails = await this.chainAdapters
         .forChain(ad.route.adToken.chain.kind)
         .getFundAdRequestContractDetails({
           adContractAddress: ad.route.adToken.chain
@@ -657,7 +657,7 @@ export class AdsService {
         ? 'EXHAUSTED'
         : ad.status;
 
-      const reqContractDetails = await this.chainProviders
+      const reqContractDetails = await this.chainAdapters
         .forChain(ad.route.adToken.chain.kind)
         .getWithdrawFromAdRequestContractDetails({
           adContractAddress: ad.route.adToken.chain
@@ -861,7 +861,7 @@ export class AdsService {
         throw new BadRequestException('Ad is already closed');
       }
 
-      const reqContractDetails = await this.chainProviders
+      const reqContractDetails = await this.chainAdapters
         .forChain(ad.route.adToken.chain.kind)
         .getCloseAdRequestContractDetails({
           adContractAddress: ad.route.adToken.chain
@@ -980,7 +980,7 @@ export class AdsService {
       if (!ad) throw new NotFoundException('Ad for Ad Id not found');
 
       // // verify adLog
-      const isValidated = await this.chainProviders
+      const isValidated = await this.chainAdapters
         .forChain(ad.route.adToken.chain.kind)
         .validateAdManagerRequest({
           chainId: ad.route.adToken.chain.chainId,

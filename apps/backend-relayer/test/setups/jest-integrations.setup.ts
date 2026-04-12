@@ -5,7 +5,12 @@ import {
 import * as dotenv from 'dotenv';
 import { execa } from 'execa';
 import path from 'path';
-import { setupContracts } from './contract-setup';
+import { deployEvmContracts } from './evm-setup';
+import {
+  deployStellarContracts,
+  linkStellarAdManagerToOrderChain,
+  StellarChainData,
+} from './stellar-setup';
 import { seedDB } from './seed';
 
 // Load .env (optional)
@@ -38,11 +43,22 @@ export default async () => {
 
   await migrate(databaseUrl);
 
-  const { ethContracts, hederaContracts } = await setupContracts();
+  const ethContracts = await deployEvmContracts();
 
-  await seedDB(ethContracts, hederaContracts);
+  // Stellar side is optional — only engages when the external bash
+  // orchestrator (scripts/run_cross_chain_e2e.sh) has exported the RPC +
+  // admin secret. Tests that depend on Stellar should skip when absent.
+  let stellarContracts: StellarChainData | undefined;
+  if (process.env.STELLAR_RPC_URL && process.env.STELLAR_ADMIN_SECRET) {
+    stellarContracts = await deployStellarContracts();
+    await linkStellarAdManagerToOrderChain(stellarContracts, ethContracts);
+  }
+
+  await seedDB(ethContracts, stellarContracts);
 
   (global as any).__ETH_CONTRACTS__ = ethContracts;
-  (global as any).__HEDERA_CONTRACTS__ = hederaContracts;
+  if (stellarContracts) {
+    (global as any).__STELLAR_CONTRACTS__ = stellarContracts;
+  }
   (global as any).__PG_CONTAINER__ = container;
 };

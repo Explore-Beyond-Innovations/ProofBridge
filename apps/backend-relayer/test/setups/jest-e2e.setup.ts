@@ -4,6 +4,7 @@ import {
 } from '@testcontainers/postgresql';
 import * as dotenv from 'dotenv';
 import { execa } from 'execa';
+import { rmSync } from 'fs';
 import path from 'path';
 import { seedDBe2e } from './seed';
 
@@ -21,6 +22,14 @@ async function migrate(databaseUrl: string) {
 }
 
 export default async () => {
+  // Wipe any leftover leveldb state from an aborted prior run before the
+  // first MMRService boots — stale MANIFEST files can otherwise surface as
+  // LEVEL_DATABASE_NOT_OPEN.
+  rmSync(path.resolve(__dirname, '../../leveldb_data'), {
+    recursive: true,
+    force: true,
+  });
+
   container = await new PostgreSqlContainer('postgres:16-alpine')
     .withDatabase('testdb')
     .withUsername('test')

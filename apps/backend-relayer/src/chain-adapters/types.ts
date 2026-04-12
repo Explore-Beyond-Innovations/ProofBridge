@@ -4,18 +4,27 @@
 // (0x-prefixed, 64 hex chars). For EVM addresses this means left-padded
 // with 12 zero bytes; for Stellar addresses the full 32-byte strkey payload.
 //
-// Fields that stay on the ad chain itself (the AdManager contract address,
-// the ad's local ERC20 `adToken`, withdraw `to`) remain 20-byte EVM
-// addresses because they're only ever consumed by EVM ABI calls.
+// Local-chain address fields (adContractAddress, adToken, withdraw `to`,
+// orderContractAddress) use `ChainAddress`, which is a 0x-prefixed hex
+// string accepted in either the 20-byte (EVM) or 32-byte (Stellar) form.
+// The chain-kind-specific adapter is responsible for validating that the
+// shape matches the chain it's bound to — see `address-validators.ts`.
+//
+// `EvmAddress` is kept only for strictly EVM-typed values that never
+// straddle chains (signatures, EIP-712 hashes).
 
 export type Bytes32Hex = `0x${string}`;
 export type EvmAddress = `0x${string}`;
+// A local-chain address. 0x-prefixed hex. Either 40 hex chars (EVM, 20
+// bytes) or 64 hex chars (Stellar/bytes32). The bound adapter validates
+// the concrete shape.
+export type ChainAddress = string;
 
 export type T_CreateAdRequest = {
-  adContractAddress: EvmAddress;
+  adContractAddress: ChainAddress;
   adChainId: bigint;
   adId: string;
-  adToken: EvmAddress;
+  adToken: ChainAddress;
   initialAmount: string;
   orderChainId: bigint;
   adRecipient: Bytes32Hex;
@@ -25,10 +34,11 @@ export type T_CreateAdRequestContractDetails = {
   chainId: string;
   contractAddress: string;
   signature: `0x${string}`;
+  signerPublicKey?: `0x${string}`;
   authToken: string;
   timeToExpire: number;
   adId: string;
-  adToken: EvmAddress;
+  adToken: ChainAddress;
   initialAmount: string;
   orderChainId: string;
   adRecipient: Bytes32Hex;
@@ -36,7 +46,7 @@ export type T_CreateAdRequestContractDetails = {
 };
 
 export type T_CreatFundAdRequest = {
-  adContractAddress: EvmAddress;
+  adContractAddress: ChainAddress;
   adChainId: bigint;
   adId: string;
   amount: string;
@@ -46,6 +56,7 @@ export type T_CreatFundAdRequestContractDetails = {
   chainId: string;
   contractAddress: string;
   signature: `0x${string}`;
+  signerPublicKey?: `0x${string}`;
   authToken: string;
   timeToExpire: number;
   adId: string;
@@ -54,40 +65,42 @@ export type T_CreatFundAdRequestContractDetails = {
 };
 
 export type T_WithdrawFromAdRequest = {
-  adContractAddress: EvmAddress;
+  adContractAddress: ChainAddress;
   adChainId: bigint;
   adId: string;
   amount: string;
-  to: EvmAddress;
+  to: ChainAddress;
 };
 
 export type T_WithdrawFromAdRequestContractDetails = {
   chainId: string;
   contractAddress: string;
   signature: `0x${string}`;
+  signerPublicKey?: `0x${string}`;
   authToken: string;
   timeToExpire: number;
   adId: string;
   amount: string;
-  to: EvmAddress;
+  to: ChainAddress;
   reqHash: `0x${string}`;
 };
 
 export type T_CloseAdRequest = {
-  adContractAddress: EvmAddress;
+  adContractAddress: ChainAddress;
   adChainId: bigint;
   adId: string;
-  to: EvmAddress;
+  to: ChainAddress;
 };
 
 export type T_CloseAdRequestContractDetails = {
   chainId: string;
   contractAddress: string;
   signature: `0x${string}`;
+  signerPublicKey?: `0x${string}`;
   authToken: string;
   timeToExpire: number;
   adId: string;
-  to: EvmAddress;
+  to: ChainAddress;
   reqHash: `0x${string}`;
 };
 
@@ -144,7 +157,7 @@ export type T_OrderPortalParams = {
 
 export type T_LockForOrderRequest = {
   adChainId: bigint;
-  adContractAddress: EvmAddress;
+  adContractAddress: ChainAddress;
   orderParams: T_OrderParams;
 };
 
@@ -152,6 +165,7 @@ export type T_LockForOrderRequestContractDetails = {
   chainId: string;
   contractAddress: string;
   signature: `0x${string}`;
+  signerPublicKey?: `0x${string}`;
   authToken: string;
   timeToExpire: number;
   orderParams: T_AdManagerOrderParams;
@@ -161,13 +175,13 @@ export type T_LockForOrderRequestContractDetails = {
 
 export type T_CreateOrderRequest = {
   orderChainId: bigint;
-  orderContractAddress: EvmAddress;
+  orderContractAddress: ChainAddress;
   orderParams: T_OrderParams;
 };
 
 export type T_CreateUnlockOrderContractDetails = {
   chainId: bigint;
-  contractAddress: EvmAddress;
+  contractAddress: ChainAddress;
   isAdCreator: boolean;
   orderParams: T_OrderParams;
   nullifierHash: string;
@@ -177,8 +191,9 @@ export type T_CreateUnlockOrderContractDetails = {
 
 export type T_UnlockOrderContractDetails = {
   chainId: string;
-  contractAddress: EvmAddress;
+  contractAddress: ChainAddress;
   signature: `0x${string}`;
+  signerPublicKey?: `0x${string}`;
   authToken: string;
   timeToExpire: number;
   orderParams: T_AdManagerOrderParams | T_OrderPortalParams;
@@ -193,6 +208,7 @@ export type T_CreateOrderRequestContractDetails = {
   chainId: string;
   contractAddress: string;
   signature: `0x${string}`;
+  signerPublicKey?: `0x${string}`;
   authToken: string;
   timeToExpire: number;
   orderParams: T_OrderPortalParams;
@@ -202,13 +218,13 @@ export type T_CreateOrderRequestContractDetails = {
 
 export type T_RequestValidation = {
   chainId: bigint;
-  contractAddress: EvmAddress;
+  contractAddress: ChainAddress;
   reqHash: `0x${string}`;
 };
 
 export type T_FetchRoot = {
   chainId: bigint;
-  contractAddress: EvmAddress;
+  contractAddress: ChainAddress;
 };
 
 export type T_FetchRootResponse = {

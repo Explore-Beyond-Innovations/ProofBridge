@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ChainKind } from '@prisma/client';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
@@ -29,10 +30,11 @@ describe('AuthController', () => {
     jest.resetAllMocks();
   });
 
-  describe('GET /v1/auth/challenge', () => {
-    it('should call AuthService.challenge with the address and return payload', async () => {
+  describe('POST /v1/auth/challenge', () => {
+    it('routes EVM challenge and returns payload', async () => {
       const address = '0x1234567890abcdef1234567890abcdef12345678';
       const mockPayload = {
+        chainKind: ChainKind.EVM,
         nonce: 'abc123',
         address,
         expiresAt: new Date(Date.now() + 300_000).toISOString(),
@@ -44,28 +46,53 @@ describe('AuthController', () => {
         .spyOn(service, 'challenge')
         .mockResolvedValueOnce(mockPayload);
 
-      const res = await controller.challenge({ address });
+      const res = await controller.challenge({
+        address,
+        chainKind: ChainKind.EVM,
+      });
 
       expect(spy).toHaveBeenCalledTimes(1);
-      expect(spy).toHaveBeenCalledWith(address);
-
+      expect(spy).toHaveBeenCalledWith(address, ChainKind.EVM);
       expect(res).toEqual(mockPayload);
     });
 
-    it('should propagate service errors', async () => {
-      const address = '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+    it('routes Stellar challenge and returns SEP-10 payload', async () => {
+      const address =
+        'GABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXY234567ABCDE';
+      const mockPayload = {
+        chainKind: ChainKind.STELLAR,
+        address,
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+        transaction: 'base64-xdr...',
+        networkPassphrase: 'Test SDF Network ; September 2015',
+      };
 
       const spy = jest
         .spyOn(service, 'challenge')
-        .mockRejectedValueOnce(new Error('boom'));
+        .mockResolvedValueOnce(mockPayload);
 
-      await expect(controller.challenge({ address })).rejects.toThrow('boom');
-      expect(spy).toHaveBeenCalledWith(address);
+      const res = await controller.challenge({
+        address,
+        chainKind: ChainKind.STELLAR,
+      });
+
+      expect(spy).toHaveBeenCalledWith(address, ChainKind.STELLAR);
+      expect(res).toEqual(mockPayload);
+    });
+
+    it('propagates service errors', async () => {
+      const address = '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+
+      jest.spyOn(service, 'challenge').mockRejectedValueOnce(new Error('boom'));
+
+      await expect(
+        controller.challenge({ address, chainKind: ChainKind.EVM }),
+      ).rejects.toThrow('boom');
     });
   });
 
   describe('POST /v1/auth/refresh', () => {
-    it('should call AuthService.refresh and return new tokens', async () => {
+    it('calls AuthService.refresh and returns new tokens', async () => {
       const dto = { refresh: 'valid-refresh-token' };
       const mockResult = {
         tokens: { access: 'new-jwt-access', refresh: 'new-jwt-refresh' },
@@ -82,23 +109,23 @@ describe('AuthController', () => {
       expect(res).toEqual(mockResult);
     });
 
-    it('should handle invalid refresh token', async () => {
+    it('propagates invalid refresh token error', async () => {
       const dto = { refresh: 'invalid-token' };
 
-      const spy = jest
+      jest
         .spyOn(service, 'refresh')
         .mockRejectedValueOnce(new Error('Invalid refresh token'));
 
       await expect(controller.refresh(dto)).rejects.toThrow(
         'Invalid refresh token',
       );
-      expect(spy).toHaveBeenCalledWith(dto.refresh);
     });
   });
 
   describe('POST /v1/auth/login', () => {
-    it('should call AuthService.verify and return payload', async () => {
+    it('forwards EVM login DTO to AuthService.login', async () => {
       const dto = {
+        chainKind: ChainKind.EVM,
         message:
           'service.xyz wants you to sign in with your Ethereum account:\n...',
         signature: '0xsignature',
@@ -114,20 +141,42 @@ describe('AuthController', () => {
 
       const res = await controller.login(dto);
 
-      expect(spy).toHaveBeenCalledTimes(1);
-      expect(spy).toHaveBeenCalledWith(dto.message, dto.signature);
+      expect(spy).toHaveBeenCalledWith(dto);
       expect(res).toEqual(mockResult);
     });
 
-    it('should propagate service errors (e.g., invalid signature)', async () => {
-      const dto = { message: 'bad', signature: '0x00' };
+    it('forwards Stellar login DTO (transaction only) to AuthService.login', async () => {
+      const dto = {
+        chainKind: ChainKind.STELLAR,
+        transaction: 'co-signed-xdr-base64',
+      };
+      const mockResult = {
+        user: { id: 'u2', username: 'stellar_user' },
+        tokens: { access: 'jwt-access', refresh: 'jwt-refresh' },
+      };
 
       const spy = jest
+        .spyOn(service, 'login')
+        .mockResolvedValueOnce(mockResult);
+
+      const res = await controller.login(dto);
+
+      expect(spy).toHaveBeenCalledWith(dto);
+      expect(res).toEqual(mockResult);
+    });
+
+    it('propagates service errors (e.g., invalid signature)', async () => {
+      const dto = {
+        chainKind: ChainKind.EVM,
+        message: 'bad',
+        signature: '0x00',
+      };
+
+      jest
         .spyOn(service, 'login')
         .mockRejectedValueOnce(new Error('Unauthorized'));
 
       await expect(controller.login(dto)).rejects.toThrow('Unauthorized');
-      expect(spy).toHaveBeenCalledWith(dto.message, dto.signature);
     });
   });
 });

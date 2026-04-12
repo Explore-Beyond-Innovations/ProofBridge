@@ -5,6 +5,7 @@ import { createTestingApp } from '../setups/create-app';
 import { Wallet } from 'ethers';
 import { SiweMessage } from 'siwe';
 import { env } from '@libs/configs';
+import { ChainKind } from '@prisma/client';
 import { LoginResponseDto } from '../../src/modules/auth/dto/auth.dto';
 
 interface ChallengeResponse {
@@ -49,7 +50,7 @@ describe('SIWE E2E', () => {
     // get nonce bound to address
     const prep = await request(app.getHttpServer())
       .post('/v1/auth/challenge')
-      .send({ address: wallet.address })
+      .send({ address: wallet.address, chainKind: ChainKind.EVM })
       .expect(200);
 
     const body = prep.body as ChallengeResponse;
@@ -77,7 +78,7 @@ describe('SIWE E2E', () => {
 
     const verify = await request(app.getHttpServer())
       .post('/v1/auth/login')
-      .send({ message, signature })
+      .send({ message, signature, chainKind: ChainKind.EVM })
       .expect(201);
 
     expect(verify.body.user).toMatchObject({
@@ -93,7 +94,7 @@ describe('SIWE E2E', () => {
   it('rejects wrong domain', async () => {
     const prep = await request(app.getHttpServer())
       .post('/v1/auth/challenge')
-      .send({ address: wallet.address })
+      .send({ address: wallet.address, chainKind: ChainKind.EVM })
       .expect(200);
 
     const body = prep.body as ChallengeResponse;
@@ -115,14 +116,14 @@ describe('SIWE E2E', () => {
 
     await request(app.getHttpServer())
       .post('/v1/auth/login')
-      .send({ message, signature: sig })
+      .send({ message, signature: sig, chainKind: ChainKind.EVM })
       .expect(400);
   });
 
   it('rejects expired message', async () => {
     const prep = await request(app.getHttpServer())
       .post('/v1/auth/challenge')
-      .send({ address: wallet.address })
+      .send({ address: wallet.address, chainKind: ChainKind.EVM })
       .expect(200);
 
     const body = prep.body as ChallengeResponse;
@@ -149,14 +150,14 @@ describe('SIWE E2E', () => {
 
     await request(app.getHttpServer())
       .post('/v1/auth/login')
-      .send({ message, signature })
+      .send({ message, signature, chainKind: ChainKind.EVM })
       .expect(400);
   });
 
   it('rejects invalid signature', async () => {
     const prep = await request(app.getHttpServer())
       .post('/v1/auth/challenge')
-      .send({ address: wallet.address })
+      .send({ address: wallet.address, chainKind: ChainKind.EVM })
       .expect(200);
 
     const body = prep.body as ChallengeResponse;
@@ -178,7 +179,7 @@ describe('SIWE E2E', () => {
 
     await request(app.getHttpServer())
       .post('/v1/auth/login')
-      .send({ message, signature: invalidSignature })
+      .send({ message, signature: invalidSignature, chainKind: ChainKind.EVM })
       .expect(401);
   });
 
@@ -200,14 +201,14 @@ describe('SIWE E2E', () => {
 
     await request(app.getHttpServer())
       .post('/v1/auth/login')
-      .send({ message, signature })
+      .send({ message, signature, chainKind: ChainKind.EVM })
       .expect(400);
   });
 
   it('POST /auth/refresh returns a fresh access token', async () => {
     const prep = await request(app.getHttpServer())
       .post('/v1/auth/challenge')
-      .send({ address: wallet.address })
+      .send({ address: wallet.address, chainKind: ChainKind.EVM })
       .expect(200);
 
     const body = prep.body as ChallengeResponse;
@@ -230,7 +231,7 @@ describe('SIWE E2E', () => {
 
     const verifyResponse = await request(app.getHttpServer())
       .post('/v1/auth/login')
-      .send({ message, signature })
+      .send({ message, signature, chainKind: ChainKind.EVM })
       .expect(201);
 
     const { tokens } = verifyResponse.body as LoginResponseDto;
