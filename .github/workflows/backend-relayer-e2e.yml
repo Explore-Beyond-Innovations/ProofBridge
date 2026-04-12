@@ -9,6 +9,7 @@ on:
       - "proof_circuits/**"
       - "scripts/**"
       - "packages/**"
+      - "package.json"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - ".github/workflows/backend-relayer-e2e.yml"
@@ -19,6 +20,7 @@ on:
       - "proof_circuits/**"
       - "scripts/**"
       - "packages/**"
+      - "package.json"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - ".github/workflows/backend-relayer-e2e.yml"
@@ -119,8 +121,15 @@ jobs:
       - name: Dump relayer logs
         if: always()
         run: |
-          docker compose -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" logs backend-relayer > .relayer.log 2>&1 || true
-          docker compose -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" logs postgres > .postgres.log 2>&1 || true
+          echo "::group::backend-relayer logs"
+          docker compose -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" logs --no-color --tail=500 backend-relayer | tee .relayer.log || true
+          echo "::endgroup::"
+          echo "::group::postgres logs"
+          docker compose -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" logs --no-color --tail=200 postgres | tee .postgres.log || true
+          echo "::endgroup::"
+          echo "::group::container state"
+          docker compose -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" ps -a || true
+          echo "::endgroup::"
 
       - name: Stop containers
         if: always()

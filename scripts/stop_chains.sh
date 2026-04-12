@@ -6,6 +6,12 @@ set -uo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+ENV_FILE="$ROOT_DIR/.chains.env"
+if [[ -f "$ENV_FILE" ]]; then
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+fi
+
 PID_FILE="$ROOT_DIR/.chains.anvil.pid"
 if [[ -f "$PID_FILE" ]]; then
   ANVIL_PID="$(cat "$PID_FILE")"

@@ -2,12 +2,15 @@ import { PrismaClient } from "@prisma/client";
 import { hash as argon2hash } from "@node-rs/argon2";
 import { ethers } from "ethers";
 
+// `null` means the role wasn't deployed for this chain in the current flow;
+// the Prisma columns are non-null so we substitute a recognizable sentinel at
+// the DB boundary (see `sentinelFor`) and log a warning.
 export interface DeployedContracts {
   eth: {
     name: string;
     chainId: string;
-    adManagerAddress: string;
-    orderPortalAddress: string;
+    adManagerAddress: string | null;
+    orderPortalAddress: string | null;
     merkleManagerAddress: string;
     verifierAddress: string;
     tokenName: string;
@@ -17,15 +20,21 @@ export interface DeployedContracts {
   stellar?: {
     name: string;
     chainId: string;
-    adManagerAddress: string; // 0x + 64 hex
-    orderPortalAddress: string;
+    adManagerAddress: string | null; // 0x + 64 hex
+    orderPortalAddress: string | null;
     merkleManagerAddress: string;
     verifierAddress: string;
     tokenName: string;
     tokenSymbol: string;
     tokenAddress: string;
-    adminSecret: string;
   };
+}
+
+function sentinelFor(role: string, chain: string, width: 40 | 64): string {
+  console.warn(
+    `[seed] ${chain} has no ${role} deployed — writing zero-address sentinel.`,
+  );
+  return "0x" + "0".repeat(width);
 }
 
 export async function seedDb(deployed: DeployedContracts): Promise<void> {
@@ -42,20 +51,24 @@ export async function seedDb(deployed: DeployedContracts): Promise<void> {
     });
 
     // EVM chain + token.
+    const ethAdManager =
+      deployed.eth.adManagerAddress ?? sentinelFor("adManager", "eth", 40);
+    const ethOrderPortal =
+      deployed.eth.orderPortalAddress ?? sentinelFor("orderPortal", "eth", 40);
     const ethChain = await prisma.chain.upsert({
       where: { chainId: BigInt(deployed.eth.chainId) },
       create: {
         name: deployed.eth.name,
         chainId: BigInt(deployed.eth.chainId),
         kind: "EVM",
-        adManagerAddress: deployed.eth.adManagerAddress,
-        orderPortalAddress: deployed.eth.orderPortalAddress,
+        adManagerAddress: ethAdManager,
+        orderPortalAddress: ethOrderPortal,
         mmr: { create: { chainId: deployed.eth.chainId } },
       },
       update: {
         name: deployed.eth.name,
-        adManagerAddress: deployed.eth.adManagerAddress,
-        orderPortalAddress: deployed.eth.orderPortalAddress,
+        adManagerAddress: ethAdManager,
+        orderPortalAddress: ethOrderPortal,
       },
       select: { id: true },
     });
@@ -87,20 +100,24 @@ export async function seedDb(deployed: DeployedContracts): Promise<void> {
     // Stellar chain + token (optional).
     if (deployed.stellar) {
       const s = deployed.stellar;
+      const stellarAdManager =
+        s.adManagerAddress ?? sentinelFor("adManager", "stellar", 64);
+      const stellarOrderPortal =
+        s.orderPortalAddress ?? sentinelFor("orderPortal", "stellar", 64);
       const stellarChain = await prisma.chain.upsert({
         where: { chainId: BigInt(s.chainId) },
         create: {
           name: s.name,
           chainId: BigInt(s.chainId),
           kind: "STELLAR",
-          adManagerAddress: s.adManagerAddress,
-          orderPortalAddress: s.orderPortalAddress,
+          adManagerAddress: stellarAdManager,
+          orderPortalAddress: stellarOrderPortal,
           mmr: { create: { chainId: s.chainId } },
         },
         update: {
           name: s.name,
-          adManagerAddress: s.adManagerAddress,
-          orderPortalAddress: s.orderPortalAddress,
+          adManagerAddress: stellarAdManager,
+          orderPortalAddress: stellarOrderPortal,
         },
         select: { id: true },
       });

@@ -55,6 +55,7 @@ export async function fundEthAddress(
   const needed = parseEther(minBalanceEther);
   const current = await client.getBalance({ address: to });
   if (current >= needed) return;
+  const missing = needed - current;
 
   const funderKey = process.env.FUNDER_KEY as `0x${string}` | undefined;
 
@@ -65,18 +66,20 @@ export async function fundEthAddress(
       account: privateKeyToAccount(funderKey),
     });
 
-    const hash = await wallet.sendTransaction({
-      to,
-      value: parseEther("10"),
-    });
+    const hash = await wallet.sendTransaction({ to, value: missing });
     await client.waitForTransactionReceipt({ hash });
     return;
   }
 
-  const ok = await tryTopUpViaRpc(to, "0x8AC7230489E80000"); // 10 ETH
+  const ok = await tryTopUpViaRpc(to, `0x${needed.toString(16)}`);
   if (!ok) {
     throw new Error(
       "Unable to fund address. Set FUNDER_KEY in env, or run against Anvil/Hardhat and allow *_setBalance.",
     );
+  }
+
+  const funded = await client.getBalance({ address: to });
+  if (funded < needed) {
+    throw new Error(`Unable to fund ${to} to ${minBalanceEther} ETH.`);
   }
 }

@@ -1059,7 +1059,6 @@ export class AdsService {
       return {
         adId: adId,
         success: true,
-        dto: dto,
       };
     } catch (e) {
       if (e instanceof Error) {

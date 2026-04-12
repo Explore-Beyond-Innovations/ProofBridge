@@ -258,11 +258,15 @@ export function writeDeployedSnapshot(
   outPath: string,
   { stellar, evm }: DeployAllResult,
 ): void {
+  // Undeployed roles are emitted as null so consumers fail fast on a real use
+  // (instead of silently contract-calling the zero address). In this flow the
+  // EVM side only plays the order role and the Stellar side only plays the ad
+  // role, so the counterpart address on each chain stays null.
   const snapshot = {
     eth: {
       name: "AnvilLocal",
       chainId: evm.chainId.toString(),
-      adManagerAddress: "0x" + "0".repeat(40), // EVM AdManager not deployed in this flow
+      adManagerAddress: null as string | null,
       orderPortalAddress: evm.addresses.orderPortal,
       merkleManagerAddress: evm.addresses.merkleManager,
       verifierAddress: evm.addresses.verifier,
@@ -274,13 +278,12 @@ export function writeDeployedSnapshot(
       name: "StellarLocal",
       chainId: stellar.chainId.toString(),
       adManagerAddress: stellar.adManagerHex,
-      orderPortalAddress: "0x" + "0".repeat(64), // Stellar OrderPortal not deployed here
+      orderPortalAddress: null as string | null,
       merkleManagerAddress: strkeyToHex(stellar.merkleManager),
       verifierAddress: strkeyToHex(stellar.verifier),
       tokenName: "XLM",
       tokenSymbol: "XLM",
       tokenAddress: stellar.adTokenHex,
-      adminSecret: process.env.STELLAR_ADMIN_SECRET ?? "",
     },
   };
   fs.writeFileSync(outPath, JSON.stringify(snapshot, null, 2));

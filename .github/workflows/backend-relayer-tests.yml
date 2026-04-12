@@ -6,6 +6,7 @@ on:
     paths:
       - "apps/backend-relayer/**"
       - "packages/**"
+      - "package.json"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - ".github/workflows/backend-relayer-tests.yml"
@@ -13,6 +14,7 @@ on:
     paths:
       - "apps/backend-relayer/**"
       - "packages/**"
+      - "package.json"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - ".github/workflows/backend-relayer-tests.yml"

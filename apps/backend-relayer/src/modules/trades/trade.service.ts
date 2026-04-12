@@ -141,10 +141,14 @@ export class TradesService {
 
       if (q.routeId) where.routeId = q.routeId;
       if (q.adId) where.adId = q.adId;
-      if (q.adCreatorAddress)
-        where.adCreatorAddress = normalizeChainAddress(q.adCreatorAddress);
-      if (q.bridgerAddress)
-        where.bridgerAddress = normalizeChainAddress(q.bridgerAddress);
+      try {
+        if (q.adCreatorAddress)
+          where.adCreatorAddress = normalizeChainAddress(q.adCreatorAddress);
+        if (q.bridgerAddress)
+          where.bridgerAddress = normalizeChainAddress(q.bridgerAddress);
+      } catch {
+        throw new BadRequestException('Invalid address filter');
+      }
 
       if (q.adTokenId || q.orderTokenId) {
         where.route = {
@@ -1145,6 +1149,7 @@ export class TradesService {
         where: {
           tradeId: tradeId,
           userAddress: normalizeChainAddress(user.walletAddress),
+          ...(dto.signature ? { signature: dto.signature } : {}),
         },
         orderBy: { createdAt: 'desc' },
         include: { trade: true },
