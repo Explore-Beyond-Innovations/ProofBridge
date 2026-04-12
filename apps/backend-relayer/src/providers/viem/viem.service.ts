@@ -285,7 +285,7 @@ export class ViemService {
   async getLockForOrderRequestContractDetails(
     data: T_LockForOrderRequest,
   ): Promise<T_LockForOrderRequestContractDetails> {
-    const { adChainId, orderParams } = data;
+    const { adChainId, adContractAddress, orderParams } = data;
     const { client, wallet } = this.getClient(adChainId.toString());
     const token: `0x${string}` = keccak256(toHex(randomUUID()));
 
@@ -299,7 +299,7 @@ export class ViemService {
     const orderHash = getTypedHash(data.orderParams);
 
     const message = await client.readContract({
-      address: orderParams.adManager,
+      address: adContractAddress,
       abi: AD_MANAGER_ABI,
       functionName: 'lockForOrderRequestHash',
       args: [orderParams.adId, orderHash, token, timeToExpire],
@@ -316,7 +316,7 @@ export class ViemService {
 
     return {
       chainId: adChainId.toString(),
-      contractAddress: orderParams.adManager,
+      contractAddress: adContractAddress,
       signature,
       authToken: token,
       timeToExpire: Number(timeToExpire),
@@ -329,7 +329,7 @@ export class ViemService {
   async getCreateOrderRequestContractDetails(
     data: T_CreateOrderRequest,
   ): Promise<T_CreateOrderRequestContractDetails> {
-    const { orderChainId, orderParams } = data;
+    const { orderChainId, orderContractAddress, orderParams } = data;
     const { client, wallet } = this.getClient(orderChainId.toString());
     const token: `0x${string}` = keccak256(toHex(randomUUID()));
 
@@ -343,7 +343,7 @@ export class ViemService {
     const orderHash = getTypedHash(data.orderParams);
 
     const message = await client.readContract({
-      address: orderParams.orderPortal,
+      address: orderContractAddress,
       abi: ORDER_PORTAL_ABI,
       functionName: 'createOrderRequestHash',
       args: [orderParams.adId, orderHash, token, timeToExpire],
@@ -357,7 +357,7 @@ export class ViemService {
 
     return {
       chainId: orderChainId.toString(),
-      contractAddress: orderParams.orderPortal,
+      contractAddress: orderContractAddress,
       signature,
       authToken: token,
       timeToExpire: Number(timeToExpire),

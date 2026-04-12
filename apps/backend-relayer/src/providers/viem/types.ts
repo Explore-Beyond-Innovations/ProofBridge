@@ -1,11 +1,24 @@
+// Cross-chain bytes32 convention
+// ────────────────────────────────────────────────────────────────────
+// All address-like fields that cross chain boundaries are `Bytes32Hex`
+// (0x-prefixed, 64 hex chars). For EVM addresses this means left-padded
+// with 12 zero bytes; for Stellar addresses the full 32-byte strkey payload.
+//
+// Fields that stay on the ad chain itself (the AdManager contract address,
+// the ad's local ERC20 `adToken`, withdraw `to`) remain 20-byte EVM
+// addresses because they're only ever consumed by EVM ABI calls.
+
+export type Bytes32Hex = `0x${string}`;
+export type EvmAddress = `0x${string}`;
+
 export type T_CreateAdRequest = {
-  adContractAddress: `0x${string}`;
+  adContractAddress: EvmAddress;
   adChainId: bigint;
   adId: string;
-  adToken: `0x${string}`;
+  adToken: EvmAddress;
   initialAmount: string;
   orderChainId: bigint;
-  adRecipient: `0x${string}`;
+  adRecipient: Bytes32Hex;
 };
 
 export type T_CreateAdRequestContractDetails = {
@@ -15,15 +28,15 @@ export type T_CreateAdRequestContractDetails = {
   authToken: string;
   timeToExpire: number;
   adId: string;
-  adToken: `0x${string}`;
+  adToken: EvmAddress;
   initialAmount: string;
   orderChainId: string;
-  adRecipient: `0x${string}`;
+  adRecipient: Bytes32Hex;
   reqHash: `0x${string}`;
 };
 
 export type T_CreatFundAdRequest = {
-  adContractAddress: `0x${string}`;
+  adContractAddress: EvmAddress;
   adChainId: bigint;
   adId: string;
   amount: string;
@@ -41,11 +54,11 @@ export type T_CreatFundAdRequestContractDetails = {
 };
 
 export type T_WithdrawFromAdRequest = {
-  adContractAddress: `0x${string}`;
+  adContractAddress: EvmAddress;
   adChainId: bigint;
   adId: string;
   amount: string;
-  to: `0x${string}`;
+  to: EvmAddress;
 };
 
 export type T_WithdrawFromAdRequestContractDetails = {
@@ -56,15 +69,15 @@ export type T_WithdrawFromAdRequestContractDetails = {
   timeToExpire: number;
   adId: string;
   amount: string;
-  to: `0x${string}`;
+  to: EvmAddress;
   reqHash: `0x${string}`;
 };
 
 export type T_CloseAdRequest = {
-  adContractAddress: `0x${string}`;
+  adContractAddress: EvmAddress;
   adChainId: bigint;
   adId: string;
-  to: `0x${string}`;
+  to: EvmAddress;
 };
 
 export type T_CloseAdRequestContractDetails = {
@@ -74,56 +87,64 @@ export type T_CloseAdRequestContractDetails = {
   authToken: string;
   timeToExpire: number;
   adId: string;
-  to: `0x${string}`;
+  to: EvmAddress;
   reqHash: `0x${string}`;
 };
 
+// Canonical cross-chain order — matches the EIP-712 `Order` typehash in
+// OrderPortal.sol and AdManager.sol. All addresses are bytes32.
 export type T_OrderParams = {
-  orderChainToken: string;
-  adChainToken: string;
+  orderChainToken: Bytes32Hex;
+  adChainToken: Bytes32Hex;
   amount: string;
-  bridger: string;
+  bridger: Bytes32Hex;
   orderChainId: string;
-  orderPortal: string;
-  orderRecipient: string;
+  orderPortal: Bytes32Hex;
+  orderRecipient: Bytes32Hex;
   adChainId: string;
-  adManager: string;
+  adManager: Bytes32Hex;
   adId: string;
-  adCreator: string;
-  adRecipient: string;
+  adCreator: Bytes32Hex;
+  adRecipient: Bytes32Hex;
   salt: string;
 };
 
+// Ad-chain subset passed to AdManager.lockForOrder / unlock. The local
+// AdManager address + adChainId are implicit from the call site so they're
+// not in the struct; `srcOrderPortal` is the remote OrderPortal bytes32.
 export type T_AdManagerOrderParams = {
-  orderChainToken: string;
-  adChainToken: string;
+  orderChainToken: Bytes32Hex;
+  adChainToken: Bytes32Hex;
   amount: string;
-  bridger: string;
+  bridger: Bytes32Hex;
   orderChainId: string;
-  srcOrderPortal: string;
-  orderRecipient: string;
+  srcOrderPortal: Bytes32Hex;
+  orderRecipient: Bytes32Hex;
   adId: string;
-  adCreator: string;
-  adRecipient: string;
+  adCreator: Bytes32Hex;
+  adRecipient: Bytes32Hex;
   salt: string;
 };
 
+// Order-chain subset passed to OrderPortal.createOrder / unlock. The local
+// OrderPortal address + orderChainId are implicit.
 export type T_OrderPortalParams = {
-  orderChainToken: string;
-  adChainToken: string;
+  orderChainToken: Bytes32Hex;
+  adChainToken: Bytes32Hex;
   amount: string;
-  bridger: string;
-  orderRecipient: string;
+  bridger: Bytes32Hex;
+  orderRecipient: Bytes32Hex;
   adChainId: string;
-  adManager: string;
+  adManager: Bytes32Hex;
   adId: string;
-  adCreator: string;
-  adRecipient: string;
+  adCreator: Bytes32Hex;
+  adRecipient: Bytes32Hex;
   salt: string;
 };
 
 export type T_LockForOrderRequest = {
   adChainId: bigint;
+  adContractAddress: EvmAddress;
   orderParams: T_OrderParams;
 };
 
@@ -140,12 +161,13 @@ export type T_LockForOrderRequestContractDetails = {
 
 export type T_CreateOrderRequest = {
   orderChainId: bigint;
+  orderContractAddress: EvmAddress;
   orderParams: T_OrderParams;
 };
 
 export type T_CreateUnlockOrderContractDetails = {
   chainId: bigint;
-  contractAddress: `0x${string}`;
+  contractAddress: EvmAddress;
   isAdCreator: boolean;
   orderParams: T_OrderParams;
   nullifierHash: string;
@@ -155,7 +177,7 @@ export type T_CreateUnlockOrderContractDetails = {
 
 export type T_UnlockOrderContractDetails = {
   chainId: string;
-  contractAddress: `0x${string}`;
+  contractAddress: EvmAddress;
   signature: `0x${string}`;
   authToken: string;
   timeToExpire: number;
@@ -180,13 +202,13 @@ export type T_CreateOrderRequestContractDetails = {
 
 export type T_RequestValidation = {
   chainId: bigint;
-  contractAddress: `0x${string}`;
+  contractAddress: EvmAddress;
   reqHash: `0x${string}`;
 };
 
 export type T_FetchRoot = {
   chainId: bigint;
-  contractAddress: `0x${string}`;
+  contractAddress: EvmAddress;
 };
 
 export type T_FetchRootResponse = {

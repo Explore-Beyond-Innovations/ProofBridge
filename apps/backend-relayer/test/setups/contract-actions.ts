@@ -2,7 +2,7 @@ import { AD_MANAGER_ABI } from '../../src/providers/viem/abis/adManager.abi';
 import { ORDER_PORTAL_ABI } from '../../src/providers/viem/abis/orderPortal.abi';
 import { MERKLE_MANAGER_ABI } from '../../src/providers/viem/abis/merkleManager.abi';
 
-import Erc20MockArtifact from '../../../contracts/out/ERC20Mock.sol/ERC20Mock.json';
+import Erc20MockArtifact from '../../../../contracts/evm/out/ERC20Mock.sol/ERC20Mock.json';
 
 import { ethers } from 'ethers';
 import { ChainData, AddressLike } from './utils';
@@ -18,7 +18,7 @@ import {
   PublicClient,
 } from 'viem';
 
-const DEFAULT_ADMIN_ROLE = ethers.ZeroHash;
+const DEFAULT_ADMIN_ROLE = ethers.ZeroHash as `0x${string}`;
 
 export async function grantManagerRole(
   publicClient: PublicClient,
@@ -220,14 +220,14 @@ export async function adminSetup(
 export async function createAd(
   publicClient: PublicClient,
   account: PrivateKeyAccount,
-  signature: string,
-  authToken: string,
+  signature: `0x${string}`,
+  authToken: `0x${string}`,
   timeToExpire: number,
   adId: string,
-  adToken: string,
+  adToken: `0x${string}`,
   fundAmount: string,
   orderChainId: string,
-  adRecipient: string,
+  adRecipient: `0x${string}`,
   adManagerAddress: string,
 ) {
   console.log(adManagerAddress);
@@ -269,8 +269,8 @@ export async function createAd(
 export async function fundAd(
   publicClient: PublicClient,
   account: PrivateKeyAccount,
-  signature: string,
-  authToken: string,
+  signature: `0x${string}`,
+  authToken: `0x${string}`,
   timeToExpire: number,
   adId: string,
   amount: bigint,
@@ -304,12 +304,12 @@ export async function fundAd(
 export async function withdrawAdFunds(
   publicClient: PublicClient,
   account: PrivateKeyAccount,
-  signature: string,
-  authToken: string,
+  signature: `0x${string}`,
+  authToken: `0x${string}`,
   timeToExpire: number,
   adId: string,
   amount: bigint,
-  to: string,
+  to: `0x${string}`,
   adManagerAddress: string,
 ) {
   const wallet = createWalletClient({
@@ -323,7 +323,7 @@ export async function withdrawAdFunds(
     address: adManagerAddress as AddressLike,
     abi: AD_MANAGER_ABI,
     functionName: 'withdrawFromAd',
-    args: [signature, authToken, timeToExpire, adId, amount, to],
+    args: [signature, authToken, BigInt(timeToExpire), adId, amount, to],
   });
 
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -340,11 +340,11 @@ export async function withdrawAdFunds(
 export async function closeAd(
   publicClient: PublicClient,
   account: PrivateKeyAccount,
-  signature: string,
-  authToken: string,
+  signature: `0x${string}`,
+  authToken: `0x${string}`,
   timeToExpire: number,
   adId: string,
-  to: string,
+  to: `0x${string}`,
   adManagerAddress: string,
 ) {
   const wallet = createWalletClient({
@@ -358,7 +358,7 @@ export async function closeAd(
     address: adManagerAddress as AddressLike,
     abi: AD_MANAGER_ABI,
     functionName: 'closeAd',
-    args: [signature, authToken, timeToExpire, adId, to],
+    args: [signature, authToken, BigInt(timeToExpire), adId, to],
   });
 
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -375,8 +375,8 @@ export async function closeAd(
 export async function createOrder(
   publicClient: PublicClient,
   account: PrivateKeyAccount,
-  signature: string,
-  authToken: string,
+  signature: `0x${string}`,
+  authToken: `0x${string}`,
   timeToExpire: number,
   orderParams: T_OrderPortalParams,
   orderPortalAddress: string,
@@ -395,7 +395,7 @@ export async function createOrder(
     args: [
       signature,
       authToken,
-      timeToExpire,
+      BigInt(timeToExpire),
       {
         ...orderParams,
         amount: BigInt(orderParams.amount),
@@ -419,8 +419,8 @@ export async function createOrder(
 export async function lockForOrder(
   publicClient: PublicClient,
   account: PrivateKeyAccount,
-  signature: string,
-  authToken: string,
+  signature: `0x${string}`,
+  authToken: `0x${string}`,
   timeToExpire: number,
   orderParams: T_AdManagerOrderParams,
   adManagerAddress: AddressLike,
@@ -445,18 +445,18 @@ export async function lockForOrder(
     args: [
       signature,
       authToken,
-      timeToExpire,
+      BigInt(timeToExpire),
       {
-        orderChainToken: getAddress(orderParams.orderChainToken),
-        adChainToken: getAddress(orderParams.adChainToken),
+        orderChainToken: orderParams.orderChainToken,
+        adChainToken: orderParams.adChainToken,
         amount: BigInt(orderParams.amount),
-        bridger: getAddress(orderParams.bridger),
+        bridger: orderParams.bridger,
         orderChainId: BigInt(orderParams.orderChainId),
-        srcOrderPortal: getAddress(orderParams.srcOrderPortal),
-        orderRecipient: getAddress(orderParams.orderRecipient),
+        srcOrderPortal: orderParams.srcOrderPortal,
+        orderRecipient: orderParams.orderRecipient,
         adId: orderParams.adId,
-        adCreator: getAddress(orderParams.adCreator),
-        adRecipient: getAddress(orderParams.adRecipient),
+        adCreator: orderParams.adCreator,
+        adRecipient: orderParams.adRecipient,
         salt: BigInt(orderParams.salt),
       },
     ],
@@ -476,13 +476,13 @@ export async function lockForOrder(
 export async function unlockAdChain(
   publicClient: PublicClient,
   account: PrivateKeyAccount,
-  signature: string,
-  authToken: string,
+  signature: `0x${string}`,
+  authToken: `0x${string}`,
   timeToExpire: number,
   orderParams: T_AdManagerOrderParams,
-  nullifierHash: string,
-  targetRoot: string,
-  proof: string,
+  nullifierHash: `0x${string}`,
+  targetRoot: `0x${string}`,
+  proof: `0x${string}`,
   adManagerAddress: string,
 ) {
   const wallet = createWalletClient({
@@ -499,13 +499,12 @@ export async function unlockAdChain(
     args: [
       signature,
       authToken,
-      timeToExpire,
+      BigInt(timeToExpire),
       {
         ...orderParams,
         amount: BigInt(orderParams.amount),
         orderChainId: BigInt(orderParams.orderChainId),
         salt: BigInt(orderParams.salt),
-        srcOrderPortal: getAddress(orderParams.srcOrderPortal),
       },
       nullifierHash,
       targetRoot,
@@ -527,13 +526,13 @@ export async function unlockAdChain(
 export async function unlockOrderChain(
   publicClient: PublicClient,
   account: PrivateKeyAccount,
-  signature: string,
-  authToken: string,
+  signature: `0x${string}`,
+  authToken: `0x${string}`,
   timeToExpire: number,
   orderParams: T_OrderPortalParams,
-  nullifierHash: string,
-  targetRoot: string,
-  proof: string,
+  nullifierHash: `0x${string}`,
+  targetRoot: `0x${string}`,
+  proof: `0x${string}`,
   orderPortalAddress: string,
 ) {
   const wallet = createWalletClient({
@@ -551,7 +550,7 @@ export async function unlockOrderChain(
     args: [
       signature,
       authToken,
-      timeToExpire,
+      BigInt(timeToExpire),
       {
         ...orderParams,
         amount: BigInt(orderParams.amount),

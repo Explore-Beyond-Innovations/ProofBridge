@@ -1,9 +1,20 @@
 import { TypedDataEncoder, Wallet, recoverAddress } from 'ethers';
 import {
+  Bytes32Hex,
   T_AdManagerOrderParams,
   T_OrderParams,
   T_OrderPortalParams,
 } from '../types';
+
+// Left-pad a 20-byte EVM address to 32 bytes (the cross-chain wire format).
+// Accepts an already-32-byte hex string and returns it unchanged. Throws on
+// malformed input.
+export function toBytes32(value: string): Bytes32Hex {
+  const hex = value.replace(/^0x/i, '').toLowerCase();
+  if (hex.length === 64) return `0x${hex}`;
+  if (hex.length === 40) return `0x${'0'.repeat(24)}${hex}`;
+  throw new Error(`toBytes32: expected 20- or 32-byte hex, got ${value}`);
+}
 
 // ----------------------------
 // OrderPortal typed data
@@ -17,20 +28,24 @@ export const domain = {
 // ----------------------------
 // OrderPortal typed data
 // ----------------------------
+// All address-like fields are bytes32 for cross-chain parity (Stellar
+// addresses are 32 bytes; EVM addresses are left-padded with 12 zero bytes).
+// Must match the on-chain ORDER_TYPEHASH in OrderPortal.sol / AdManager.sol
+// and proofbridge-core/src/eip712.rs.
 export const orderTypes: Record<string, { name: string; type: string }[]> = {
   Order: [
-    { name: 'orderChainToken', type: 'address' },
-    { name: 'adChainToken', type: 'address' },
+    { name: 'orderChainToken', type: 'bytes32' },
+    { name: 'adChainToken', type: 'bytes32' },
     { name: 'amount', type: 'uint256' },
-    { name: 'bridger', type: 'address' },
+    { name: 'bridger', type: 'bytes32' },
     { name: 'orderChainId', type: 'uint256' },
-    { name: 'orderPortal', type: 'address' },
-    { name: 'orderRecipient', type: 'address' },
+    { name: 'orderPortal', type: 'bytes32' },
+    { name: 'orderRecipient', type: 'bytes32' },
     { name: 'adChainId', type: 'uint256' },
-    { name: 'adManager', type: 'address' },
+    { name: 'adManager', type: 'bytes32' },
     { name: 'adId', type: 'string' },
-    { name: 'adCreator', type: 'address' },
-    { name: 'adRecipient', type: 'address' },
+    { name: 'adCreator', type: 'bytes32' },
+    { name: 'adRecipient', type: 'bytes32' },
     { name: 'salt', type: 'uint256' },
   ],
 };
