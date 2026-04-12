@@ -12,14 +12,36 @@ SCRIPT_DIR="$ROOT_DIR/scripts/cross-chain-e2e"
 
 CONTAINER_NAME="${STELLAR_CONTAINER_NAME:-stellar-e2e}"
 NETWORK_NAME="${STELLAR_NETWORK_NAME:-local}"
-SOURCE_ACCOUNT="${STELLAR_SOURCE_ACCOUNT:-alice}"
 STELLAR_RPC_URL="${STELLAR_RPC_URL:-http://localhost:8000/soroban/rpc}"
 NETWORK_PASSPHRASE="${STELLAR_NETWORK_PASSPHRASE:-Standalone Network ; February 2017}"
 
 ANVIL_PORT="${ANVIL_PORT:-8545}"
-EVM_RPC_URL="http://localhost:$ANVIL_PORT"
-# Anvil default funded account #0
-EVM_PRIVATE_KEY="${EVM_PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}"
+# Use 127.0.0.1 explicitly — on GitHub runners, Node resolves "localhost"
+# to ::1 first, which fails to reach Anvil (bound on IPv4 0.0.0.0).
+EVM_RPC_URL="http://127.0.0.1:$ANVIL_PORT"
+
+# ── user roles (4 actors drive the flow) ─────────────────────────────
+# 1. Stellar admin     — configures the Stellar AdManager contract.
+# 2. EVM admin         — configures the EVM OrderPortal contract.
+# 3. Ad creator        — Stellar identity creates the ad + locks XLM in;
+#                        supplies an EVM address to receive tokens on unlock.
+# 4. Order creator     — EVM identity creates the order; supplies a Stellar
+#    (aka bridger)       identity (its key must be in the CLI keystore since
+#                        unlock calls order_recipient.require_auth()).
+
+STELLAR_ADMIN_ACCOUNT="${STELLAR_ADMIN_ACCOUNT:-admin}"
+STELLAR_AD_CREATOR_ACCOUNT="${STELLAR_AD_CREATOR_ACCOUNT:-alice}"
+STELLAR_ORDER_CREATOR_ACCOUNT="${STELLAR_ORDER_CREATOR_ACCOUNT:-bridger}"
+
+# Anvil prefunded keys — #0 admin, #1 order creator.
+EVM_ADMIN_PRIVATE_KEY="${EVM_ADMIN_PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}"
+EVM_ORDER_CREATOR_PRIVATE_KEY="${EVM_ORDER_CREATOR_PRIVATE_KEY:-0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d}"
+# Ad creator's EVM recipient — receive-only, no key needed. Defaults to
+# Anvil prefunded account #2's address.
+AD_CREATOR_EVM_RECIPIENT="${AD_CREATOR_EVM_RECIPIENT:-0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC}"
+
+# stellar.ts reads STELLAR_SOURCE_ACCOUNT as the default CLI source.
+export STELLAR_SOURCE_ACCOUNT="$STELLAR_ADMIN_ACCOUNT"
 
 ANVIL_PID=""
 
@@ -65,28 +87,36 @@ if [[ "$HEALTHY" -ne 1 ]]; then
 fi
 echo "Stellar localnet is healthy."
 
-echo "Preparing source account..."
-stellar keys generate "$SOURCE_ACCOUNT" >/dev/null 2>&1 || true
-FUND_OK=0
-for attempt in $(seq 1 30); do
-  if stellar keys fund "$SOURCE_ACCOUNT" --network "$NETWORK_NAME" 2>/dev/null; then
-    FUND_OK=1
-    break
-  fi
-  echo "  friendbot not ready yet (attempt $attempt/30), waiting..."
-  sleep 10
+echo "Preparing Stellar accounts (admin, ad creator, order creator)..."
+for acct in "$STELLAR_ADMIN_ACCOUNT" "$STELLAR_AD_CREATOR_ACCOUNT" "$STELLAR_ORDER_CREATOR_ACCOUNT"; do
+  stellar keys generate "$acct" >/dev/null 2>&1 || true
 done
-if [[ "$FUND_OK" -ne 1 ]]; then
-  echo "Failed to fund $SOURCE_ACCOUNT" >&2
-  exit 1
-fi
-echo "Source account funded."
+
+for acct in "$STELLAR_ADMIN_ACCOUNT" "$STELLAR_AD_CREATOR_ACCOUNT" "$STELLAR_ORDER_CREATOR_ACCOUNT"; do
+  FUND_OK=0
+  for attempt in $(seq 1 30); do
+    if stellar keys fund "$acct" --network "$NETWORK_NAME" 2>/dev/null; then
+      FUND_OK=1
+      break
+    fi
+    echo "  friendbot not ready for '$acct' (attempt $attempt/30), waiting..."
+    sleep 10
+  done
+  if [[ "$FUND_OK" -ne 1 ]]; then
+    echo "Failed to fund $acct" >&2
+    exit 1
+  fi
+done
+echo "Stellar accounts funded."
 
 # ── start Anvil ──────────────────────────────────────────────────────
 
 echo ""
 echo "=== Starting Anvil (EVM devnet) ==="
-anvil --host 0.0.0.0 --port "$ANVIL_PORT" --silent &
+# Kill any existing Anvil on the target port
+lsof -ti :"$ANVIL_PORT" | xargs -r kill -9 2>/dev/null || true
+sleep 1
+anvil --host 0.0.0.0 --port "$ANVIL_PORT" --block-time 2 --silent &
 ANVIL_PID=$!
 sleep 2
 
@@ -125,10 +155,14 @@ echo "=== Running cross-chain E2E test ==="
 
 export STELLAR_RPC_URL
 export STELLAR_NETWORK="$NETWORK_NAME"
-export STELLAR_SOURCE_ACCOUNT="$SOURCE_ACCOUNT"
 export STELLAR_NETWORK_PASSPHRASE="$NETWORK_PASSPHRASE"
+export STELLAR_ADMIN_ACCOUNT
+export STELLAR_AD_CREATOR_ACCOUNT
+export STELLAR_ORDER_CREATOR_ACCOUNT
 export EVM_RPC_URL
-export EVM_PRIVATE_KEY
+export EVM_ADMIN_PRIVATE_KEY
+export EVM_ORDER_CREATOR_PRIVATE_KEY
+export AD_CREATOR_EVM_RECIPIENT
 export ROOT_DIR
 
 cd "$SCRIPT_DIR"

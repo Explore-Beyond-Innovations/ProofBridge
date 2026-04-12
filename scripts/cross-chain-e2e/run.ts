@@ -1,36 +1,42 @@
 /**
  * Cross-chain E2E test runner.
  *
- * Deploys ProofBridge on a local Stellar network (ad chain) and Anvil (EVM order chain),
- * then exercises the full cross-chain bridge flow:
- *   1. Deploy contracts on both chains
- *   2. Link chains bidirectionally
- *   3. Create ad on Stellar
- *   4. Create order on EVM
- *   5. Lock order on Stellar
- *   6. Generate ZK proofs
- *   7. Bridger unlocks on Stellar
- *   8. Ad-creator unlocks on EVM
+ * Deploys ProofBridge on a local Stellar network (ad chain) and Anvil (EVM
+ * order chain), then exercises the full cross-chain bridge flow.
+ *
+ * Four actors drive the flow (all provisioned by run_cross_chain_e2e.sh):
+ *   1. stellarAdmin  — configures AdManager on Stellar; ed25519 key signs
+ *                      manager pre-auth for create_ad / lock_for_order / unlock.
+ *   2. evmAdmin      — configures OrderPortal on EVM; ECDSA key signs manager
+ *                      pre-auth for createOrder / unlock.
+ *   3. adCreator     — primary on Stellar (creates ad + authorizes SAC pull).
+ *                      Supplies an EVM address to receive tokens on unlock.
+ *   4. orderCreator  — primary on EVM (creates the order, pays test tokens).
+ *      (bridger)       Supplies a Stellar identity whose key is in the CLI
+ *                      keystore so unlock's order_recipient.require_auth()
+ *                      auto-signs.
  */
 
 import * as path from "path";
-import * as fs from "fs";
 import { ethers } from "ethers";
 import {
   deployContract,
+  deploySAC,
   invokeContract,
   getAddress,
+  getSecret,
+  base32Decode,
   strkeyToHex,
   evmAddressToBytes32,
-  stellarIdToEvmAddress,
 } from "./lib/stellar.js";
-import { deployEvmContracts, createSigner } from "./lib/evm.js";
+import {
+  deployEvmContracts,
+  NonceTracker,
+  getContract,
+} from "./lib/evm.js";
 import {
   AuthTokenCounter,
-  generateEd25519Keypair,
   signEd25519,
-  setChainRequestHash,
-  setTokenRouteRequestHash,
   createAdRequestHash,
   lockForOrderRequestHash,
   unlockOrderRequestHash,
@@ -38,32 +44,39 @@ import {
   evmUnlockOrderRequestHash,
   evmSignRequest,
 } from "./lib/signing.js";
-import { generateProofs, computeOrderHash, type OrderParams } from "./lib/proof.js";
+import {
+  generateProofs,
+  computeOrderHash,
+  type OrderParams,
+} from "./lib/proof.js";
 
 // ── environment ─────────────────────────────────────────────────────
 
 const ROOT_DIR = process.env.ROOT_DIR!;
 const EVM_RPC_URL = process.env.EVM_RPC_URL!;
-const EVM_PRIVATE_KEY = process.env.EVM_PRIVATE_KEY!;
+const EVM_ADMIN_PRIVATE_KEY = process.env.EVM_ADMIN_PRIVATE_KEY!;
+const EVM_ORDER_CREATOR_PRIVATE_KEY =
+  process.env.EVM_ORDER_CREATOR_PRIVATE_KEY!;
+const STELLAR_AD_CREATOR_ACCOUNT = process.env.STELLAR_AD_CREATOR_ACCOUNT!;
+const STELLAR_ORDER_CREATOR_ACCOUNT =
+  process.env.STELLAR_ORDER_CREATOR_ACCOUNT!;
+const AD_CREATOR_EVM_RECIPIENT = process.env.AD_CREATOR_EVM_RECIPIENT!;
 
 const STELLAR_CHAIN_ID = 1000001n;
 const EVM_CHAIN_ID = 31337n; // Anvil default
 
 const WASM_DIR = path.join(
   ROOT_DIR,
-  "contracts/stellar/target/wasm32v1-none/release"
+  "contracts/stellar/target/wasm32v1-none/release",
 );
-const VK_PATH = path.join(
-  ROOT_DIR,
-  "proof_circuits/deposits/target/vk"
-);
+const VK_PATH = path.join(ROOT_DIR, "proof_circuits/deposits/target/vk");
 const CIRCUIT_PATH = path.join(
   ROOT_DIR,
-  "proof_circuits/deposits/target/deposit_circuit.json"
+  "proof_circuits/deposits/target/deposit_circuit.json",
 );
 
 const AD_ID = "e2e-test-ad";
-const AMOUNT = 1_000_000n;
+const AMOUNT = 1_000_000_000n; // 100 XLM (stroops have 7 decimals)
 const SALT = 42n;
 
 // ── helpers ─────────────────────────────────────────────────────────
@@ -84,174 +97,222 @@ function phase(n: number, title: string) {
   console.log(`${"=".repeat(60)}\n`);
 }
 
+/** Format a stroops i128 value as a human-readable XLM string. */
+function xlm(stroops: bigint): string {
+  const neg = stroops < 0n;
+  const abs = neg ? -stroops : stroops;
+  const whole = abs / 10_000_000n;
+  const frac = abs % 10_000_000n;
+  const fracStr = frac.toString().padStart(7, "0").replace(/0+$/, "");
+  return `${neg ? "-" : ""}${whole}${fracStr ? "." + fracStr : ""} XLM`;
+}
+
+/** Read an account's balance on a Stellar token (SAC). */
+function stellarTokenBalance(sac: string, account: string): bigint {
+  const out = invokeContract(sac, "balance", [`--id`, account], {
+    send: false,
+  });
+  // stellar CLI prints the i128 as the last non-empty line, possibly quoted.
+  const last = out
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .pop()!;
+  return BigInt(last.replace(/^"|"$/g, ""));
+}
+
 // ── main ────────────────────────────────────────────────────────────
 
 async function main() {
   console.log("Cross-Chain E2E Test");
   console.log(`  Stellar chain ID: ${STELLAR_CHAIN_ID}`);
-  console.log(`  EVM chain ID: ${EVM_CHAIN_ID}`);
-  console.log(`  EVM RPC: ${EVM_RPC_URL}`);
+  console.log(`  EVM chain ID:     ${EVM_CHAIN_ID}`);
+  console.log(`  EVM RPC:          ${EVM_RPC_URL}`);
 
-  // Ed25519 keypair for Stellar admin auth
-  const { publicKey: adminPubKey, secretKey: adminSecretKey } =
-    generateEd25519Keypair();
+  // ── actors ─────────────────────────────────────────────────────────
+
+  // Stellar admin — default CLI source + manager pre-auth signer.
+  const stellarAdmin = getAddress();
+  const stellarAdminSecret = base32Decode(getSecret()).slice(1, 33);
+  const stellarAdminSecretKey = Buffer.from(stellarAdminSecret);
+  const stellarAdminPubKey = Buffer.from(
+    (await import("@noble/ed25519")).getPublicKey(stellarAdminSecretKey),
+  );
+
+  // Ad creator — Stellar primary, EVM recipient (no key on EVM).
+  const adCreatorStellar = getAddress(STELLAR_AD_CREATOR_ACCOUNT);
+  const adCreatorStellarHex = strkeyToHex(adCreatorStellar);
+  const adCreatorEvmHex = evmAddressToBytes32(AD_CREATOR_EVM_RECIPIENT);
+
+  // Order creator — EVM primary, Stellar recipient (key required for
+  // require_auth on unlock; kept in the stellar CLI keystore).
+  const orderCreatorStellar = getAddress(STELLAR_ORDER_CREATOR_ACCOUNT);
+  const orderCreatorStellarHex = strkeyToHex(orderCreatorStellar);
+
   const authCounter = new AuthTokenCounter();
   const TIME_TO_EXPIRE = BigInt("18446744073709551615"); // u64::MAX
+  const EVM_TIME_TO_EXPIRE = BigInt(
+    Math.floor(Date.now() / 1000) + 86400 * 365 * 100,
+  );
 
-  // EVM time_to_expire — use a large but valid timestamp (year 2100)
-  const EVM_TIME_TO_EXPIRE = BigInt(Math.floor(Date.now() / 1000) + 86400 * 365 * 100);
-
-  // Stellar source account address (alice)
-  const aliceAddress = getAddress();
-  console.log(`  Stellar source: ${aliceAddress}`);
+  console.log(`  Stellar admin:         ${stellarAdmin}`);
+  console.log(`  Ad creator (stellar):  ${adCreatorStellar}`);
+  console.log(`  Ad creator (evm):      ${AD_CREATOR_EVM_RECIPIENT}`);
+  console.log(`  Order creator (xlm):   ${orderCreatorStellar}`);
 
   // ════════════════════════════════════════════════════════════════
   // Phase 1: Deploy Stellar Contracts (Ad Chain)
   // ════════════════════════════════════════════════════════════════
   phase(1, "Deploy Stellar Contracts (ad chain)");
 
-  // Deploy Verifier with VK
   console.log("Deploying Verifier...");
-  const stellarVerifier = deployContract(
-    path.join(WASM_DIR, "verifier.wasm"),
-    [`--vk_bytes-file-path`, VK_PATH]
-  );
+  const stellarVerifier = deployContract(path.join(WASM_DIR, "verifier.wasm"), [
+    `--vk_bytes-file-path`,
+    VK_PATH,
+  ]);
   console.log(`  Verifier: ${stellarVerifier}`);
 
-  // Deploy MerkleManager
   console.log("Deploying MerkleManager...");
   const stellarMerkle = deployContract(
-    path.join(WASM_DIR, "merkle_manager.wasm")
+    path.join(WASM_DIR, "merkle_manager.wasm"),
   );
   console.log(`  MerkleManager: ${stellarMerkle}`);
 
-  // Initialize MerkleManager
-  invokeContract(stellarMerkle, "initialize", [
-    `--admin`,
-    aliceAddress,
-  ]);
+  invokeContract(stellarMerkle, "initialize", [`--admin`, stellarAdmin]);
 
-  // For e2e test, we'll use a synthetic 32-byte address for ad token
-  // In a real scenario this would be a deployed SAC token
-  const stellarAdTokenHex = "0x" + "d4".repeat(32);
+  // Native XLM SAC — admin has friendbot-funded XLM the AdManager can pull
+  // on create_ad; the same SAC credits the order creator on Stellar unlock.
+  console.log("Deploying native XLM SAC...");
+  const stellarAdToken = deploySAC("native");
+  console.log(`  NativeXLM SAC: ${stellarAdToken}`);
+  const stellarAdTokenHex = strkeyToHex(stellarAdToken);
 
-  // Deploy AdManager
   console.log("Deploying AdManager...");
   const stellarAdManager = deployContract(
-    path.join(WASM_DIR, "ad_manager.wasm")
+    path.join(WASM_DIR, "ad_manager.wasm"),
   );
   console.log(`  AdManager: ${stellarAdManager}`);
 
-  // Initialize AdManager
   invokeContract(stellarAdManager, "initialize", [
-    `--admin`, aliceAddress,
-    `--verifier`, stellarVerifier,
-    `--merkle_manager`, stellarMerkle,
-    `--w_native_token`, stellarAdManager, // placeholder, not used in test
-    `--chain_id`, STELLAR_CHAIN_ID.toString(),
+    `--admin`,
+    stellarAdmin,
+    `--verifier`,
+    stellarVerifier,
+    `--merkle_manager`,
+    stellarMerkle,
+    `--w_native_token`,
+    stellarAdToken,
+    `--chain_id`,
+    STELLAR_CHAIN_ID.toString(),
   ]);
 
-  // Set MerkleManager to allow AdManager as manager
   invokeContract(stellarMerkle, "set_manager", [
-    `--manager`, stellarAdManager,
-    `--enabled`, "true",
+    `--manager`,
+    stellarAdManager,
+    `--status`,
+    "true",
   ]);
 
   console.log("Stellar contracts deployed and initialized.");
+
+  // Snapshot XLM balances before any contract movement so we can assert
+  // deltas at the end: ad creator should lose AMOUNT (locked in the ad),
+  // order creator should gain AMOUNT (received on Stellar unlock).
+  const adCreatorXlmBefore = stellarTokenBalance(stellarAdToken, adCreatorStellar);
+  const orderCreatorXlmBefore = stellarTokenBalance(
+    stellarAdToken,
+    orderCreatorStellar,
+  );
+  console.log(`  Ad creator XLM (before):    ${xlm(adCreatorXlmBefore)}`);
+  console.log(`  Order creator XLM (before): ${xlm(orderCreatorXlmBefore)}`);
 
   // ════════════════════════════════════════════════════════════════
   // Phase 2: Deploy EVM Contracts (Order Chain)
   // ════════════════════════════════════════════════════════════════
   phase(2, "Deploy EVM Contracts (order chain)");
 
-  const evm = await deployEvmContracts(EVM_RPC_URL, EVM_PRIVATE_KEY);
-  const evmSigner = createSigner(EVM_RPC_URL, EVM_PRIVATE_KEY);
+  const evm = await deployEvmContracts(EVM_RPC_URL, EVM_ADMIN_PRIVATE_KEY);
+  const evmSigner = evm.signer;
+  const nonces = evm.nonces;
   const evmAdmin = await evmSigner.getAddress();
+  const provider = evmSigner.provider!;
 
   console.log(`  EVM admin/manager: ${evmAdmin}`);
-  console.log("EVM contracts deployed.");
+
+  // Order creator's EVM wallet — owns its own nonce tracker.
+  const orderCreatorWallet = new ethers.Wallet(
+    EVM_ORDER_CREATOR_PRIVATE_KEY,
+    provider,
+  );
+  const orderCreatorNonces = new NonceTracker(orderCreatorWallet);
+  await orderCreatorNonces.init();
+  const orderCreatorEvm = await orderCreatorWallet.getAddress();
+  const orderCreatorEvmHex = evmAddressToBytes32(orderCreatorEvm);
+  console.log(`  Order creator:     ${orderCreatorEvm}`);
+
+  // OrderPortal + TestToken instances bound to the order creator — used
+  // for approve + createOrder so msg.sender is the order creator.
+  const orderPortalAsCreator = getContract(
+    evm.addresses.orderPortal,
+    "OrderPortal",
+    "OrderPortal",
+    orderCreatorWallet,
+  );
+  const testTokenAsCreator = getContract(
+    evm.addresses.testToken,
+    "ERC20Mock",
+    "ERC20Mock",
+    orderCreatorWallet,
+  );
 
   // ════════════════════════════════════════════════════════════════
   // Phase 3: Cross-Chain Linking
   // ════════════════════════════════════════════════════════════════
   phase(3, "Cross-Chain Linking");
 
-  // Stellar AdManager contract address as 32-byte hex
   const stellarAdManagerHex = strkeyToHex(stellarAdManager);
   const stellarAdManagerBuf = hexToBuffer(stellarAdManagerHex);
-
-  // EVM OrderPortal address as 32-byte hex (left-padded)
   const evmOrderPortalBytes32 = evmAddressToBytes32(evm.addresses.orderPortal);
-
-  // EVM test token address as 32-byte hex (left-padded)
   const evmTokenBytes32 = evmAddressToBytes32(evm.addresses.testToken);
 
-  // --- Stellar AdManager: setChain ---
   console.log("Linking Stellar AdManager → EVM OrderPortal...");
-  {
-    const authToken = authCounter.next();
-    const msgHash = setChainRequestHash(
-      authToken,
-      TIME_TO_EXPIRE,
-      STELLAR_CHAIN_ID,
-      stellarAdManagerBuf
-    );
-    const sig = signEd25519(msgHash, adminSecretKey);
+  invokeContract(stellarAdManager, "set_chain", [
+    `--order_chain_id`,
+    EVM_CHAIN_ID.toString(),
+    `--order_portal`,
+    evmOrderPortalBytes32.replace(/^0x/, ""),
+    `--supported`,
+    "true",
+  ]);
 
-    invokeContract(stellarAdManager, "set_chain", [
-      `--signature`, sig.toString("hex"),
-      `--public_key`, adminPubKey.toString("hex"),
-      `--auth_token`, authToken.toString("hex"),
-      `--time_to_expire`, TIME_TO_EXPIRE.toString(),
-      `--order_chain_id`, EVM_CHAIN_ID.toString(),
-      `--order_portal`, evmOrderPortalBytes32.replace(/^0x/, ""),
-      `--supported`, "true",
-    ]);
-  }
-
-  // --- Stellar AdManager: setTokenRoute ---
   console.log("Setting Stellar token route...");
-  {
-    const authToken = authCounter.next();
-    const msgHash = setTokenRouteRequestHash(
-      authToken,
-      TIME_TO_EXPIRE,
-      STELLAR_CHAIN_ID,
-      stellarAdManagerBuf
-    );
-    const sig = signEd25519(msgHash, adminSecretKey);
+  invokeContract(stellarAdManager, "set_token_route", [
+    `--ad_token`,
+    stellarAdTokenHex.replace(/^0x/, ""),
+    `--order_token`,
+    evmTokenBytes32.replace(/^0x/, ""),
+    `--order_chain_id`,
+    EVM_CHAIN_ID.toString(),
+  ]);
 
-    invokeContract(stellarAdManager, "set_token_route", [
-      `--signature`, sig.toString("hex"),
-      `--public_key`, adminPubKey.toString("hex"),
-      `--auth_token`, authToken.toString("hex"),
-      `--time_to_expire`, TIME_TO_EXPIRE.toString(),
-      `--ad_chain_token`, stellarAdTokenHex.replace(/^0x/, ""),
-      `--order_chain_token`, evmTokenBytes32.replace(/^0x/, ""),
-      `--order_chain_id`, EVM_CHAIN_ID.toString(),
-    ]);
-  }
-
-  // --- EVM OrderPortal: setChain ---
   console.log("Linking EVM OrderPortal → Stellar AdManager...");
-  const stellarAdManagerEvm = stellarIdToEvmAddress(stellarAdManager);
   {
     const tx = await evm.orderPortal.getFunction("setChain")(
       STELLAR_CHAIN_ID,
-      stellarAdManagerEvm,
-      true
+      stellarAdManagerHex,
+      true,
+      { nonce: nonces.next() },
     );
     await tx.wait();
   }
 
-  // --- EVM OrderPortal: setTokenRoute ---
   console.log("Setting EVM token route...");
-  const stellarTokenEvm = "0x" + stellarAdTokenHex.replace(/^0x/, "").slice(24);
   {
     const tx = await evm.orderPortal.getFunction("setTokenRoute")(
       evm.addresses.testToken,
       STELLAR_CHAIN_ID,
-      stellarTokenEvm
+      stellarAdTokenHex,
+      { nonce: nonces.next() },
     );
     await tx.wait();
   }
@@ -263,9 +324,6 @@ async function main() {
   // ════════════════════════════════════════════════════════════════
   phase(4, "Create Ad on Stellar");
 
-  // For simplicity, use the EVM admin as both ad_creator and ad_recipient
-  const adCreatorHex = evmAddressToBytes32(evmAdmin);
-  const adRecipientHex = evmAddressToBytes32(evmAdmin);
   const adTokenBuf = hexToBuffer(stellarAdTokenHex);
 
   {
@@ -277,91 +335,105 @@ async function main() {
       adTokenBuf,
       AMOUNT,
       EVM_CHAIN_ID,
-      hexToBuffer(adRecipientHex),
+      hexToBuffer(adCreatorEvmHex),
       STELLAR_CHAIN_ID,
-      stellarAdManagerBuf
+      stellarAdManagerBuf,
     );
-    const sig = signEd25519(msgHash, adminSecretKey);
+    const sig = signEd25519(msgHash, stellarAdminSecretKey);
 
-    invokeContract(stellarAdManager, "create_ad", [
-      `--signature`, sig.toString("hex"),
-      `--public_key`, adminPubKey.toString("hex"),
-      `--auth_token`, authToken.toString("hex"),
-      `--time_to_expire`, TIME_TO_EXPIRE.toString(),
-      `--ad_id`, AD_ID,
-      `--token`, stellarAdTokenHex.replace(/^0x/, ""),
-      `--amount`, AMOUNT.toString(),
-      `--order_chain_id`, EVM_CHAIN_ID.toString(),
-      `--ad_recipient`, adRecipientHex.replace(/^0x/, ""),
-    ]);
+    // Ad creator is tx source — authorizes the SAC transfer via require_auth.
+    invokeContract(
+      stellarAdManager,
+      "create_ad",
+      [
+        `--signature`,
+        sig.toString("hex"),
+        `--public_key`,
+        stellarAdminPubKey.toString("hex"),
+        `--auth_token`,
+        authToken.toString("hex"),
+        `--time_to_expire`,
+        TIME_TO_EXPIRE.toString(),
+        `--creator`,
+        adCreatorStellar,
+        `--ad_id`,
+        AD_ID,
+        `--ad_token`,
+        stellarAdTokenHex.replace(/^0x/, ""),
+        `--initial_amount`,
+        AMOUNT.toString(),
+        `--order_chain_id`,
+        EVM_CHAIN_ID.toString(),
+        `--ad_recipient`,
+        adCreatorEvmHex.replace(/^0x/, ""),
+      ],
+      { source: STELLAR_AD_CREATOR_ACCOUNT },
+    );
   }
 
-  console.log(`Ad "${AD_ID}" created on Stellar.`);
+  console.log(`Ad "${AD_ID}" created on Stellar by ad creator.`);
 
   // ════════════════════════════════════════════════════════════════
   // Phase 5: Create Order on EVM
   // ════════════════════════════════════════════════════════════════
   phase(5, "Create Order on EVM");
 
-  // Mint test tokens to bridger (use admin as bridger for simplicity)
-  console.log("Minting test tokens...");
+  // Admin mints test tokens to the order creator; the order creator then
+  // approves OrderPortal and calls createOrder as msg.sender.
+  console.log("Minting test tokens to order creator...");
   {
-    const mintTx = await evm.testToken.getFunction("mint")(
-      evmAdmin,
-      AMOUNT * 10n
+    const tx = await evm.testToken.getFunction("mint")(
+      orderCreatorEvm,
+      AMOUNT * 10n,
+      { nonce: nonces.next() },
     );
-    await mintTx.wait();
+    await tx.wait();
   }
 
-  // Approve OrderPortal
+  console.log("Order creator approving OrderPortal...");
   {
-    const approveTx = await evm.testToken.getFunction("approve")(
+    const tx = await testTokenAsCreator.getFunction("approve")(
       evm.addresses.orderPortal,
-      AMOUNT
+      AMOUNT,
+      { nonce: orderCreatorNonces.next() },
     );
-    await approveTx.wait();
+    await tx.wait();
   }
 
-  // Build EVM OrderParams struct (uses 20-byte addresses)
-  // The contract internally converts via toBytes32() for EIP-712 hashing
   const evmOrderParams = {
-    orderChainToken: evm.addresses.testToken,
-    adChainToken: stellarTokenEvm,
+    orderChainToken: evmTokenBytes32,
+    adChainToken: stellarAdTokenHex,
     amount: AMOUNT,
-    bridger: evmAdmin,
-    orderRecipient: evmAdmin,
+    bridger: orderCreatorEvmHex,
+    orderRecipient: orderCreatorStellarHex,
     adChainId: STELLAR_CHAIN_ID,
-    adManager: stellarAdManagerEvm,
+    adManager: stellarAdManagerHex,
     adId: AD_ID,
-    adCreator: evmAdmin, // truncated from adCreatorHex
-    adRecipient: evmAdmin, // truncated from adRecipientHex
+    adCreator: adCreatorStellarHex,
+    adRecipient: adCreatorEvmHex,
     salt: SALT,
   };
 
-  // Build 32-byte order params for proof generation (cross-chain compatible)
   const orderParams: OrderParams = {
     orderChainToken: evmTokenBytes32,
     adChainToken: stellarAdTokenHex,
     amount: AMOUNT,
-    bridger: evmAddressToBytes32(evmAdmin),
+    bridger: orderCreatorEvmHex,
     orderChainId: EVM_CHAIN_ID,
-    orderPortal: evmAddressToBytes32(evm.addresses.orderPortal),
-    orderRecipient: evmAddressToBytes32(evmAdmin),
+    orderPortal: evmOrderPortalBytes32,
+    orderRecipient: orderCreatorStellarHex,
     adChainId: STELLAR_CHAIN_ID,
     adManager: stellarAdManagerHex,
     adId: AD_ID,
-    adCreator: adCreatorHex,
-    adRecipient: adRecipientHex,
+    adCreator: adCreatorStellarHex,
+    adRecipient: adCreatorEvmHex,
     salt: SALT,
   };
 
-  // Compute order hash off-chain (EIP-712 typed data hash with minimal domain)
-  // This matches what the EVM contract computes internally via _hashOrder
   const orderHash = computeOrderHash(orderParams);
   console.log(`  Order hash: ${orderHash}`);
 
-  // Generate ECDSA signature for createOrder
-  console.log("Signing createOrder request...");
+  console.log("Signing createOrder pre-auth (evm admin)...");
   const evmAuthToken1 = "0x" + "0".repeat(62) + "a1";
   const createOrderMsgHash = evmCreateOrderRequestHash(
     AD_ID,
@@ -369,23 +441,23 @@ async function main() {
     evmAuthToken1,
     EVM_TIME_TO_EXPIRE,
     EVM_CHAIN_ID,
-    evm.addresses.orderPortal
+    evm.addresses.orderPortal,
   );
   const createOrderSig = await evmSignRequest(createOrderMsgHash, evmSigner);
 
-  console.log("Creating order on EVM OrderPortal...");
+  console.log("Order creator submitting createOrder...");
   {
-    const tx = await evm.orderPortal.getFunction("createOrder")(
+    const tx = await orderPortalAsCreator.getFunction("createOrder")(
       createOrderSig,
       evmAuthToken1,
       EVM_TIME_TO_EXPIRE,
-      evmOrderParams
+      evmOrderParams,
+      { nonce: orderCreatorNonces.next() },
     );
     const receipt = await tx.wait();
     console.log(`  createOrder tx: ${receipt.hash}`);
   }
 
-  // Verify order is Open
   const orderStatus = await evm.orderPortal.getFunction("orders")(orderHash);
   assert(orderStatus === 1n, `Order should be Open (1), got ${orderStatus}`);
   console.log("Order created and funded on EVM.");
@@ -394,6 +466,23 @@ async function main() {
   // Phase 6: Lock Order on Stellar
   // ════════════════════════════════════════════════════════════════
   phase(6, "Lock Order on Stellar");
+
+  const stellarOrderParams = {
+    order_chain_token: evmTokenBytes32.replace(/^0x/, ""),
+    ad_chain_token: stellarAdTokenHex.replace(/^0x/, ""),
+    amount: AMOUNT.toString(),
+    bridger: orderCreatorEvmHex.replace(/^0x/, ""),
+    order_chain_id: EVM_CHAIN_ID.toString(),
+    src_order_portal: evmOrderPortalBytes32.replace(/^0x/, ""),
+    order_recipient: orderCreatorStellarHex.replace(/^0x/, ""),
+    ad_id: AD_ID,
+    ad_creator: adCreatorStellarHex.replace(/^0x/, ""),
+    ad_recipient: adCreatorEvmHex.replace(/^0x/, ""),
+    salt: SALT.toString(),
+  };
+  // Wrap in single quotes so bash preserves the JSON's double quotes when
+  // execSync passes the command through /bin/sh -c.
+  const stellarOrderParamsJson = `'${JSON.stringify(stellarOrderParams)}'`;
 
   {
     const authToken = authCounter.next();
@@ -404,18 +493,28 @@ async function main() {
       AD_ID,
       orderHashBuf,
       STELLAR_CHAIN_ID,
-      stellarAdManagerBuf
+      stellarAdManagerBuf,
     );
-    const sig = signEd25519(msgHash, adminSecretKey);
+    const sig = signEd25519(msgHash, stellarAdminSecretKey);
 
-    invokeContract(stellarAdManager, "lock_for_order", [
-      `--signature`, sig.toString("hex"),
-      `--public_key`, adminPubKey.toString("hex"),
-      `--auth_token`, authToken.toString("hex"),
-      `--time_to_expire`, TIME_TO_EXPIRE.toString(),
-      `--ad_id`, AD_ID,
-      `--order_hash`, orderHash.replace(/^0x/, ""),
-    ]);
+    // Source = ad creator so ad.maker.require_auth() is auto-signed.
+    invokeContract(
+      stellarAdManager,
+      "lock_for_order",
+      [
+        `--signature`,
+        sig.toString("hex"),
+        `--public_key`,
+        stellarAdminPubKey.toString("hex"),
+        `--auth_token`,
+        authToken.toString("hex"),
+        `--time_to_expire`,
+        TIME_TO_EXPIRE.toString(),
+        `--params`,
+        stellarOrderParamsJson,
+      ],
+      { source: STELLAR_AD_CREATOR_ACCOUNT },
+    );
   }
 
   console.log("Order locked on Stellar AdManager.");
@@ -427,18 +526,17 @@ async function main() {
 
   const proofResult = await generateProofs(orderParams, CIRCUIT_PATH);
 
-  console.log(`  Order hash: ${proofResult.orderHash}`);
-  console.log(`  Order hash (field mod): ${proofResult.orderHashMod.toString()}`);
-  console.log(`  Target root: ${proofResult.targetRoot}`);
-  console.log(`  Bridger nullifier: ${proofResult.bridgerNullifier.toString()}`);
-  console.log(`  Ad-creator nullifier: ${proofResult.adCreatorNullifier.toString()}`);
-  console.log(`  Bridger proof: ${proofResult.bridgerProof.length} bytes`);
-  console.log(`  Ad-creator proof: ${proofResult.adCreatorProof.length} bytes`);
+  console.log(`  Order hash:           ${proofResult.orderHash}`);
+  console.log(`  Target root:          ${proofResult.targetRoot}`);
+  console.log(`  Bridger nullifier:    ${proofResult.bridgerNullifier}`);
+  console.log(`  Ad-creator nullifier: ${proofResult.adCreatorNullifier}`);
+  console.log(`  Bridger proof:        ${proofResult.bridgerProof.length} bytes`);
+  console.log(`  Ad-creator proof:     ${proofResult.adCreatorProof.length} bytes`);
 
   // ════════════════════════════════════════════════════════════════
-  // Phase 8: Bridger Unlocks on Stellar (ad chain)
+  // Phase 8: Order Creator Unlocks on Stellar (ad chain)
   // ════════════════════════════════════════════════════════════════
-  phase(8, "Bridger Unlocks on Stellar");
+  phase(8, "Order Creator Unlocks on Stellar");
 
   {
     const authToken = authCounter.next();
@@ -451,40 +549,54 @@ async function main() {
       orderHashBuf,
       targetRootBuf,
       STELLAR_CHAIN_ID,
-      stellarAdManagerBuf
+      stellarAdManagerBuf,
     );
-    const sig = signEd25519(msgHash, adminSecretKey);
+    const sig = signEd25519(msgHash, stellarAdminSecretKey);
 
-    // Convert proof bytes to hex string for CLI
     const proofHex = Buffer.from(proofResult.bridgerProof).toString("hex");
-    const nullifierHex = proofResult.bridgerNullifier.toString().replace(/^0x/, "");
+    const nullifierHex = proofResult.bridgerNullifier
+      .toString()
+      .replace(/^0x/, "");
 
-    invokeContract(stellarAdManager, "unlock", [
-      `--signature`, sig.toString("hex"),
-      `--public_key`, adminPubKey.toString("hex"),
-      `--auth_token`, authToken.toString("hex"),
-      `--time_to_expire`, TIME_TO_EXPIRE.toString(),
-      `--ad_id`, AD_ID,
-      `--order_hash`, orderHash.replace(/^0x/, ""),
-      `--target_root`, proofResult.targetRoot.replace(/^0x/, ""),
-      `--nullifier_hash`, nullifierHex,
-      `--proof`, proofHex,
-    ]);
+    // Source = order creator (Stellar identity) so order_recipient.require_auth()
+    // is auto-signed on the unlock.
+    invokeContract(
+      stellarAdManager,
+      "unlock",
+      [
+        `--signature`,
+        sig.toString("hex"),
+        `--public_key`,
+        stellarAdminPubKey.toString("hex"),
+        `--auth_token`,
+        authToken.toString("hex"),
+        `--time_to_expire`,
+        TIME_TO_EXPIRE.toString(),
+        `--params`,
+        stellarOrderParamsJson,
+        `--nullifier_hash`,
+        nullifierHex,
+        `--target_root`,
+        proofResult.targetRoot.replace(/^0x/, ""),
+        `--proof`,
+        proofHex,
+      ],
+      { source: STELLAR_ORDER_CREATOR_ACCOUNT },
+    );
   }
 
-  console.log("Bridger unlocked on Stellar! Tokens released to bridger.");
+  console.log("Order creator unlocked on Stellar — XLM released.");
 
   // ════════════════════════════════════════════════════════════════
-  // Phase 9: Ad-Creator Unlocks on EVM (order chain)
+  // Phase 9: Ad Creator Unlocks on EVM (order chain)
   // ════════════════════════════════════════════════════════════════
-  phase(9, "Ad-Creator Unlocks on EVM");
+  phase(9, "Ad Creator Unlocks on EVM");
 
   {
     const evmAuthToken2 = "0x" + "0".repeat(62) + "a2";
     const nullifierHash = proofResult.adCreatorNullifier.toString();
     const targetRoot = proofResult.targetRoot;
 
-    // Generate ECDSA signature for unlock
     const unlockMsgHash = evmUnlockOrderRequestHash(
       AD_ID,
       orderHash,
@@ -492,12 +604,12 @@ async function main() {
       evmAuthToken2,
       EVM_TIME_TO_EXPIRE,
       EVM_CHAIN_ID,
-      evm.addresses.orderPortal
+      evm.addresses.orderPortal,
     );
     const unlockSig = await evmSignRequest(unlockMsgHash, evmSigner);
 
-    // Convert proof to hex for EVM call
-    const proofHex = "0x" + Buffer.from(proofResult.adCreatorProof).toString("hex");
+    const proofHex =
+      "0x" + Buffer.from(proofResult.adCreatorProof).toString("hex");
 
     console.log("Calling EVM OrderPortal.unlock...");
     const tx = await evm.orderPortal.getFunction("unlock")(
@@ -507,37 +619,84 @@ async function main() {
       evmOrderParams,
       nullifierHash,
       targetRoot,
-      proofHex
+      proofHex,
+      { nonce: nonces.next() },
     );
     const receipt = await tx.wait();
     console.log(`  unlock tx: ${receipt.hash}`);
   }
 
-  // Verify order is Filled
   const finalStatus = await evm.orderPortal.getFunction("orders")(orderHash);
   assert(finalStatus === 2n, `Order should be Filled (2), got ${finalStatus}`);
-  console.log("Ad-creator unlocked on EVM! Tokens released to ad-recipient.");
+  console.log("Ad creator unlocked on EVM — tokens released to EVM recipient.");
 
   // ════════════════════════════════════════════════════════════════
   // Phase 10: Assertions & Summary
   // ════════════════════════════════════════════════════════════════
   phase(10, "Assertions & Summary");
 
-  // Verify nullifier is consumed on EVM (double-unlock should fail)
-  const bridgerNullUsed = await evm.orderPortal.getFunction("nullifierUsed")(
-    proofResult.adCreatorNullifier.toString()
+  const adCreatorNullUsed = await evm.orderPortal.getFunction("nullifierUsed")(
+    proofResult.adCreatorNullifier.toString(),
   );
-  assert(bridgerNullUsed === true, "Ad-creator nullifier should be consumed on EVM");
+  assert(adCreatorNullUsed, "Ad-creator nullifier should be consumed on EVM");
 
-  // Verify ad-recipient received tokens on EVM
-  const adRecipientBalance = await evm.testToken.getFunction("balanceOf")(evmAdmin);
-  console.log(`  Ad-recipient EVM token balance: ${adRecipientBalance}`);
-  // The ad-recipient (evmAdmin) minted 10*AMOUNT, spent AMOUNT on createOrder,
-  // then got AMOUNT back from unlock. Net: 10*AMOUNT.
-  assert(
-    adRecipientBalance === AMOUNT * 10n,
-    `Expected balance ${AMOUNT * 10n}, got ${adRecipientBalance}`
+  // EVM token accounting:
+  //   order creator: minted 10*AMOUNT, spent AMOUNT on createOrder → 9*AMOUNT
+  //   ad creator (EVM recipient): 0 → AMOUNT after unlock
+  const orderCreatorBalance = await evm.testToken.getFunction("balanceOf")(
+    orderCreatorEvm,
   );
+  const adRecipientBalance = await evm.testToken.getFunction("balanceOf")(
+    AD_CREATOR_EVM_RECIPIENT,
+  );
+
+  console.log(`  Order creator EVM token balance:  ${orderCreatorBalance} (expected ${AMOUNT * 9n})`);
+  console.log(`  Ad creator EVM token balance:     ${adRecipientBalance} (expected ${AMOUNT})`);
+
+  assert(
+    orderCreatorBalance === AMOUNT * 9n,
+    `Order creator EVM balance: expected ${AMOUNT * 9n}, got ${orderCreatorBalance}`,
+  );
+  assert(
+    adRecipientBalance === AMOUNT,
+    `Ad creator EVM recipient did not receive order token: expected ${AMOUNT}, got ${adRecipientBalance}`,
+  );
+  console.log("  ✓ Ad creator EVM recipient received the order token.");
+
+  // Stellar XLM accounting — allow small slop for network fees (both
+  // accounts were the source of at least one tx).
+  const adCreatorXlmAfter = stellarTokenBalance(stellarAdToken, adCreatorStellar);
+  const orderCreatorXlmAfter = stellarTokenBalance(
+    stellarAdToken,
+    orderCreatorStellar,
+  );
+  const adCreatorDelta = adCreatorXlmBefore - adCreatorXlmAfter; // positive: spent
+  const orderCreatorDelta = orderCreatorXlmAfter - orderCreatorXlmBefore; // positive: received
+  const FEE_SLOP = 10_000_000n; // 1 XLM — generous ceiling for localnet fees
+
+  // Derive the fees each account paid from the observed deltas.
+  //   Ad creator: spent AMOUNT locking the ad + fees for create_ad + lock_for_order.
+  //   Order creator: received AMOUNT from unlock, paid the (expensive) unlock fee.
+  const adCreatorFees = adCreatorDelta - AMOUNT;
+  const orderCreatorFees = AMOUNT - orderCreatorDelta;
+
+  console.log("");
+  console.log(
+    `  Ad creator:    locked -${xlm(AMOUNT)} into ad, paid ~${xlm(adCreatorFees)} in fees (create_ad + lock_for_order) → net -${xlm(adCreatorDelta)}.`,
+  );
+  console.log(
+    `  Order creator: received +${xlm(AMOUNT)} from the contract, paid ~${xlm(orderCreatorFees)} in fees for the unlock tx → net ${orderCreatorDelta >= 0n ? "+" : ""}${xlm(orderCreatorDelta)}.`,
+  );
+
+  assert(
+    adCreatorDelta >= AMOUNT && adCreatorDelta <= AMOUNT + FEE_SLOP,
+    `Ad creator should have spent ~${xlm(AMOUNT)} (incl. fees), spent ${xlm(adCreatorDelta)}`,
+  );
+  assert(
+    orderCreatorDelta <= AMOUNT && AMOUNT - orderCreatorDelta <= FEE_SLOP,
+    `Order creator did not receive order amount: expected ~${xlm(AMOUNT)} (minus fees), got ${xlm(orderCreatorDelta)}`,
+  );
+  console.log("  ✓ Order creator Stellar address received the order amount.");
 
   console.log("\nCross-chain E2E test completed successfully!");
   console.log("");
@@ -552,20 +711,12 @@ async function main() {
   console.log(`  OrderPortal:    ${evm.addresses.orderPortal}`);
   console.log(`  TestToken:      ${evm.addresses.testToken}`);
   console.log("");
-  console.log("Flow completed:");
-  console.log("  ✓ Ad created on Stellar");
-  console.log("  ✓ Order created on EVM");
-  console.log("  ✓ Order locked on Stellar");
-  console.log("  ✓ ZK proofs generated");
-  console.log("  ✓ Bridger unlocked on Stellar");
-  console.log("  ✓ Ad-creator unlocked on EVM");
-  console.log("  ✓ Nullifiers consumed");
-  console.log("  ✓ Token balances verified");
-  console.log("");
   console.log("Order hash:", orderHash);
 }
 
-main().catch((err) => {
-  console.error("\n\nCross-chain E2E test FAILED:", err);
-  process.exit(1);
-});
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error("\n\nCross-chain E2E test FAILED:", err);
+    process.exit(1);
+  });

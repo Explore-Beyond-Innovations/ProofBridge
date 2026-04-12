@@ -26,13 +26,12 @@ export function stellar(args: string): string {
 /** Deploy a contract WASM, return the contract ID (C... address). */
 export function deployContract(
   wasmPath: string,
-  constructorArgs: string[] = []
+  constructorArgs: string[] = [],
 ): string {
-  const ctorStr = constructorArgs.length > 0
-    ? `-- ${constructorArgs.join(" ")}`
-    : "";
+  const ctorStr =
+    constructorArgs.length > 0 ? `-- ${constructorArgs.join(" ")}` : "";
   const output = stellar(
-    `contract deploy --wasm "${wasmPath}" --source "${SOURCE}" --network "${NETWORK}" ${ctorStr}`
+    `contract deploy --wasm "${wasmPath}" --source "${SOURCE}" --network "${NETWORK}" ${ctorStr}`,
   );
   // Contract ID is the last non-empty line
   const lines = output.split("\n").filter((l) => l.trim());
@@ -48,18 +47,54 @@ export function invokeContract(
   contractId: string,
   fn: string,
   args: string[] = [],
-  options: { send?: boolean } = {}
+  options: { send?: boolean; source?: string } = {},
 ): string {
   const sendFlag = options.send === false ? "--send no" : "--send yes";
+  const source = options.source ?? SOURCE;
   const argsStr = args.length > 0 ? args.join(" ") : "";
   return stellar(
-    `contract invoke --id "${contractId}" --source-account "${SOURCE}" --network "${NETWORK}" ${sendFlag} -- ${fn} ${argsStr}`
+    `contract invoke --id "${contractId}" --source-account "${source}" --network "${NETWORK}" ${sendFlag} -- ${fn} ${argsStr}`,
   );
 }
 
 /** Get the public address for a named Stellar identity. */
 export function getAddress(name: string = SOURCE): string {
   return stellar(`keys address "${name}"`);
+}
+
+/**
+ * Idempotently generate a Stellar key under `name` and fund it via friendbot.
+ * Safe to call repeatedly — existing keys / accounts are left alone.
+ */
+export function generateAndFundKey(name: string): string {
+  try {
+    stellar(`keys generate "${name}"`);
+  } catch {
+    // Already exists — leave it alone.
+  }
+  try {
+    stellar(`keys fund "${name}" --network "${NETWORK}"`);
+  } catch {
+    // Already funded — fine.
+  }
+  return getAddress(name);
+}
+
+/**
+ * Deploy a Stellar Asset Contract (SAC) for a classic asset, returning its
+ * C... contract ID. If the SAC is already deployed, falls back to looking up
+ * the id via `contract id asset`. Use `--asset native` for XLM.
+ */
+export function deploySAC(asset: string = "native"): string {
+  try {
+    return stellar(
+      `contract asset deploy --asset "${asset}" --source "${SOURCE}" --network "${NETWORK}"`,
+    );
+  } catch {
+    return stellar(
+      `contract id asset --asset "${asset}" --source "${SOURCE}" --network "${NETWORK}"`,
+    );
+  }
 }
 
 /** Get the secret key for a named Stellar identity. */
@@ -89,7 +124,7 @@ function base32Encode(data: Uint8Array): string {
   return result;
 }
 
-function base32Decode(str: string): Uint8Array {
+export function base32Decode(str: string): Uint8Array {
   const lookup: Record<string, number> = {};
   for (let i = 0; i < BASE32_ALPHABET.length; i++) {
     lookup[BASE32_ALPHABET[i]] = i;
@@ -156,20 +191,17 @@ export function hexToAccountAddress(hex: string): string {
   return encodeStrkey(STRKEY_ED25519, buf);
 }
 
+/** Convert an ed25519 public key (32-byte Buffer) to a Stellar G... address. */
+export function pubkeyToAddress(pubkey: Buffer): string {
+  return encodeStrkey(STRKEY_ED25519, pubkey);
+}
+
 /**
  * Convert a 20-byte EVM address to 32-byte hex (left-padded with zeros).
- * This is how EVM addresses are stored on the Stellar side.
+ * This is how EVM addresses are stored on the Stellar side and how EVM
+ * contracts encode `address` values inside `bytes32` cross-chain fields.
  */
 export function evmAddressToBytes32(evmAddr: string): string {
   const clean = evmAddr.replace(/^0x/i, "").toLowerCase().padStart(40, "0");
   return "0x" + "0".repeat(24) + clean;
-}
-
-/**
- * Truncate a 32-byte Stellar contract ID to 20-byte EVM address (low 20 bytes).
- * Used when registering Stellar addresses on the EVM side.
- */
-export function stellarIdToEvmAddress(contractId: string): string {
-  const hex = strkeyToHex(contractId).replace(/^0x/, "");
-  return "0x" + hex.slice(24); // last 20 bytes
 }

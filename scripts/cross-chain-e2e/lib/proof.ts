@@ -5,14 +5,15 @@
 
 import { Barretenberg, Fr, UltraHonkBackend } from "@aztec/bb.js";
 import { Noir } from "@noir-lang/noir_js";
-import {
-  MerkleMountainRange as MMR,
-  LevelDB,
-  Poseidon2Hasher,
-} from "proofbridge-mmr";
+import { createRequire } from "module";
 import { keccak256 as ethersKeccak256 } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
+
+// proofbridge-mmr is CJS with Object.defineProperty exports — Node ESM
+// can't resolve named exports from that pattern, so use createRequire.
+const require = createRequire(import.meta.url);
+const { MerkleMountainRange: MMR, LevelDB, Poseidon2Hasher } = require("proofbridge-mmr");
 
 // ── helpers ─────────────────────────────────────────────────────────
 
@@ -44,19 +45,19 @@ function padArray(arr: string[], targetLen = 20): string[] {
 // ── EIP-712 (matching proofbridge-core/src/eip712.rs) ───────────────
 
 const DOMAIN_TYPEHASH_MIN = keccak256(
-  Buffer.from("EIP712Domain(string name,string version)")
+  Buffer.from("EIP712Domain(string name,string version)"),
 );
 const NAME_HASH = keccak256(Buffer.from("Proofbridge"));
 const VERSION_HASH = keccak256(Buffer.from("1"));
 const ORDER_TYPEHASH = keccak256(
   Buffer.from(
-    "Order(address orderChainToken,address adChainToken,uint256 amount,address bridger,uint256 orderChainId,address orderPortal,address orderRecipient,uint256 adChainId,address adManager,string adId,address adCreator,address adRecipient,uint256 salt)"
-  )
+    "Order(bytes32 orderChainToken,bytes32 adChainToken,uint256 amount,bytes32 bridger,uint256 orderChainId,bytes32 orderPortal,bytes32 orderRecipient,uint256 adChainId,bytes32 adManager,string adId,bytes32 adCreator,bytes32 adRecipient,uint256 salt)",
+  ),
 );
 
 function domainSeparator(): Buffer {
   return keccak256(
-    Buffer.concat([DOMAIN_TYPEHASH_MIN, NAME_HASH, VERSION_HASH])
+    Buffer.concat([DOMAIN_TYPEHASH_MIN, NAME_HASH, VERSION_HASH]),
   );
 }
 
@@ -94,7 +95,7 @@ function structHashOrder(p: OrderParams): Buffer {
       abiEncodeAddress(p.adCreator),
       abiEncodeAddress(p.adRecipient),
       abiEncodeUint256(p.salt),
-    ])
+    ]),
   );
 }
 
@@ -103,7 +104,7 @@ export function computeOrderHash(params: OrderParams): string {
   const structHash = structHashOrder(params);
   const prefix = Buffer.from([0x19, 0x01]);
   const hash = keccak256(
-    Buffer.concat([prefix, domainSeparator(), structHash])
+    Buffer.concat([prefix, domainSeparator(), structHash]),
   );
   return "0x" + hash.toString("hex");
 }
@@ -120,7 +121,7 @@ export function buildPublicInputs(
   nullifierHash: string,
   orderHashMod: string,
   targetRoot: string,
-  chainFlag: number // 0 = order chain, 1 = ad chain
+  chainFlag: number, // 0 = order chain, 1 = ad chain
 ): Buffer {
   const buf = Buffer.alloc(128);
   hexToBytes32(nullifierHash).copy(buf, 0);
@@ -154,7 +155,7 @@ export interface ProofResult {
 export async function generateProofs(
   orderParams: OrderParams,
   circuitPath: string,
-  secretHex?: string
+  secretHex?: string,
 ): Promise<ProofResult> {
   console.log("  Loading deposit circuit...");
   const circuit = JSON.parse(fs.readFileSync(circuitPath, "utf8"));
@@ -164,8 +165,7 @@ export async function generateProofs(
 
   // Secret (deterministic or random)
   const secret =
-    secretHex ??
-    "0x" + Buffer.from(Fr.random().toBuffer()).toString("hex");
+    secretHex ?? "0x" + Buffer.from(Fr.random().toBuffer()).toString("hex");
   const secretBuf = Fr.fromString(secret).toBuffer();
 
   // Split secret into left/right halves
@@ -202,10 +202,7 @@ export async function generateProofs(
 
   // Compute nullifiers
   const bridgerNullifier = await bb.poseidon2Hash([leftField, orderHashMod]);
-  const adCreatorNullifier = await bb.poseidon2Hash([
-    orderHashMod,
-    rightField,
-  ]);
+  const adCreatorNullifier = await bb.poseidon2Hash([orderHashMod, rightField]);
   console.log("  Bridger nullifier:", bridgerNullifier.toString());
   console.log("  Ad-creator nullifier:", adCreatorNullifier.toString());
 
@@ -220,11 +217,11 @@ export async function generateProofs(
     tree_width: merkleProof.width.toString(),
     target_sibling_hashes_len: merkleProof.siblings.length.toString(),
     target_sibling_hashes: padArray(
-      merkleProof.siblings.map((s: any) => s.toString())
+      merkleProof.siblings.map((s: any) => s.toString()),
     ),
     target_peak_hashes_len: merkleProof.peaks.length.toString(),
     target_peak_hashes: padArray(
-      merkleProof.peaks.map((p: any) => p.toString())
+      merkleProof.peaks.map((p: any) => p.toString()),
     ),
   };
 
@@ -255,13 +252,13 @@ export async function generateProofs(
     bridgerNullifier.toString(),
     orderHashMod.toString(),
     targetRoot,
-    1
+    1,
   );
   const adCreatorPublicInputs = buildPublicInputs(
     adCreatorNullifier.toString(),
     orderHashMod.toString(),
     targetRoot,
-    0
+    0,
   );
 
   // Cleanup
