@@ -30,7 +30,11 @@ RUN pnpm install --frozen-lockfile --offline --ignore-scripts \
  && pnpm --filter backend-relayer build
 
 # Produce a self-contained runtime dir with only the relayer's prod deps.
-RUN pnpm --filter backend-relayer deploy --prod --legacy /out
+# `pnpm deploy` only copies files listed in the package's `files` field, so
+# the built `dist/` and `prisma/` dirs have to be copied explicitly.
+RUN pnpm --filter backend-relayer deploy --prod --legacy /out \
+ && cp -r apps/backend-relayer/dist /out/dist \
+ && cp -r apps/backend-relayer/prisma /out/prisma
 
 # -----------------------------------------------------------------------------
 # Stage 2 — runtime

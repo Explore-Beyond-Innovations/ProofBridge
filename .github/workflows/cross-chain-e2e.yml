@@ -71,7 +71,7 @@ jobs:
         run: bash scripts/start_chains.sh
 
       - name: Run cross-chain E2E test
-        run: npx tsx scripts/cross-chain-e2e/run.ts
+        run: pnpm --filter cross-chain-e2e exec tsx run.ts
 
       - name: Stop chains
         if: always()
