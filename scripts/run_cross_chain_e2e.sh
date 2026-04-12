@@ -16,7 +16,9 @@ STELLAR_RPC_URL="${STELLAR_RPC_URL:-http://localhost:8000/soroban/rpc}"
 NETWORK_PASSPHRASE="${STELLAR_NETWORK_PASSPHRASE:-Standalone Network ; February 2017}"
 
 ANVIL_PORT="${ANVIL_PORT:-8545}"
-EVM_RPC_URL="http://localhost:$ANVIL_PORT"
+# Use 127.0.0.1 explicitly — on GitHub runners, Node resolves "localhost"
+# to ::1 first, which fails to reach Anvil (bound on IPv4 0.0.0.0).
+EVM_RPC_URL="http://127.0.0.1:$ANVIL_PORT"
 
 # ── user roles (4 actors drive the flow) ─────────────────────────────
 # 1. Stellar admin     — configures the Stellar AdManager contract.
