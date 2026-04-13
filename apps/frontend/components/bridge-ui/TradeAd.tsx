@@ -15,7 +15,7 @@ import { Status } from "../shared/Status"
 import { chain_icons } from "@/lib/chain-icons"
 import { useAccount, useBalance } from "wagmi"
 import { useCreateTrade } from "@/hooks/useTrades"
-import { useChainModal } from "@rainbow-me/rainbowkit"
+import { useChainModal, useConnectModal } from "@rainbow-me/rainbowkit"
 import { useStellarWallet } from "@/components/providers/StellarWallet"
 import { useQuery } from "@tanstack/react-query"
 import { getStellarTokenBalance } from "@/utils/stellar/balance"
@@ -44,7 +44,9 @@ export const TradeAd = ({ ...props }: IAd) => {
   const account = useAccount()
   const { mutateAsync, isPending } = useCreateTrade()
   const { openChainModal } = useChainModal()
-  const { address: stellarAddress } = useStellarWallet()
+  const { openConnectModal } = useConnectModal()
+  const { address: stellarAddress, connect: connectStellar } =
+    useStellarWallet()
 
   // Order chain = chain the bridger pays on. Drives which wallet's balance to
   // read and which connect-flow to surface.
@@ -108,13 +110,7 @@ export const TradeAd = ({ ...props }: IAd) => {
     props.adToken.chainKind === "STELLAR" ? stellarAddress : account.address
 
   const handleCreateTrade = async () => {
-    if (!bridgerDstAddress) {
-      throw new Error(
-        props.adToken.chainKind === "STELLAR"
-          ? "Connect a Stellar wallet to receive on the destination chain"
-          : "Connect an EVM wallet to receive on the destination chain",
-      )
-    }
+    if (!bridgerDstAddress) return
     await mutateAsync({
       payload: {
         adId: props.id,
@@ -126,6 +122,57 @@ export const TradeAd = ({ ...props }: IAd) => {
     })
     toggleModal()
   }
+
+  // Resolve which action the primary button should perform. Priority: pay-side
+  // wallet first (can't bridge without it), then destination-wallet, then the
+  // bridge action itself. Keeps button state readable at a glance.
+  const orderChainName = chains[props.orderToken.chainId]?.name
+  const adChainName = chains[props.adToken.chainId]?.name
+  const connectionAction: {
+    label: string
+    onClick?: () => void
+    isBridge: boolean
+  } = (() => {
+    if (isStellarOrder && !stellarAddress) {
+      return {
+        label: "Connect Stellar wallet",
+        onClick: () => {
+          void connectStellar()
+        },
+        isBridge: false,
+      }
+    }
+    if (!isStellarOrder && !account.address) {
+      return {
+        label: `Connect wallet for ${orderChainName}`,
+        onClick: openConnectModal,
+        isBridge: false,
+      }
+    }
+    if (!isStellarOrder && String(account.chainId) !== props.orderToken.chainId) {
+      return {
+        label: `Switch to ${orderChainName}`,
+        onClick: openChainModal,
+        isBridge: false,
+      }
+    }
+    if (!bridgerDstAddress) {
+      return props.adToken.chainKind === "STELLAR"
+        ? {
+            label: "Connect Stellar wallet (destination)",
+            onClick: () => {
+              void connectStellar()
+            },
+            isBridge: false,
+          }
+        : {
+            label: `Connect wallet for ${adChainName}`,
+            onClick: openConnectModal,
+            isBridge: false,
+          }
+    }
+    return { label: "Bridge", onClick: handleCreateTrade, isBridge: true }
+  })()
   return (
     <div>
       <Modal
@@ -300,64 +347,22 @@ export const TradeAd = ({ ...props }: IAd) => {
             </div>
 
             <div className="flex gap-4">
-              {isStellarOrder ? (
-                !stellarAddress ? (
-                  <Button
-                    size="large"
-                    className="w-full !h-[45px] !text-sm"
-                    type="primary"
-                    disabled={props.status !== "ACTIVE" || isPending}
-                  >
-                    Connect Stellar wallet
-                  </Button>
-                ) : (
-                  <Button
-                    size="large"
-                    className="w-full !h-[45px]"
-                    type="primary"
-                    disabled={
-                      props.status !== "ACTIVE" ||
-                      Number(balance_value) < Number(amount) ||
-                      isPending ||
-                      Number(amount) <= 0
-                    }
-                    onClick={handleCreateTrade}
-                    loading={isPending}
-                  >
-                    Bridge
-                  </Button>
-                )
-              ) : String(account.chainId) !== props.orderToken.chainId ? (
-                <Button
-                  size="large"
-                  className="w-full !h-[45px] !text-sm"
-                  type="primary"
-                  disabled={
-                    props.status !== "ACTIVE" ||
-                    Number(balance_value) < Number(amount) ||
-                    isPending
-                  }
-                  onClick={openChainModal}
-                >
-                  Connect to {chains[props.orderToken.chainId].name}
-                </Button>
-              ) : (
-                <Button
-                  size="large"
-                  className="w-full !h-[45px]"
-                  type="primary"
-                  disabled={
-                    props.status !== "ACTIVE" ||
-                    Number(balance_value) < Number(amount) ||
-                    isPending ||
-                    Number(amount) <= 0
-                  }
-                  onClick={handleCreateTrade}
-                  loading={isPending}
-                >
-                  Bridge
-                </Button>
-              )}
+              <Button
+                size="large"
+                className="w-full !h-[45px] !text-sm"
+                type="primary"
+                disabled={
+                  props.status !== "ACTIVE" ||
+                  isPending ||
+                  (connectionAction.isBridge &&
+                    (Number(balance_value) < Number(amount) ||
+                      Number(amount) <= 0))
+                }
+                onClick={connectionAction.onClick}
+                loading={connectionAction.isBridge && isPending}
+              >
+                {connectionAction.label}
+              </Button>
               <Button
                 size="large"
                 className="w-full !h-[45px] !bg-transparent"
