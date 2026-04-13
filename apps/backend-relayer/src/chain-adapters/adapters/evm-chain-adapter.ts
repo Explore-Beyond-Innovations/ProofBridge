@@ -183,13 +183,13 @@ export class EvmChainAdapter extends ChainAdapter {
   verifyOrderSignature(
     address: ChainAddress,
     orderHash: `0x${string}`,
-    signature: `0x${string}`,
+    signature: string,
   ): boolean {
     this.assertLocalAddress(address, 'address');
     return this.viem.verifyOrderSignature(
       address as `0x${string}`,
       orderHash,
-      signature,
+      signature as `0x${string}`,
     );
   }
 }

@@ -37,6 +37,35 @@ import {
   hasTrustline,
 } from "@/utils/stellar/trustline";
 import type { TrustlineCtx } from "@/utils/stellar/trustline";
+import type { IAdToken } from "@/types/ads";
+
+/**
+ * Blocks Stellar SAC withdrawals/closes when the recipient pubkey has no
+ * trustline to the underlying classic asset. Soroban would otherwise revert
+ * the transfer mid-flight with a generic error; this surfaces it early.
+ */
+async function assertRecipientTrustline(
+  adToken: IAdToken,
+  toPublicKey: string,
+): Promise<void> {
+  if (adToken.chainKind !== "STELLAR") return;
+  if (adToken.kind !== "SAC") return;
+  if (!adToken.assetIssuer) {
+    throw new Error(
+      `Token ${adToken.symbol} is marked SAC but has no assetIssuer configured`,
+    );
+  }
+  const ok = await hasTrustline(
+    toPublicKey,
+    adToken.symbol,
+    adToken.assetIssuer,
+  );
+  if (!ok) {
+    throw new Error(
+      `Recipient ${toPublicKey.slice(0, 6)}… has no trustline for ${adToken.symbol}. Ask them to add the asset in their Stellar wallet (issuer ${adToken.assetIssuer.slice(0, 6)}…) before retrying.`,
+    );
+  }
+}
 
 /**
  * For SAC tokens, the signer's account must trust the underlying classic
@@ -347,6 +376,8 @@ export const useWithdrawFunds = () => {
       const response = await withdrawFromAd(data);
 
       if (response.chainKind === "STELLAR") {
+        const ad = await getSingleAd(data.adId);
+        await assertRecipientTrustline(ad.adToken, data.to);
         const txHash = await withdrawFromAdSoroban(
           buildStellarCtx(),
           {
@@ -418,6 +449,8 @@ export const useCloseAd = () => {
       const response = await closeAd(data);
 
       if (response.chainKind === "STELLAR") {
+        const ad = await getSingleAd(data.adId);
+        await assertRecipientTrustline(ad.adToken, data.to);
         const txHash = await closeAdSoroban(
           buildStellarCtx(),
           {

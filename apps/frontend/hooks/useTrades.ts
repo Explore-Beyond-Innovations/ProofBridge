@@ -17,13 +17,14 @@ import {
 import { config } from "@/utils/wagmi-config";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { waitForTransactionReceipt } from "wagmi/actions";
-import { useAccount, useWriteContract, useSignTypedData } from "wagmi";
+import { useWriteContract, useSignTypedData } from "wagmi";
 import { toast } from "sonner";
 import { ERC20_ABI } from "@/abis/ERC20.abi";
 import { getSingleToken } from "@/services/tokens.service";
 import { AD_MANAGER_ABI } from "@/abis/AdManager.abi";
 import { formatUnits, parseEther } from "viem";
 import { useStellarAdapter } from "@/lib/stellar-adapter";
+import { useStellarWallet } from "@/components/providers/StellarWallet";
 import {
   createOrderSoroban,
   lockForOrderSoroban,
@@ -327,54 +328,71 @@ export const useLockFunds = () => {
 export const useUnLockFunds = () => {
   const { writeContractAsync } = useWriteContract();
   const { signTypedDataAsync } = useSignTypedData();
-  const account = useAccount();
   const { buildCtx: buildStellarCtx } = useStellarAdapter();
+  const { signMessage: signStellarMessage } = useStellarWallet();
   return useMutation({
     mutationKey: ["unlock-fund"],
     mutationFn: async (id: string) => {
       const params = await getTradeParams(id);
-      const signature = await signTypedDataAsync({
-        types: {
-          Order: [
-            { name: "orderChainToken", type: "address" },
-            { name: "adChainToken", type: "address" },
-            { name: "amount", type: "uint256" },
-            { name: "bridger", type: "address" },
-            { name: "orderChainId", type: "uint256" },
-            { name: "orderPortal", type: "address" },
-            { name: "orderRecipient", type: "address" },
-            { name: "adChainId", type: "uint256" },
-            { name: "adManager", type: "address" },
-            { name: "adId", type: "string" },
-            { name: "adCreator", type: "address" },
-            { name: "adRecipient", type: "address" },
-            { name: "salt", type: "uint256" },
-          ],
-        },
-        primaryType: "Order",
-        message: {
-          orderChainToken: params.orderChainToken,
-          adChainToken: params.adChainToken,
-          amount: BigInt(params.amount),
-          bridger: params.bridger,
-          orderChainId: BigInt(params.orderChainId),
-          orderPortal: params.orderPortal,
-          orderRecipient: params.orderRecipient,
-          adChainId: BigInt(params.adChainId),
-          adManager: params.adManager,
-          adId: params.adId,
-          adCreator: params.adCreator,
-          adRecipient: params.adRecipient,
-          salt: BigInt(params.salt),
-        },
-        domain: {
-          name: "Proofbridge",
-          version: "1",
-        },
-      });
-      const response = await unlockFunds({ id, signature: signature });
 
-      const isAdCreator = account.address === params?.adCreator;
+      // Unlock signing depends on the chain the caller is unlocking on — not
+      // the caller's origin wallet. adCreator unlocks on the order chain;
+      // bridger unlocks on the ad chain. Backend tells us which.
+      let signature: string;
+      if (params.unlockChainKind === "STELLAR") {
+        // SEP-43 signMessage — off-chain authorization only; the signed bytes
+        // are domain-separated + ed25519-verified server-side.
+        signature = await signStellarMessage(params.orderHash);
+      } else {
+        signature = await signTypedDataAsync({
+          types: {
+            Order: [
+              { name: "orderChainToken", type: "address" },
+              { name: "adChainToken", type: "address" },
+              { name: "amount", type: "uint256" },
+              { name: "bridger", type: "address" },
+              { name: "orderChainId", type: "uint256" },
+              { name: "orderPortal", type: "address" },
+              { name: "orderRecipient", type: "address" },
+              { name: "adChainId", type: "uint256" },
+              { name: "adManager", type: "address" },
+              { name: "adId", type: "string" },
+              { name: "adCreator", type: "address" },
+              { name: "adRecipient", type: "address" },
+              { name: "salt", type: "uint256" },
+            ],
+          },
+          primaryType: "Order",
+          message: {
+            orderChainToken: params.orderChainToken,
+            adChainToken: params.adChainToken,
+            amount: BigInt(params.amount),
+            bridger: params.bridger,
+            orderChainId: BigInt(params.orderChainId),
+            orderPortal: params.orderPortal,
+            orderRecipient: params.orderRecipient,
+            adChainId: BigInt(params.adChainId),
+            adManager: params.adManager,
+            adId: params.adId,
+            adCreator: params.adCreator,
+            adRecipient: params.adRecipient,
+            salt: BigInt(params.salt),
+          },
+          domain: {
+            name: "Proofbridge",
+            version: "1",
+          },
+        });
+      }
+      const response = await unlockFunds({ id, signature });
+
+      // Role determines which contract ABI we hit. Backend ships
+      // OrderPortal-shape params (adManager/adChainId) when the caller is the
+      // ad creator unlocking on the order chain, and AdManager-shape
+      // (srcOrderPortal/orderChainId) for the bridger unlocking on the ad
+      // chain. Discriminate on the key — much more robust than comparing
+      // addresses across chain kinds.
+      const isAdCreator = "adManager" in response.orderParams;
 
       if (response.chainKind === "STELLAR") {
         // Relayer still emits the proof payload as hex strings; actions layer

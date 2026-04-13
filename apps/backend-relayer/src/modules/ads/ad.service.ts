@@ -122,6 +122,7 @@ export class AdsService {
               name: true,
               decimals: true,
               kind: true,
+              assetIssuer: true,
             },
           },
           orderToken: {
@@ -132,6 +133,7 @@ export class AdsService {
               name: true,
               decimals: true,
               kind: true,
+              assetIssuer: true,
             },
           },
           status: true,
@@ -199,6 +201,7 @@ export class AdsService {
             chainId: i.adToken.chain.chainId.toString(),
             chainKind: i.adToken.chain.kind as string,
             kind: i.adToken.kind as string,
+            assetIssuer: i.adToken.assetIssuer,
           },
           orderToken: {
             name: i.orderToken.name,
@@ -208,6 +211,7 @@ export class AdsService {
             chainId: i.orderToken.chain.chainId.toString(),
             chainKind: i.orderToken.chain.kind as string,
             kind: i.orderToken.kind as string,
+            assetIssuer: i.orderToken.assetIssuer,
           },
         };
       });
@@ -252,6 +256,7 @@ export class AdsService {
               name: true,
               decimals: true,
               kind: true,
+              assetIssuer: true,
             },
           },
           orderToken: {
@@ -262,6 +267,7 @@ export class AdsService {
               name: true,
               decimals: true,
               kind: true,
+              assetIssuer: true,
             },
           },
           createdAt: true,
@@ -305,6 +311,7 @@ export class AdsService {
           chainId: ad.adToken.chain.chainId.toString(),
           chainKind: ad.adToken.chain.kind as string,
           kind: ad.adToken.kind as string,
+          assetIssuer: ad.adToken.assetIssuer,
         },
         orderToken: {
           name: ad.orderToken.name,
@@ -314,6 +321,7 @@ export class AdsService {
           chainId: ad.orderToken.chain.chainId.toString(),
           chainKind: ad.orderToken.chain.kind as string,
           kind: ad.orderToken.kind as string,
+          assetIssuer: ad.orderToken.assetIssuer,
         },
         metadata: ad.metadata ?? null,
         createdAt: ad.createdAt.toISOString(),

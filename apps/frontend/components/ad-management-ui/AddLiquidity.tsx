@@ -19,6 +19,7 @@ import {
 } from "viem/chains"
 import { CiWarning } from "react-icons/ci"
 import { useGetAllTokens } from "@/hooks/useTokens"
+import { useStellarWallet } from "@/components/providers/StellarWallet"
 
 const supported_chains: Record<number, Chain> = {
   [hederaTestnet.id]: hederaTestnet,
@@ -29,11 +30,16 @@ const supported_chains: Record<number, Chain> = {
 
 export const AddLiquidity = () => {
   const account = useAccount()
+  const { address: stellarAddress } = useStellarWallet()
   const { data: chains, isLoading: loadingChains } = useGetAllChains({
     limit: 10,
   })
   const [base_chain, setBase_chain] = useState<Chain>()
   const [order_chain, setOrder_chain] = useState<Chain>()
+  const [orderChainId, setOrderChainId] = useState<string>("")
+  const orderChainKind = chains?.data?.find(
+    (c) => c.chainId === orderChainId,
+  )?.kind
   const is_base_chain = base_chain?.id === account.chainId
   const { openChainModal } = useChainModal()
   const { mutateAsync: createAd, isPending } = useCreateAd()
@@ -51,18 +57,31 @@ export const AddLiquidity = () => {
   })
   const { data: routes, isLoading: loadingRoutes } = useGetBridgeRoutes({
     adChainId: String(base_chain?.id),
-    orderChainId: String(order_chain?.id),
+    orderChainId: orderChainId || String(order_chain?.id),
     adTokenId: selectedTokenId,
   })
+
+  // Creator's receive address lives on the *order chain* (destination). Pick
+  // the wallet matching that chain's kind so we don't submit a 0x EVM address
+  // as a Stellar G-strkey or vice versa.
+  const creatorDstAddress =
+    orderChainKind === "STELLAR" ? stellarAddress : account.address
 
   const handleCreateAd = async () => {
     try {
       const token = tokens?.data?.find((value) => value.id === selectedTokenId);
+      if (!creatorDstAddress) {
+        throw new Error(
+          orderChainKind === "STELLAR"
+            ? "Connect a Stellar wallet to receive on the destination chain"
+            : "Connect an EVM wallet to receive on the destination chain",
+        )
+      }
 
       const response = await createAd({
         payload: {
           routeId: routes?.data[0]?.id!,
-          creatorDstAddress: account.address!,
+          creatorDstAddress,
 
           maxAmount: parseUnits(
             max,
@@ -106,7 +125,7 @@ export const AddLiquidity = () => {
               <Select
                 loading={loadingChains}
                 className="w-full !h-[40px]"
-                options={chains?.rows
+                options={chains?.data
                   .filter(
                     (chain) =>
                       isVisibleChain(chain.chainId) &&
@@ -136,7 +155,7 @@ export const AddLiquidity = () => {
               <Select
                 loading={loadingChains}
                 className="w-full !h-[40px]"
-                options={chains?.rows
+                options={chains?.data
                   .filter(
                     (chain) =>
                       isVisibleChain(chain.chainId) &&
@@ -153,8 +172,12 @@ export const AddLiquidity = () => {
                 }}
                 onChange={(value: number) => {
                   setOrder_chain(supported_chains[value])
+                  setOrderChainId(String(value))
                 }}
-                onClear={() => setOrder_chain(undefined)}
+                onClear={() => {
+                  setOrder_chain(undefined)
+                  setOrderChainId("")
+                }}
               />
             </div>
           </div>

@@ -11,7 +11,6 @@ import {
 import { ArrowRight, Bot, Clock, Rabbit, Verified } from "lucide-react"
 import Image from "next/image"
 import { TradeAd } from "./TradeAd"
-import { SellAd } from "./SellAdd"
 import { useGetAllChains } from "@/hooks/useChains"
 import { IChain } from "@/types/chains"
 import { useGetAllTokens } from "@/hooks/useTokens"
@@ -47,7 +46,7 @@ export const BridgeTab = () => {
     orderTokenId: selectedTokenId,
   })
   // useEffect(() => {
-  //   if (chains?.rows.length) {
+  //   if (chains?.data.length) {
   //     setSelectedBaseChainId(chains.rows[0].chainId)
   //   }
   // }, [chains])
@@ -84,7 +83,7 @@ export const BridgeTab = () => {
                   className="min-w-[200px] !h-[40px]"
                   value={selectedBaseChainId}
                 >
-                  {chains?.rows
+                  {chains?.data
                     ?.filter((chain) => isVisibleChain(chain.chainId))
                     .map((chain) => {
                       return (
@@ -110,7 +109,7 @@ export const BridgeTab = () => {
                   className="min-w-[200px] !h-[40px]"
                   value={selectedDstChainId}
                 >
-                  {chains?.rows
+                  {chains?.data
                     ?.filter((chain) => isVisibleChain(chain.chainId))
                     .map((chain) => {
                       return (
@@ -186,7 +185,7 @@ export const BridgeTab = () => {
         <IoDocumentText className="text-primary" />
         <p className="text-sm underline">
           {
-            chains?.rows?.find((chain) => chain.chainId === selectedBaseChainId)
+            chains?.data?.find((chain) => chain.chainId === selectedBaseChainId)
               ?.name
           }{" "}
           ADs

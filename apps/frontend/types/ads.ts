@@ -30,18 +30,15 @@ export interface ICreateAdResponse {
 }
 
 export interface IFundAdResponse {
+  chainId: string
   contractAddress: Address
   signature: Address
   signerPublicKey?: Address
   authToken: Address
   timeToExpire: number
   adId: string
-  adToken: Address
-  orderChainId: string
-  adRecipient: Address
+  amount: string
   reqHash: Address
-  chainId: number
-  amount: number
   chainKind: ChainKind
 }
 
@@ -106,9 +103,9 @@ export interface IUpdateAdRequest {
 export interface IUpdateAdResponse {
   id: string
   creatorAddress: string
-  minAmount: {}
-  maxAmount: {}
-  metadata: {}
+  minAmount: string | null
+  maxAmount: string | null
+  metadata: { title?: string; description?: string } | null
 }
 
 export interface IConfirmAdTxRequest {
@@ -125,8 +122,9 @@ export interface IAd {
   orderTokenId: string
   poolAmount: string
   availableAmount: string
-  minAmount: string
-  maxAmount: string
+  // Nullable in backend DTO — guard before BigInt()/parseToBigInt.
+  minAmount: string | null
+  maxAmount: string | null
   status: AdStatusT
   metadata: { title?: string; description?: string }
   createdAt: string
@@ -143,6 +141,9 @@ export interface IAdToken {
   chainId: string
   chainKind: ChainKind
   kind: TokenKind
+  // Populated only for SAC tokens (classic-asset issuer G-strkey). Needed for
+  // trustline checks on recipients of Stellar SAC transfers.
+  assetIssuer?: string | null
 }
 
 export interface IGetAdsParams {

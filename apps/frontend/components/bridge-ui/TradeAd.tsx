@@ -16,6 +16,9 @@ import { chain_icons } from "@/lib/chain-icons"
 import { useAccount, useBalance } from "wagmi"
 import { useCreateTrade } from "@/hooks/useTrades"
 import { useChainModal } from "@rainbow-me/rainbowkit"
+import { useStellarWallet } from "@/components/providers/StellarWallet"
+import { useQuery } from "@tanstack/react-query"
+import { getStellarTokenBalance } from "@/utils/stellar/balance"
 
 export const TradeAd = ({ ...props }: IAd) => {
   const [openModal, setOpenModal] = useState(false)
@@ -39,43 +42,85 @@ export const TradeAd = ({ ...props }: IAd) => {
   const [amount, setAmount] = useState("")
   const txFee = Number(amount) * (txFeePercent / 100)
   const account = useAccount()
+  const { mutateAsync, isPending } = useCreateTrade()
+  const { openChainModal } = useChainModal()
+  const { address: stellarAddress } = useStellarWallet()
+
+  // Order chain = chain the bridger pays on. Drives which wallet's balance to
+  // read and which connect-flow to surface.
+  const isStellarOrder = props.orderToken.chainKind === "STELLAR"
   const nativeBalance = useBalance({
     chainId: Number(props.orderToken.chainId),
     address: account.address,
+    query: { enabled: !isStellarOrder },
   })
   const balance = useBalance({
     chainId: Number(props.orderToken.chainId),
     token: props.orderToken.address,
     address: account.address,
+    query: { enabled: !isStellarOrder && props.orderToken.kind === "ERC20" },
   })
-  const [balance_value, setBalance_value] = useState("")
+  const stellarBalance = useQuery({
+    queryKey: [
+      "stellar-balance",
+      stellarAddress,
+      props.orderToken.address,
+      props.orderToken.chainId,
+    ],
+    queryFn: () =>
+      getStellarTokenBalance(stellarAddress!, {
+        kind: props.orderToken.kind,
+        symbol: props.orderToken.symbol,
+        decimals: props.orderToken.decimals,
+        assetIssuer: props.orderToken.assetIssuer,
+      }),
+    enabled: isStellarOrder && !!stellarAddress,
+  })
 
+  const [balance_value, setBalance_value] = useState("")
   useEffect(() => {
+    if (isStellarOrder) {
+      if (stellarBalance.data) {
+        setBalance_value(
+          formatUnits(stellarBalance.data.value, stellarBalance.data.decimals),
+        )
+      }
+      return
+    }
     if (balance.data) {
       setBalance_value(
-        formatUnits(balance?.data?.value!, balance?.data?.decimals!)
+        formatUnits(balance?.data?.value!, balance?.data?.decimals!),
       )
     } else if (nativeBalance.data) {
       setBalance_value(
-        formatUnits(nativeBalance?.data?.value!, nativeBalance?.data?.decimals!)
+        formatUnits(
+          nativeBalance?.data?.value!,
+          nativeBalance?.data?.decimals!,
+        ),
       )
     }
-  }, [balance, nativeBalance, props])
+  }, [balance.data, nativeBalance.data, stellarBalance.data, isStellarOrder])
 
-  useEffect(() => {
-
-  }, [nativeBalance, props])
-
-  const { mutateAsync, isPending } = useCreateTrade()
-  const { openChainModal } = useChainModal()
+  // Bridger's receive address lives on the *ad chain* (the destination).
+  // Pick the wallet that matches its kind so we don't send an EVM 0x address
+  // as a Stellar G-strkey (or vice versa).
+  const bridgerDstAddress =
+    props.adToken.chainKind === "STELLAR" ? stellarAddress : account.address
 
   const handleCreateTrade = async () => {
+    if (!bridgerDstAddress) {
+      throw new Error(
+        props.adToken.chainKind === "STELLAR"
+          ? "Connect a Stellar wallet to receive on the destination chain"
+          : "Connect an EVM wallet to receive on the destination chain",
+      )
+    }
     await mutateAsync({
       payload: {
         adId: props.id,
         routeId: props.routeId,
         amount: parseUnits(amount, props.orderToken.decimals).toString(),
-        bridgerDstAddress: account.address!,
+        bridgerDstAddress,
       },
       orderTokenId: props.orderTokenId,
     })
@@ -185,12 +230,16 @@ export const TradeAd = ({ ...props }: IAd) => {
             <div className="flex items-center gap-4">
               <p>{chains[props.orderToken.chainId]?.name} balance</p>
               <p className="font-semibold text-primary font-pixter tracking-wide">
-                {balance.isLoading || nativeBalance.isLoading ? (
+                {(isStellarOrder
+                  ? stellarBalance.isLoading
+                  : balance.isLoading || nativeBalance.isLoading) ? (
                   <Skeleton.Button active />
                 ) : (
                   <>
                     {Number(balance_value).toLocaleString()}{" "}
-                    {balance?.data?.symbol || nativeBalance?.data?.symbol}
+                    {isStellarOrder
+                      ? props.orderToken.symbol
+                      : balance?.data?.symbol || nativeBalance?.data?.symbol}
                   </>
                 )}
               </p>
@@ -212,7 +261,11 @@ export const TradeAd = ({ ...props }: IAd) => {
                     type="number"
                     onChange={(e) => setAmount(e.target.value)}
                     value={amount}
-                    disabled={balance.isLoading || nativeBalance.isLoading}
+                    disabled={
+                      isStellarOrder
+                        ? stellarBalance.isLoading
+                        : balance.isLoading || nativeBalance.isLoading
+                    }
                   />
                   <p className="text-[11px] space-x-2">
                     <span>{tokenSymbol}</span>{" "}
@@ -220,14 +273,7 @@ export const TradeAd = ({ ...props }: IAd) => {
                     <span
                       className="cursor-pointer text-primary"
                       role="button"
-                      onClick={() => {
-                        setAmount(
-                          formatUnits(
-                            balance?.data?.value!,
-                            balance?.data?.decimals!
-                          )
-                        )
-                      }}
+                      onClick={() => setAmount(balance_value)}
                     >
                       All
                     </span>
@@ -254,7 +300,34 @@ export const TradeAd = ({ ...props }: IAd) => {
             </div>
 
             <div className="flex gap-4">
-              {String(account.chainId) !== props.orderToken.chainId ? (
+              {isStellarOrder ? (
+                !stellarAddress ? (
+                  <Button
+                    size="large"
+                    className="w-full !h-[45px] !text-sm"
+                    type="primary"
+                    disabled={props.status !== "ACTIVE" || isPending}
+                  >
+                    Connect Stellar wallet
+                  </Button>
+                ) : (
+                  <Button
+                    size="large"
+                    className="w-full !h-[45px]"
+                    type="primary"
+                    disabled={
+                      props.status !== "ACTIVE" ||
+                      Number(balance_value) < Number(amount) ||
+                      isPending ||
+                      Number(amount) <= 0
+                    }
+                    onClick={handleCreateTrade}
+                    loading={isPending}
+                  >
+                    Bridge
+                  </Button>
+                )
+              ) : String(account.chainId) !== props.orderToken.chainId ? (
                 <Button
                   size="large"
                   className="w-full !h-[45px] !text-sm"

@@ -7,7 +7,8 @@ export interface ICreateTradeRequest {
   adId: string
   routeId: string
   amount: string
-  bridgerDstAddress: Address
+  // Cross-chain: 0x… on EVM, G-strkey on Stellar. Backend normalizes.
+  bridgerDstAddress: string
 }
 
 export interface ICreateTradeResponse {
@@ -19,19 +20,8 @@ export interface ICreateTradeResponse {
     signerPublicKey?: Address
     authToken: Address
     timeToExpire: number
-    orderParams: {
-      orderChainToken: Address
-      adChainToken: Address
-      amount: string
-      bridger: Address
-      orderRecipient: Address
-      adChainId: string
-      adManager: Address
-      adId: string
-      adCreator: Address
-      adRecipient: Address
-      salt: string
-    }
+    // Create-trade always targets the OrderPortal (order chain side).
+    orderParams: IOrderPortalOrderParams
     orderHash: string
     reqHash: string
     chainKind: ChainKind
@@ -99,19 +89,20 @@ export interface IUnlockFundsResponse {
 
 export interface IUnlockFundsRequest {
   id: string
-  signature: Address
+  // `0x`-hex on EVM, base64 SEP-43 on Stellar — backend normalizes.
+  signature: string
 }
 
 export interface IConfirmUnlockFundsRequest {
   id: string
-  signature: Address
+  signature: string
   txHash: string
 }
 
 export interface IConfirmTradeTxRequest {
   tradeId: string
   txHash: string
-  signature: Address
+  signature: string
 }
 
 export interface IConfirmTradeTxReponse {
@@ -170,4 +161,8 @@ export interface ITradeParams {
   orderPortal: Address
   adChainId: string
   adManager: Address
+  orderHash: string
+  // Chain kind of the chain this caller unlocks on. Drives signing flow —
+  // EVM → EIP-712; STELLAR → SEP-43 signMessage.
+  unlockChainKind: ChainKind
 }

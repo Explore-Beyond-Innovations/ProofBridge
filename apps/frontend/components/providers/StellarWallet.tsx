@@ -31,6 +31,10 @@ interface StellarWalletContextValue {
     xdr: string,
     networkPassphrase?: string,
   ) => Promise<string>
+  // SEP-43-style off-chain signature. Resolves with a base64 ed25519
+  // signature. Not all modules implement it (Ledger/Albedo/Rabet/WC throw) —
+  // surface the error to the caller.
+  signMessage: (message: string) => Promise<string>
 }
 
 const StellarWalletContext = createContext<StellarWalletContextValue | null>(
@@ -162,6 +166,17 @@ export const StellarWalletProvider = ({
     [address],
   )
 
+  const signMessage = useCallback(
+    async (message: string) => {
+      const { signedMessage } = await StellarWalletsKit.signMessage(message, {
+        networkPassphrase: Networks.TESTNET,
+        address: address ?? undefined,
+      })
+      return signedMessage
+    },
+    [address],
+  )
+
   const value = useMemo<StellarWalletContextValue>(
     () => ({
       address,
@@ -171,8 +186,17 @@ export const StellarWalletProvider = ({
       connect,
       disconnect,
       signTransaction,
+      signMessage,
     }),
-    [address, isConnecting, isReady, connect, disconnect, signTransaction],
+    [
+      address,
+      isConnecting,
+      isReady,
+      connect,
+      disconnect,
+      signTransaction,
+      signMessage,
+    ],
   )
 
   return (

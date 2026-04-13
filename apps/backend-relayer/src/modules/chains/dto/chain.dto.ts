@@ -180,7 +180,7 @@ export class ChainResponseDto {
 
 export class ListChainsResponseDto {
   @ApiProperty({ type: [ChainResponseDto] })
-  rows!: ChainResponseDto[];
+  data!: ChainResponseDto[];
 
   @ApiProperty({
     description: 'Next pagination cursor',
