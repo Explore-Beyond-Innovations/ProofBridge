@@ -16,8 +16,13 @@ PID_FILE="$ROOT_DIR/.chains.anvil.pid"
 if [[ -f "$PID_FILE" ]]; then
   ANVIL_PID="$(cat "$PID_FILE")"
   if [[ -n "$ANVIL_PID" ]] && kill -0 "$ANVIL_PID" 2>/dev/null; then
-    echo "Stopping Anvil (PID $ANVIL_PID)..."
-    kill "$ANVIL_PID" 2>/dev/null || true
+    CMD="$(ps -o comm= -p "$ANVIL_PID" 2>/dev/null || true)"
+    if [[ "$CMD" == anvil* ]]; then
+      echo "Stopping Anvil (PID $ANVIL_PID)..."
+      kill "$ANVIL_PID" 2>/dev/null || true
+    else
+      echo "Skipping stale PID $ANVIL_PID (now: '${CMD:-unknown}')."
+    fi
   fi
   rm -f "$PID_FILE"
 fi
