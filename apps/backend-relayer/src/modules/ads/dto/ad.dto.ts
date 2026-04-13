@@ -241,13 +241,20 @@ export class TokenDto {
   symbol!: string;
   @ApiProperty({ type: String, description: 'Token contract address' })
   address!: string;
-  @ApiProperty({ type: String, description: 'Token decimal places' })
+  @ApiProperty({ type: Number, description: 'Token decimal places' })
   decimals!: number;
   @ApiProperty({ type: String, description: 'Blockchain chain ID' })
   chainId!: string;
   @ApiProperty({
-    enum: ['ERC20', 'NATIVE'],
-    description: 'Token kind (e.g., ERC20, NATIVE)',
+    enum: ['EVM', 'STELLAR'],
+    description:
+      'Kind of the underlying chain — tells the client which address format and signing scheme the token lives on.',
+  })
+  chainKind!: string;
+  @ApiProperty({
+    enum: ['ERC20', 'NATIVE', 'SAC', 'SEP41'],
+    description:
+      'Token kind (EVM: ERC20/NATIVE; Stellar: NATIVE/SAC/SEP41)',
   })
   kind!: string;
 }
@@ -410,6 +417,12 @@ export class CreateAdResponseDto {
       '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
   })
   reqHash!: `0x${string}`;
+
+  @ApiProperty({
+    enum: ['EVM', 'STELLAR'],
+    description: 'Kind of chain the ad contract runs on',
+  })
+  chainKind!: 'EVM' | 'STELLAR';
 }
 export class FundAdResponseDto {
   @ApiProperty({
@@ -461,6 +474,12 @@ export class FundAdResponseDto {
       '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
   })
   reqHash!: `0x${string}`;
+
+  @ApiProperty({
+    enum: ['EVM', 'STELLAR'],
+    description: 'Kind of chain the ad contract runs on',
+  })
+  chainKind!: 'EVM' | 'STELLAR';
 }
 
 export class WithdrawAdResponseDto {
@@ -519,6 +538,12 @@ export class WithdrawAdResponseDto {
       '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
   })
   reqHash!: `0x${string}`;
+
+  @ApiProperty({
+    enum: ['EVM', 'STELLAR'],
+    description: 'Kind of chain the ad contract runs on',
+  })
+  chainKind!: 'EVM' | 'STELLAR';
 }
 
 export class ConfirmChainActionADResponseDto {
@@ -621,4 +646,10 @@ export class CloseAdResponseDto {
       '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
   })
   reqHash!: `0x${string}`;
+
+  @ApiProperty({
+    enum: ['EVM', 'STELLAR'],
+    description: 'Kind of chain the ad contract runs on',
+  })
+  chainKind!: 'EVM' | 'STELLAR';
 }

@@ -10,6 +10,7 @@ import { SiweMessage } from "siwe"
 import { useAccount } from "wagmi"
 import Cookies from "js-cookie"
 import { urls } from "@/utils/urls"
+import { requestChallenge, submitLogin } from "@/services/auth.service"
 
 function useAuthenticationAdapter() {
   // If the user is logged in but the account is different (e.g. they changed account in Metamask), log them out and reload the page.
@@ -18,18 +19,11 @@ function useAuthenticationAdapter() {
   return useMemo(() => {
     return createAuthenticationAdapter({
       getNonce: async () => {
-        const res = await fetch(
-          "https://proofbridge.onrender.com/v1/auth/challenge",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              address: account.address,
-            }),
-          }
-        )
-        const data = await res.json()
-        return data.nonce
+        const res = await requestChallenge("EVM", account.address ?? "")
+        if (res.chainKind !== "EVM") {
+          throw new Error("Unexpected challenge kind")
+        }
+        return res.nonce
       },
       createMessage: ({ nonce, address, chainId }) => {
         return new SiweMessage({
@@ -44,22 +38,21 @@ function useAuthenticationAdapter() {
       },
 
       verify: async ({ message, signature }) => {
-        const loginRes = await fetch(
-          "https://proofbridge.onrender.com/v1/auth/login",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message, signature }),
-          }
-        )
-        const data = await loginRes.json()
-        Cookies.set("auth_token", data.tokens.access)
-        Cookies.set("refresh_token", data.tokens.refresh)
-        window.location.reload()
-        return Boolean(loginRes.ok)
+        try {
+          const data = await submitLogin({
+            chainKind: "EVM",
+            message,
+            signature,
+          })
+          Cookies.set("auth_token", data.tokens.access)
+          Cookies.set("refresh_token", data.tokens.refresh)
+          window.location.reload()
+          return true
+        } catch {
+          return false
+        }
       },
       signOut: async () => {
-        // await fetch("/api/logout")
         Cookies.remove("auth_token")
         Cookies.remove("refresh_token")
         window.location.reload()

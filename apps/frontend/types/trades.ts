@@ -1,5 +1,6 @@
 import { Address } from "viem"
-import { AdStatusT } from "./ads"
+import { TradeStatusT } from "./ads"
+import type { ChainKind } from "./chains"
 import { IToken } from "./tokens"
 
 export interface ICreateTradeRequest {
@@ -7,7 +8,6 @@ export interface ICreateTradeRequest {
   routeId: string
   amount: string
   bridgerDstAddress: Address
-  orderTokenId: string
 }
 
 export interface ICreateTradeResponse {
@@ -16,6 +16,7 @@ export interface ICreateTradeResponse {
     chainId: string
     contractAddress: Address
     signature: Address
+    signerPublicKey?: Address
     authToken: Address
     timeToExpire: number
     orderParams: {
@@ -33,57 +34,67 @@ export interface ICreateTradeResponse {
     }
     orderHash: string
     reqHash: string
+    chainKind: ChainKind
   }
+}
+
+export interface IAdManagerOrderParams {
+  orderChainToken: Address
+  adChainToken: Address
+  amount: string
+  bridger: Address
+  orderChainId: string
+  srcOrderPortal: Address
+  orderRecipient: Address
+  adId: string
+  adCreator: Address
+  adRecipient: Address
+  salt: string
+}
+
+export interface IOrderPortalOrderParams {
+  orderChainToken: Address
+  adChainToken: Address
+  amount: string
+  bridger: Address
+  adChainId: string
+  adManager: Address
+  orderRecipient: Address
+  adId: string
+  adCreator: Address
+  adRecipient: Address
+  salt: string
 }
 
 export interface ILockFundsReponse {
   chainId: string
   contractAddress: Address
   signature: Address
+  signerPublicKey?: Address
   authToken: Address
   timeToExpire: number
-  orderParams: {
-    orderChainToken: string
-    adChainToken: string
-    amount: string
-    bridger: string
-    orderChainId: string
-    srcOrderPortal: string
-    orderRecipient: string
-    adId: string
-    adCreator: string
-    adRecipient: string
-    salt: string
-  }
-  orderHash: string
-  reqHash: string
+  orderParams: IAdManagerOrderParams
+  orderHash: Address
+  reqHash: Address
+  chainKind: ChainKind
 }
 
 export interface IUnlockFundsResponse {
   chainId: string
   contractAddress: Address
   signature: Address
-  authToken: string
+  signerPublicKey?: Address
+  authToken: Address
   timeToExpire: number
-  orderParams: {
-    orderChainToken: Address
-    adChainToken: Address
-    amount: string
-    bridger: Address
-    orderChainId: string
-    orderPortal: Address
-    orderRecipient: Address
-    adId: string
-    adCreator: Address
-    adRecipient: Address
-    salt: string
-    adChainId: string
-  }
+  // Discriminate on the presence of `adManager` (OrderPortal side, adCreator
+  // unlocking) vs `srcOrderPortal` (AdManager side, bridger unlocking).
+  orderParams: IOrderPortalOrderParams | IAdManagerOrderParams
   nullifierHash: Address
   targetRoot: Address
   proof: Address
   orderHash: Address
   reqHash: Address
+  chainKind: ChainKind
 }
 
 export interface IUnlockFundsRequest {
@@ -94,12 +105,12 @@ export interface IUnlockFundsRequest {
 export interface IConfirmUnlockFundsRequest {
   id: string
   signature: Address
-  txHash: Address
+  txHash: string
 }
 
 export interface IConfirmTradeTxRequest {
   tradeId: string
-  txHash: Address
+  txHash: string
   signature: Address
 }
 
@@ -114,7 +125,7 @@ export interface IGetTradesParams {
   routeId?: string
   cursor?: string
   limit?: number
-  AdId?: string
+  adId?: string
   minAmount?: string
   maxAmount?: string
   orderTokenId?: string
@@ -128,7 +139,7 @@ export interface ITrade {
   adCreatorAddress: Address
   bridgerAddress: Address
   amount: string
-  status: AdStatusT
+  status: TradeStatusT
   createdAt: string
   updatedAt: string
   ad: {

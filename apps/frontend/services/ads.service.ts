@@ -15,8 +15,6 @@ import {
   IWithdrawFromAdRequest,
   IWithdrawFromAdResponse,
 } from "@/types/ads"
-import axios from "axios"
-
 const ads_route = (path = "") => {
   return `${urls.API_URL}/v1/ads${path}`
 }
@@ -50,7 +48,7 @@ export const closeAd = async (data: ICloseAdRequest) => {
 
 export const updatedAd = async (data: IUpdateAdRequest) => {
   const { adId, ...rest } = data
-  const response = await api.post(ads_route(`/${adId}/update`), {
+  const response = await api.patch(ads_route(`/${adId}/update`), {
     ...rest,
   })
   return response.data as IUpdateAdResponse
@@ -63,7 +61,7 @@ export const confirmAdTx = async (data: IConfirmAdTxRequest) => {
 }
 
 export const getAllAds = async (params: IGetAdsParams) => {
-  const response = await axios.get(ads_route(), { params })
+  const response = await api.get(ads_route(), { params })
   return response.data as {
     data: IAd[]
     nextCursor: string
@@ -71,6 +69,6 @@ export const getAllAds = async (params: IGetAdsParams) => {
 }
 
 export const getSingleAd = async (id: string) => {
-  const response = await axios.get(ads_route(`/${id}`))
+  const response = await api.get(ads_route(`/${id}`))
   return response.data as IAd
 }

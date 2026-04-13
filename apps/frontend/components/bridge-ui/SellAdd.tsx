@@ -130,7 +130,7 @@ export const SellAd = ({ ...props }: propsI) => {
                 <p className="text-xs text-grey-300">I will get</p>
                 <div className="grid [grid-template-columns:20px_1fr_17%] gap-1 items-center">
                   <Image
-                    src={"/assets/logos/hbar.png"}
+                    src={"/assets/logos/stellar-logo.svg"}
                     alt=""
                     height={20}
                     width={20}

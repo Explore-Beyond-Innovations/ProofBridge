@@ -10,6 +10,7 @@ import { parseToBigInt } from "@/lib/parse-to-bigint"
 import { chains } from "@/lib/chains"
 import moment from "moment"
 import { truncateString } from "@/utils/truncate-string"
+import { formatChainAddress } from "@/utils/format-address"
 import { Status } from "../shared/Status"
 import { chain_icons } from "@/lib/chain-icons"
 import { useAccount, useBalance } from "wagmi"
@@ -70,10 +71,12 @@ export const TradeAd = ({ ...props }: IAd) => {
 
   const handleCreateTrade = async () => {
     await mutateAsync({
-      adId: props.id,
-      routeId: props.routeId,
-      amount: parseUnits(amount, props.orderToken.decimals).toString(),
-      bridgerDstAddress: account.address!,
+      payload: {
+        adId: props.id,
+        routeId: props.routeId,
+        amount: parseUnits(amount, props.orderToken.decimals).toString(),
+        bridgerDstAddress: account.address!,
+      },
       orderTokenId: props.orderTokenId,
     })
     toggleModal()
@@ -358,7 +361,12 @@ const MerchantInfo = ({
   creatorAddress,
   ...props
 }: merchantI) => {
-  const initial = creatorAddress[creatorAddress.length - 1]
+  // Ad creators fund on the ad chain — render their address in its native form.
+  const displayAddress = formatChainAddress(
+    creatorAddress,
+    props.adToken?.chainKind,
+  )
+  const initial = displayAddress[displayAddress.length - 1] ?? "?"
 
   return (
     <>
@@ -375,7 +383,7 @@ const MerchantInfo = ({
               <div>
                 <div className="flex items-center gap-1">
                   <p className="font-semibold tracking-wider">
-                    {truncateString(creatorAddress, 5, 5)}
+                    {truncateString(displayAddress, 5, 5)}
                   </p>
                   <Verified className="text-primary" size={15} />
                 </div>

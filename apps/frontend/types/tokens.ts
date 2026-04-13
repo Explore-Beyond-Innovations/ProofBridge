@@ -1,4 +1,7 @@
 import { Address } from "viem"
+import type { ChainKind } from "./chains"
+
+export type TokenKind = "NATIVE" | "ERC20" | "SAC" | "SEP41"
 
 export interface IGetTokensParams {
   limit?: string
@@ -13,12 +16,15 @@ export interface IToken {
   name: string
   address: Address
   decimals: number
-  kind: "NATIVE" | "ERC20"
+  kind: TokenKind
+  /** Stellar classic-asset issuer (G-strkey). Populated only for SAC tokens. */
+  assetIssuer?: string | null
   createdAt: string
   updatedAt: string
   chain: {
     id: string
     name: string
     chainId: string
+    kind: ChainKind
   }
 }

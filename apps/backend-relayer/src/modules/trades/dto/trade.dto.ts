@@ -158,6 +158,14 @@ export class ChainDto {
 
   @ApiProperty({ example: '1' })
   chainId!: string;
+
+  @ApiProperty({
+    example: 'EVM',
+    enum: ['EVM', 'STELLAR'],
+    description:
+      'Kind of the underlying chain — tells the client which address format and signing scheme the token lives on.',
+  })
+  kind!: string;
 }
 
 export class TokenDto {
@@ -172,8 +180,9 @@ export class TokenDto {
 
   @ApiProperty({
     example: 'ERC20',
-    enum: ['ERC20', 'NATIVE'],
-    description: 'Token kind (e.g., ERC20, NATIVE)',
+    enum: ['ERC20', 'NATIVE', 'SAC', 'SEP41'],
+    description:
+      'Token kind (EVM: ERC20/NATIVE; Stellar: NATIVE/SAC/SEP41)',
   })
   kind!: string;
 
@@ -393,6 +402,12 @@ export class LockForOrderResponseDto {
   })
   @IsString()
   orderHash!: string;
+
+  @ApiProperty({
+    enum: ['EVM', 'STELLAR'],
+    description: 'Kind of chain the ad contract runs on',
+  })
+  chainKind!: 'EVM' | 'STELLAR';
 }
 
 export class OrderPortalParamsDto {
@@ -527,6 +542,12 @@ export class CreateOrderRequestContractDetailsDto {
   })
   @IsString()
   reqHash!: `0x${string}`;
+
+  @ApiProperty({
+    enum: ['EVM', 'STELLAR'],
+    description: 'Kind of chain the order contract runs on',
+  })
+  chainKind!: 'EVM' | 'STELLAR';
 }
 
 export class CreateTradeRequestContractResponseDto {
@@ -630,6 +651,12 @@ export class UnlockOrderResponseDto {
   })
   @IsString()
   reqHash!: `0x${string}`;
+
+  @ApiProperty({
+    enum: ['EVM', 'STELLAR'],
+    description: 'Kind of chain the unlock runs on',
+  })
+  chainKind!: 'EVM' | 'STELLAR';
 }
 
 export class ConfirmChainActionTradeResponseDto {

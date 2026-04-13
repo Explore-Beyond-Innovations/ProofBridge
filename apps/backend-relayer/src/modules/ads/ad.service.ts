@@ -116,7 +116,7 @@ export class AdsService {
           maxAmount: true,
           adToken: {
             select: {
-              chain: { select: { chainId: true } },
+              chain: { select: { chainId: true, kind: true } },
               address: true,
               symbol: true,
               name: true,
@@ -126,7 +126,7 @@ export class AdsService {
           },
           orderToken: {
             select: {
-              chain: { select: { chainId: true } },
+              chain: { select: { chainId: true, kind: true } },
               address: true,
               symbol: true,
               name: true,
@@ -197,6 +197,7 @@ export class AdsService {
             address: i.adToken.address,
             decimals: i.adToken.decimals,
             chainId: i.adToken.chain.chainId.toString(),
+            chainKind: i.adToken.chain.kind as string,
             kind: i.adToken.kind as string,
           },
           orderToken: {
@@ -205,6 +206,7 @@ export class AdsService {
             address: i.orderToken.address,
             decimals: i.orderToken.decimals,
             chainId: i.orderToken.chain.chainId.toString(),
+            chainKind: i.orderToken.chain.kind as string,
             kind: i.orderToken.kind as string,
           },
         };
@@ -244,7 +246,7 @@ export class AdsService {
           metadata: true,
           adToken: {
             select: {
-              chain: { select: { chainId: true } },
+              chain: { select: { chainId: true, kind: true } },
               address: true,
               symbol: true,
               name: true,
@@ -254,7 +256,7 @@ export class AdsService {
           },
           orderToken: {
             select: {
-              chain: { select: { chainId: true } },
+              chain: { select: { chainId: true, kind: true } },
               address: true,
               symbol: true,
               name: true,
@@ -301,6 +303,7 @@ export class AdsService {
           address: ad.adToken.address,
           decimals: ad.adToken.decimals,
           chainId: ad.adToken.chain.chainId.toString(),
+          chainKind: ad.adToken.chain.kind as string,
           kind: ad.adToken.kind as string,
         },
         orderToken: {
@@ -309,6 +312,7 @@ export class AdsService {
           address: ad.orderToken.address,
           decimals: ad.orderToken.decimals,
           chainId: ad.orderToken.chain.chainId.toString(),
+          chainKind: ad.orderToken.chain.kind as string,
           kind: ad.orderToken.kind as string,
         },
         metadata: ad.metadata ?? null,
@@ -497,7 +501,10 @@ export class AdsService {
         return reqContractDetails;
       });
 
-      return requestDetails;
+      return {
+        ...requestDetails,
+        chainKind: route.adToken.chain.kind as string,
+      };
     } catch (e) {
       if (e instanceof Error) {
         if (e instanceof HttpException) throw e;
@@ -618,7 +625,10 @@ export class AdsService {
         return entry;
       });
 
-      return reqContractDetails;
+      return {
+        ...reqContractDetails,
+        chainKind: ad.route.adToken.chain.kind as string,
+      };
     } catch (e) {
       if (e instanceof Error) {
         if (e instanceof HttpException) throw e;
@@ -762,7 +772,10 @@ export class AdsService {
         }
       });
 
-      return reqContractDetails;
+      return {
+        ...reqContractDetails,
+        chainKind: ad.route.adToken.chain.kind as string,
+      };
     } catch (e) {
       if (e instanceof Error) {
         if (e instanceof HttpException) throw e;
@@ -975,7 +988,10 @@ export class AdsService {
         }
       });
 
-      return reqContractDetails;
+      return {
+        ...reqContractDetails,
+        chainKind: ad.route.adToken.chain.kind as string,
+      };
     } catch (e) {
       if (e instanceof Error) {
         if (e instanceof HttpException) throw e;

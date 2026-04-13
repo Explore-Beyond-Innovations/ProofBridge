@@ -2,10 +2,8 @@
 import React, { useEffect, useState } from "react"
 import {
   Alert,
-  Avatar,
   Button,
   Divider,
-  Input,
   Select,
   Skeleton,
   Tooltip,
@@ -20,8 +18,9 @@ import { useGetAllTokens } from "@/hooks/useTokens"
 import { useGetAllAds } from "@/hooks/useAds"
 import { GiChainLightning } from "react-icons/gi"
 import SkeletonTradeAd from "./SkeletonTradeAd"
-import { hederaTestnet, sepolia } from "viem/chains"
+import { sepolia } from "viem/chains"
 import { chain_icons } from "@/lib/chain-icons"
+import { isVisibleChain, STELLAR_TESTNET_CHAIN_ID } from "@/lib/chains"
 import { IoDocumentText } from "react-icons/io5"
 import { Logo } from "../shared/Logo"
 
@@ -29,7 +28,7 @@ export const BridgeTab = () => {
   const { data: chains, isLoading: loadingChains } = useGetAllChains({})
 
   const [selectedBaseChainId, setSelectedBaseChainId] = useState<string>(
-    `${hederaTestnet.id}`
+    STELLAR_TESTNET_CHAIN_ID
   )
   const [selectedDstChainId, setSelectedDstChainId] = useState<string>(
     `${sepolia.id}`
@@ -66,13 +65,13 @@ export const BridgeTab = () => {
             <GiChainLightning />
             <p className="text-sm">From Chain</p>
           </div>
-          <div className="flex items-center gap-2 w-[200px]">
+          <div className="flex items-center gap-2 w-50">
             <GiChainLightning />
             <p className="text-sm">To Chain</p>
           </div>
         </div>
         <div className="flex md:flex-row flex-col md:items-center gap-4">
-          <div className="inline-flex items-center gap-2 bg-grey-800 p-[5px] rounded-sm w-fit">
+          <div className="inline-flex items-center gap-2 bg-grey-800 p-1.25 rounded-sm w-fit">
             {loadingChains ? (
               <>
                 <Skeleton.Button active={true} />
@@ -85,21 +84,23 @@ export const BridgeTab = () => {
                   className="min-w-[200px] !h-[40px]"
                   value={selectedBaseChainId}
                 >
-                  {chains?.rows?.map((chain) => {
-                    return (
-                      <Select.Option key={chain.chainId} value={chain.chainId}>
-                        <div className="flex items-center gap-2">
-                          <Image
-                            src={chain_icons[chain.chainId]}
-                            alt=""
-                            width={20}
-                            height={20}
-                          />
-                          <span className="text-[13px]">{chain.name}</span>
-                        </div>
-                      </Select.Option>
-                    )
-                  })}
+                  {chains?.rows
+                    ?.filter((chain) => isVisibleChain(chain.chainId))
+                    .map((chain) => {
+                      return (
+                        <Select.Option key={chain.chainId} value={chain.chainId}>
+                          <div className="flex items-center gap-2">
+                            <Image
+                              src={chain_icons[chain.chainId]}
+                              alt=""
+                              width={20}
+                              height={20}
+                            />
+                            <span className="text-[13px]">{chain.name}</span>
+                          </div>
+                        </Select.Option>
+                      )
+                    })}
                 </Select>
                 <div>
                   <ArrowRight size={14} />
@@ -109,21 +110,23 @@ export const BridgeTab = () => {
                   className="min-w-[200px] !h-[40px]"
                   value={selectedDstChainId}
                 >
-                  {chains?.rows?.map((chain) => {
-                    return (
-                      <Select.Option key={chain.chainId} value={chain.chainId}>
-                        <div className="flex items-center gap-2">
-                          <Image
-                            src={chain_icons[chain.chainId]}
-                            alt=""
-                            width={20}
-                            height={20}
-                          />
-                          <span className="text-[13px]">{chain.name}</span>
-                        </div>
-                      </Select.Option>
-                    )
-                  })}
+                  {chains?.rows
+                    ?.filter((chain) => isVisibleChain(chain.chainId))
+                    .map((chain) => {
+                      return (
+                        <Select.Option key={chain.chainId} value={chain.chainId}>
+                          <div className="flex items-center gap-2">
+                            <Image
+                              src={chain_icons[chain.chainId]}
+                              alt=""
+                              width={20}
+                              height={20}
+                            />
+                            <span className="text-[13px]">{chain.name}</span>
+                          </div>
+                        </Select.Option>
+                      )
+                    })}
                 </Select>
               </>
             )}
@@ -154,11 +157,10 @@ export const BridgeTab = () => {
                   return (
                     <p
                       key={index}
-                      className={`${
-                        isActive
-                          ? "text-black bg-primary px-3 py-2 rounded-sm"
-                          : ""
-                      } cursor-pointer`}
+                      className={`${isActive
+                        ? "text-black bg-primary px-3 py-2 rounded-sm"
+                        : ""
+                        } cursor-pointer`}
                       onClick={() => setSelectedTokenId(token.id)}
                     >
                       {token.name}
@@ -229,7 +231,7 @@ export const BridgeTab = () => {
               type="primary"
               className="mt-4"
               onClick={() => {
-                setSelectedBaseChainId(`${hederaTestnet.id}`)
+                setSelectedBaseChainId(STELLAR_TESTNET_CHAIN_ID)
                 setSelectedDstChainId(`${sepolia.id}`)
               }}
             >

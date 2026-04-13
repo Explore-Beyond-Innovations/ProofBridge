@@ -9,6 +9,7 @@ import { Chain, parseUnits } from "viem"
 import { useAccount } from "wagmi"
 import { useChainModal } from "@rainbow-me/rainbowkit"
 import { useGetAllChains } from "@/hooks/useChains"
+import { isVisibleChain } from "@/lib/chains"
 import { GiCancel } from "react-icons/gi"
 import {
   hederaTestnet,
@@ -106,7 +107,11 @@ export const AddLiquidity = () => {
                 loading={loadingChains}
                 className="w-full !h-[40px]"
                 options={chains?.rows
-                  .filter((chain) => Number(chain.chainId) !== order_chain?.id!)
+                  .filter(
+                    (chain) =>
+                      isVisibleChain(chain.chainId) &&
+                      Number(chain.chainId) !== order_chain?.id!
+                  )
                   .map((chain) => {
                     return {
                       label: chain.name,
@@ -132,7 +137,11 @@ export const AddLiquidity = () => {
                 loading={loadingChains}
                 className="w-full !h-[40px]"
                 options={chains?.rows
-                  .filter((chain) => Number(chain.chainId) !== base_chain?.id!)
+                  .filter(
+                    (chain) =>
+                      isVisibleChain(chain.chainId) &&
+                      Number(chain.chainId) !== base_chain?.id!
+                  )
                   .map((chain) => {
                     return {
                       label: chain.name,

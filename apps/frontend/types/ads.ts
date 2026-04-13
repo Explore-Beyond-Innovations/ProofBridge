@@ -1,4 +1,6 @@
 import { Address } from "viem"
+import type { ChainKind } from "./chains"
+import type { TokenKind } from "./tokens"
 
 export interface ICreateAdRequest {
   routeId: string
@@ -15,6 +17,7 @@ export interface ICreateAdRequest {
 export interface ICreateAdResponse {
   contractAddress: Address
   signature: Address
+  signerPublicKey?: Address
   authToken: Address
   timeToExpire: number
   adId: string
@@ -23,11 +26,13 @@ export interface ICreateAdResponse {
   adRecipient: Address
   reqHash: Address
   chainId: number
+  chainKind: ChainKind
 }
 
 export interface IFundAdResponse {
   contractAddress: Address
   signature: Address
+  signerPublicKey?: Address
   authToken: Address
   timeToExpire: number
   adId: string
@@ -37,53 +42,58 @@ export interface IFundAdResponse {
   reqHash: Address
   chainId: number
   amount: number
+  chainKind: ChainKind
 }
 
 export interface ITopUpAdRequest {
   adId: string
   poolAmountTopUp: string
-  amountBigInt: BigInt
+  amountBigInt: bigint
   tokenId: string
 }
 
 export interface IWithdrawFromAdRequest {
   adId: string
   poolAmountWithdraw: string
-  amountBigInt: BigInt
-  to: Address
+  amountBigInt: bigint
+  to: string
 }
 
 export interface IWithdrawFromAdResponse {
   chainId: string
   contractAddress: Address
   signature: Address
+  signerPublicKey?: Address
   authToken: Address
   timeToExpire: number
   adId: string
   amount: string
   to: Address
   reqHash: Address
+  chainKind: ChainKind
 }
 
 export interface ICloseAdRequest {
   adId: string
-  to: Address
+  to: string
 }
 
 export interface ICloseAdResponse {
   chainId: string
   contractAddress: Address
   signature: Address
+  signerPublicKey?: Address
   authToken: Address
   timeToExpire: number
   adId: string
   amount: string
   to: Address
   reqHash: Address
+  chainKind: ChainKind
 }
 
 export interface IUpdateAdRequest {
-  status?: "ACTIVE" | "INACTIVE"
+  status?: "ACTIVE" | "PAUSED"
   minAmount?: string
   maxAmount?: string
   metadata?: {
@@ -103,7 +113,7 @@ export interface IUpdateAdResponse {
 
 export interface IConfirmAdTxRequest {
   adId: string
-  txHash: Address
+  txHash: string
   signature: Address
 }
 
@@ -121,20 +131,18 @@ export interface IAd {
   metadata: { title?: string; description?: string }
   createdAt: string
   updatedAt: string
-  adToken: {
-    name: string
-    symbol: string
-    address: Address
-    decimals: number
-    chainId: string
-  }
-  orderToken: {
-    name: string
-    symbol: string
-    address: Address
-    decimals: number
-    chainId: string
-  }
+  adToken: IAdToken
+  orderToken: IAdToken
+}
+
+export interface IAdToken {
+  name: string
+  symbol: string
+  address: Address
+  decimals: number
+  chainId: string
+  chainKind: ChainKind
+  kind: TokenKind
 }
 
 export interface IGetAdsParams {
@@ -150,10 +158,10 @@ export interface IGetAdsParams {
 }
 
 export type AdStatusT =
+  | "INACTIVE"
   | "ACTIVE"
   | "PAUSED"
-  | "INACTIVE"
   | "EXHAUSTED"
   | "CLOSED"
-  | "LOCKED"
-  | "COMPLETED"
+
+export type TradeStatusT = "INACTIVE" | "ACTIVE" | "LOCKED" | "COMPLETED"

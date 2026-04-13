@@ -7,6 +7,7 @@ import { SmoothScroll } from "@/components/shared/SmoothScroller"
 import { TanstackQueryProvider } from "@/components/providers/TanstackProvider"
 import { Wagmi } from "@/components/providers/Wagmi"
 import { RainbowKit } from "@/components/providers/RainbowKit"
+import { StellarWalletProvider } from "@/components/providers/StellarWallet"
 import { Toaster } from "@/components/ui/sonner"
 
 const perfectlyNineties = localFont({
@@ -56,12 +57,14 @@ export default function RootLayout({
       >
         <Wagmi>
           <TanstackQueryProvider>
-            <RainbowKit>
-              <AntConfigProvider>
-                <SmoothScroll>{children}</SmoothScroll>
-              </AntConfigProvider>
-              <Toaster />
-            </RainbowKit>
+            <StellarWalletProvider>
+              <RainbowKit>
+                <AntConfigProvider>
+                  <SmoothScroll>{children}</SmoothScroll>
+                </AntConfigProvider>
+                <Toaster />
+              </RainbowKit>
+            </StellarWalletProvider>
           </TanstackQueryProvider>
         </Wagmi>
       </body>

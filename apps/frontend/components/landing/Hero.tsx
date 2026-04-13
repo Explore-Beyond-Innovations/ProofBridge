@@ -68,7 +68,7 @@ export const Hero = () => {
             Bridge
           </h2>
           <p className="text-xl">
-            Unlocking the next generation of cross-chain bridging on Hedera
+            Unlocking the next generation of cross-chain bridging between Ethereum and Stellar
           </p>
           <div className="flex items-center gap-5 mt-4">
             <Button

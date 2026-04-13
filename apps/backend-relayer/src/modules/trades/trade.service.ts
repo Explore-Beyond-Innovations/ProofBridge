@@ -61,7 +61,7 @@ export class TradesService {
                 select: {
                   id: true,
                   symbol: true,
-                  chain: { select: { name: true, chainId: true } },
+                  chain: { select: { name: true, chainId: true, kind: true } },
                   kind: true,
                   address: true,
                   decimals: true,
@@ -71,7 +71,7 @@ export class TradesService {
                 select: {
                   id: true,
                   symbol: true,
-                  chain: { select: { name: true, chainId: true } },
+                  chain: { select: { name: true, chainId: true, kind: true } },
                   kind: true,
                   address: true,
                   decimals: true,
@@ -187,7 +187,7 @@ export class TradesService {
                 select: {
                   id: true,
                   symbol: true,
-                  chain: { select: { name: true, chainId: true } },
+                  chain: { select: { name: true, chainId: true, kind: true } },
                   kind: true,
                   address: true,
                   decimals: true,
@@ -197,7 +197,7 @@ export class TradesService {
                 select: {
                   id: true,
                   symbol: true,
-                  chain: { select: { name: true, chainId: true } },
+                  chain: { select: { name: true, chainId: true, kind: true } },
                   kind: true,
                   address: true,
                   decimals: true,
@@ -465,7 +465,13 @@ export class TradesService {
         return { tradeId: trade.id, reqContractDetails };
       });
 
-      return result;
+      return {
+        ...result,
+        reqContractDetails: {
+          ...result.reqContractDetails,
+          chainKind: ad.route.orderToken.chain.kind as string,
+        },
+      };
     } catch (e) {
       if (e instanceof Error) {
         if (e instanceof HttpException) throw e;
@@ -716,7 +722,10 @@ export class TradesService {
         },
       });
 
-      return reqContractDetails;
+      return {
+        ...reqContractDetails,
+        chainKind: trade.route.adToken.chain.kind as string,
+      };
     } catch (e) {
       if (e instanceof Error) {
         if (e instanceof HttpException) throw e;
@@ -946,7 +955,10 @@ export class TradesService {
         },
       });
 
-      return requestContractDetails;
+      return {
+        ...requestContractDetails,
+        chainKind: unlockChain.kind as string,
+      };
     } catch (e) {
       console.log(e);
       if (e instanceof Error) {

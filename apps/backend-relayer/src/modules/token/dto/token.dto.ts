@@ -127,6 +127,15 @@ export class CreateTokenDto {
     message: `kind must be one of: ${Object.values(TokenKind).join(', ')}`,
   })
   kind?: TokenKind;
+
+  @ApiPropertyOptional({
+    description:
+      'Stellar classic-asset issuer (G-strkey). Required only for SAC tokens.',
+    example: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
+  })
+  @IsOptional()
+  @IsString()
+  assetIssuer?: string;
 }
 
 export class UpdateTokenDto {
@@ -188,6 +197,15 @@ export class UpdateTokenDto {
     message: `kind must be one of: ${Object.values(TokenKind).join(', ')}`,
   })
   kind?: TokenKind;
+
+  @ApiPropertyOptional({
+    description:
+      'Stellar classic-asset issuer (G-strkey). Pass an empty string to clear.',
+    example: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
+  })
+  @IsOptional()
+  @IsString()
+  assetIssuer?: string;
 }
 
 export class TokenChainDto {
@@ -208,6 +226,12 @@ export class TokenChainDto {
     type: 'string',
   })
   chainId!: string;
+
+  @ApiProperty({
+    description: 'Chain kind',
+    enum: ['EVM', 'STELLAR'],
+  })
+  kind!: 'EVM' | 'STELLAR';
 }
 
 export class TokenDataResponseDto {
@@ -246,6 +270,14 @@ export class TokenDataResponseDto {
     type: 'string',
   })
   kind!: string;
+
+  @ApiProperty({
+    description:
+      'Stellar classic-asset issuer (G-strkey). Populated only for SAC tokens.',
+    type: 'string',
+    nullable: true,
+  })
+  assetIssuer!: string | null;
 
   @ApiProperty({
     description: 'Creation timestamp',
