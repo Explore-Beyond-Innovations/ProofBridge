@@ -32,3 +32,20 @@ export function phase(n: number | string, title: string): void {
   const bar = "=".repeat(60);
   console.log(`\n${bar}\nPhase ${n}: ${title}\n${bar}`);
 }
+
+export async function step<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  const t0 = Date.now();
+  console.log(`  → ${label}`);
+  try {
+    const out = await fn();
+    console.log(`  ✓ ${label} (${Date.now() - t0}ms)`);
+    return out;
+  } catch (e) {
+    console.log(`  ✗ ${label} (${Date.now() - t0}ms)`);
+    throw e;
+  }
+}
+
+export function note(msg: string): void {
+  console.log(`    · ${msg}`);
+}
