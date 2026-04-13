@@ -67,5 +67,12 @@ jobs:
             contracts/stellar/target
           key: ${{ runner.os }}-cargo-e2e-${{ hashFiles('contracts/stellar/Cargo.lock') }}
 
+      - name: Start chains (Stellar + Anvil) and build contracts
+        run: bash scripts/start_chains.sh
+
       - name: Run cross-chain E2E test
-        run: bash scripts/run_cross_chain_e2e.sh
+        run: pnpm --filter cross-chain-e2e exec tsx run.ts
+
+      - name: Stop chains
+        if: always()
+        run: bash scripts/stop_chains.sh

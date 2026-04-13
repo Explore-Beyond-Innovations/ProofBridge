@@ -1,0 +1,155 @@
+name: Backend Relayer E2E
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/backend-relayer/**"
+      - "contracts/**"
+      - "proof_circuits/**"
+      - "scripts/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/backend-relayer-e2e.yml"
+  pull_request:
+    paths:
+      - "apps/backend-relayer/**"
+      - "contracts/**"
+      - "proof_circuits/**"
+      - "scripts/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/backend-relayer-e2e.yml"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  SNAPSHOT_PATH: ${{ github.workspace }}/scripts/relayer-e2e/deployed.json
+  COMPOSE_FILE: apps/backend-relayer/docker-compose.e2e.yaml
+  COMPOSE_PROJECT_NAME: relayer-e2e
+  HOST_DATABASE_URL: postgresql://relayer:relayer@localhost:5433/relayer
+  RELAYER_URL: http://localhost:2005
+  STELLAR_CHAIN_ID: "1000001"
+  EVM_CHAIN_ID: "31337"
+
+jobs:
+  backend-relayer-e2e:
+    name: Backend Relayer E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install wasm32v1-none target
+        run: rustup target add wasm32v1-none
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install Stellar CLI
+        env:
+          STELLAR_CLI_VERSION: "23.3.0"
+          STELLAR_CLI_SHA256: "b3a5455d7113a53a8bd0f1ba0148a14b7aa7a46ee2f49c3b9277424775b309ad"
+        run: |
+          set -euo pipefail
+          url="https://github.com/stellar/stellar-cli/releases/download/v${STELLAR_CLI_VERSION}/stellar-cli-${STELLAR_CLI_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSL "$url" -o /tmp/stellar-cli.tar.gz
+          echo "${STELLAR_CLI_SHA256}  /tmp/stellar-cli.tar.gz" | sha256sum -c -
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf /tmp/stellar-cli.tar.gz -C "$HOME/.local/bin" stellar
+          chmod +x "$HOME/.local/bin/stellar"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache cargo directories
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/stellar/target
+          key: ${{ runner.os }}-cargo-relayer-e2e-${{ hashFiles('contracts/stellar/Cargo.lock') }}
+
+      - name: Generate Prisma client
+        run: pnpm --filter backend-relayer exec prisma generate
+
+      # ── 1. chains ────────────────────────────────────────────────────
+      - name: Start chains (Stellar + Anvil) and build contracts
+        run: bash scripts/start_chains.sh
+
+      - name: Export chain env
+        run: |
+          # .chains.env uses `export KEY='value'`; $GITHUB_ENV expects KEY=value.
+          sed -E "s/^export[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)='(.*)'$/\1=\2/" .chains.env >> "$GITHUB_ENV"
+
+      # ── 2. deploy ────────────────────────────────────────────────────
+      - name: Deploy contracts
+        run: pnpm --filter relayer-e2e exec tsx cli.ts deploy --out "$SNAPSHOT_PATH"
+
+      # ── 3. postgres + backend-relayer containers ─────────────────────
+      - name: Start postgres + backend-relayer
+        env:
+          STELLAR_NETWORK_PASSPHRASE: "Standalone Network ; February 2017"
+        run: docker compose -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" up -d --build --wait
+
+      # ── 4. seed ──────────────────────────────────────────────────────
+      - name: Seed database
+        run: DATABASE_URL="$HOST_DATABASE_URL" pnpm --filter relayer-e2e exec tsx cli.ts seed --in "$SNAPSHOT_PATH"
+
+      # ── 5. flows ─────────────────────────────────────────────────────
+      - name: Run lifecycle flows
+        run: pnpm --filter relayer-e2e exec tsx cli.ts flows
+
+      # ── teardown ─────────────────────────────────────────────────────
+      - name: Dump relayer logs
+        if: always()
+        run: |
+          echo "::group::backend-relayer logs"
+          docker compose -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" logs --no-color --tail=500 backend-relayer | tee .relayer.log || true
+          echo "::endgroup::"
+          echo "::group::postgres logs"
+          docker compose -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" logs --no-color --tail=200 postgres | tee .postgres.log || true
+          echo "::endgroup::"
+          echo "::group::container state"
+          docker compose -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" ps -a || true
+          echo "::endgroup::"
+
+      - name: Stop containers
+        if: always()
+        run: docker compose -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" down --remove-orphans --volumes || true
+
+      - name: Stop chains
+        if: always()
+        run: bash scripts/stop_chains.sh || true
+
+      - name: Upload logs + snapshot
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relayer-logs
+          path: |
+            .relayer.log
+            .postgres.log
+            .chains.anvil.log
+            scripts/relayer-e2e/deployed.json
+          if-no-files-found: ignore

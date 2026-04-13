@@ -6,6 +6,7 @@
 
 import { keccak256 } from 'viem';
 import { T_OrderParams } from '../../../chain-adapters/types';
+import { uuidToBigInt } from '../../viem/ethers/typedData';
 
 function keccak(data: Buffer): Buffer {
   const hex = keccak256(`0x${data.toString('hex')}`);
@@ -55,7 +56,10 @@ function structHashOrder(p: T_OrderParams): Buffer {
       keccak(Buffer.from(p.adId)),
       hexToBytes32(p.adCreator),
       hexToBytes32(p.adRecipient),
-      u256BE(BigInt(p.salt)),
+      // salt is carried as a UUID string across the API; both EVM typedData
+      // and the Stellar contracts encode it as a uint256 derived from the
+      // raw 128-bit UUID. Use uuidToBigInt to match.
+      u256BE(uuidToBigInt(p.salt)),
     ]),
   );
 }

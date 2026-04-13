@@ -117,6 +117,7 @@ export class StellarService {
   } {
     const signer = this.getSigner();
     const sig = signEd25519(message, signer.seed);
+
     return {
       signature: `0x${sig.toString('hex')}`,
       signerPublicKey: `0x${signer.publicKey.toString('hex')}`,
@@ -166,6 +167,7 @@ export class StellarService {
       contractAddress: hex32ToBuffer(adContractAddress),
     });
     const { signature, signerPublicKey } = this.sign(message);
+
     return Promise.resolve({
       chainId: adChainId.toString(),
       contractAddress: adContractAddress,

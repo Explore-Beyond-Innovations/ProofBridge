@@ -14,7 +14,6 @@ import {
   QueryTradesDto,
   UnlockTradeDto,
 } from './dto/trade.dto';
-import { getAddress, isAddress } from 'viem';
 import { Request } from 'express';
 import { ChainAdapterService } from '../../chain-adapters/chain-adapter.service';
 import { MMRService } from '../mmr/mmr.service';
@@ -22,7 +21,11 @@ import { ProofService } from '../../providers/noir/proof.service';
 import { randomUUID } from 'crypto';
 import { Prisma, TradeStatus } from '@prisma/client';
 import { EncryptionService } from '@libs/encryption.service';
-import { toBytes32, uuidToBigInt } from '../../providers/viem/ethers/typedData';
+import {
+  normalizeChainAddress,
+  toBytes32,
+  uuidToBigInt,
+} from '../../providers/viem/ethers/typedData';
 
 @Injectable()
 export class TradesService {
@@ -138,9 +141,14 @@ export class TradesService {
 
       if (q.routeId) where.routeId = q.routeId;
       if (q.adId) where.adId = q.adId;
-      if (q.adCreatorAddress)
-        where.adCreatorAddress = getAddress(q.adCreatorAddress);
-      if (q.bridgerAddress) where.bridgerAddress = getAddress(q.bridgerAddress);
+      try {
+        if (q.adCreatorAddress)
+          where.adCreatorAddress = normalizeChainAddress(q.adCreatorAddress);
+        if (q.bridgerAddress)
+          where.bridgerAddress = normalizeChainAddress(q.bridgerAddress);
+      } catch {
+        throw new BadRequestException('Invalid address filter');
+      }
 
       if (q.adTokenId || q.orderTokenId) {
         where.route = {
@@ -274,10 +282,6 @@ export class TradesService {
 
       if (!user) throw new UnauthorizedException('Unauthorized');
 
-      if (!isAddress(dto.bridgerDstAddress)) {
-        throw new BadRequestException('Invalid address');
-      }
-
       const ad = await this.prisma.ad
         .findUnique({
           where: { id: dto.adId },
@@ -305,6 +309,7 @@ export class TradesService {
                       select: {
                         adManagerAddress: true,
                         chainId: true,
+                        kind: true,
                       },
                     },
                   },
@@ -346,6 +351,18 @@ export class TradesService {
         );
       }
 
+      // bridgerDstAddress lives on the ad chain (where the bridger receives
+      // the locked tokens), so validate against that chain's kind.
+      let normalizedBridgerDst: string;
+      try {
+        normalizedBridgerDst = normalizeChainAddress(
+          dto.bridgerDstAddress,
+          ad.route.adToken.chain.kind,
+        );
+      } catch {
+        throw new BadRequestException('Invalid bridgerDstAddress');
+      }
+
       const amount = new Prisma.Decimal(dto.amount);
       if (ad.minAmount && amount.lt(ad.minAmount)) {
         throw new BadRequestException('Amount below minAmount');
@@ -382,7 +399,7 @@ export class TradesService {
             orderPortal: toBytes32(
               ad.route.orderToken.chain.orderPortalAddress,
             ),
-            orderRecipient: toBytes32(dto.bridgerDstAddress),
+            orderRecipient: toBytes32(normalizedBridgerDst),
             adChainId: ad.route.adToken.chain.chainId.toString(),
             adManager: toBytes32(ad.route.adToken.chain.adManagerAddress),
             adId: ad.id,
@@ -400,10 +417,10 @@ export class TradesService {
             adId: ad.id,
             routeId: ad.route.id,
             amount: amount.toFixed(0),
-            adCreatorAddress: getAddress(ad.creatorAddress),
-            adCreatorDstAddress: getAddress(ad.creatorDstAddress),
-            bridgerAddress: getAddress(user.walletAddress),
-            bridgerDstAddress: getAddress(dto.bridgerDstAddress),
+            adCreatorAddress: normalizeChainAddress(ad.creatorAddress),
+            adCreatorDstAddress: normalizeChainAddress(ad.creatorDstAddress),
+            bridgerAddress: normalizeChainAddress(user.walletAddress),
+            bridgerDstAddress: normalizedBridgerDst,
             orderHash: reqContractDetails.orderHash,
           },
           select: { id: true, status: true },
@@ -525,27 +542,30 @@ export class TradesService {
       if (!trade) throw new NotFoundException('Trade not found');
 
       if (
-        getAddress(trade.bridgerAddress) !== getAddress(user.walletAddress) &&
-        getAddress(trade.adCreatorAddress) !== getAddress(user.walletAddress)
+        normalizeChainAddress(trade.bridgerAddress) !==
+          normalizeChainAddress(user.walletAddress) &&
+        normalizeChainAddress(trade.adCreatorAddress) !==
+          normalizeChainAddress(user.walletAddress)
       ) {
         throw new ForbiddenException('Unauthorized');
       }
 
+      // All address-like fields are declared bytes32 in the cross-chain
+      // Order typed-data (EVM addresses left-padded; Stellar accounts already
+      // 32 bytes), so return the padded wire form here.
       return {
-        orderChainToken: getAddress(trade.route.orderToken.address),
-        adChainToken: getAddress(trade.route.adToken.address),
+        orderChainToken: toBytes32(trade.route.orderToken.address),
+        adChainToken: toBytes32(trade.route.adToken.address),
         amount: trade.amount.toFixed(0),
-        bridger: getAddress(trade.bridgerAddress),
+        bridger: toBytes32(trade.bridgerAddress),
         orderChainId: trade.route.orderToken.chain.chainId.toString(),
-        orderPortal: getAddress(
-          trade.route.orderToken.chain.orderPortalAddress,
-        ),
-        orderRecipient: getAddress(trade.bridgerDstAddress),
+        orderPortal: toBytes32(trade.route.orderToken.chain.orderPortalAddress),
+        orderRecipient: toBytes32(trade.bridgerDstAddress),
         adChainId: trade.route.adToken.chain.chainId.toString(),
-        adManager: getAddress(trade.route.adToken.chain.adManagerAddress),
+        adManager: toBytes32(trade.route.adToken.chain.adManagerAddress),
         adId: trade.adId,
-        adCreator: getAddress(trade.adCreatorAddress),
-        adRecipient: getAddress(trade.adCreatorDstAddress),
+        adCreator: toBytes32(trade.adCreatorAddress),
+        adRecipient: toBytes32(trade.adCreatorDstAddress),
         salt: uuidToBigInt(trade.id).toString(),
       };
     } catch (e) {
@@ -581,7 +601,7 @@ export class TradesService {
       const trade = await this.prisma.trade.findFirst({
         where: {
           id: tradeId,
-          adCreatorAddress: getAddress(user.walletAddress),
+          adCreatorAddress: normalizeChainAddress(user.walletAddress),
         },
         select: {
           id: true,
@@ -776,11 +796,11 @@ export class TradesService {
 
       if (!trade) throw new NotFoundException('Trade not found');
 
-      const caller = getAddress(user.walletAddress);
+      const caller = normalizeChainAddress(user.walletAddress);
 
       const isParty =
-        caller === getAddress(trade.bridgerAddress) ||
-        caller === getAddress(trade.adCreatorAddress);
+        caller === normalizeChainAddress(trade.bridgerAddress) ||
+        caller === normalizeChainAddress(trade.adCreatorAddress);
 
       if (!isParty) throw new UnauthorizedException('Not a participant');
 
@@ -791,16 +811,25 @@ export class TradesService {
         );
       }
 
-      const isAdCreator = caller === getAddress(trade.adCreatorAddress);
+      const isAdCreator =
+        caller === normalizeChainAddress(trade.adCreatorAddress);
 
       const unlockChain = isAdCreator
         ? trade.route.orderToken.chain
         : trade.route.adToken.chain;
 
+      // The on-chain contract recovers the unlocker's *destination* address on
+      // the unlock chain from the signature. Caller's walletAddress is their
+      // origin-chain wallet, which is the wrong format when unlocking cross-chain.
+      const unlockSigner = normalizeChainAddress(
+        isAdCreator ? trade.adCreatorDstAddress : trade.bridgerDstAddress,
+        unlockChain.kind,
+      );
+
       const isAuthorized = this.chainAdapters
         .forChain(unlockChain.kind)
         .verifyOrderSignature(
-          caller,
+          unlockSigner as `0x${string}`,
           trade.orderHash as `0x${string}`,
           dto.signature as `0x${string}`,
         );
@@ -963,10 +992,10 @@ export class TradesService {
         throw new NotFoundException('Trade update log not found');
 
       if (
-        getAddress(tradeLogUpdate.trade.bridgerAddress) !==
-          getAddress(user.walletAddress) &&
-        getAddress(tradeLogUpdate.trade.adCreatorAddress) !==
-          getAddress(user.walletAddress)
+        normalizeChainAddress(tradeLogUpdate.trade.bridgerAddress) !==
+          normalizeChainAddress(user.walletAddress) &&
+        normalizeChainAddress(tradeLogUpdate.trade.adCreatorAddress) !==
+          normalizeChainAddress(user.walletAddress)
       ) {
         throw new ForbiddenException('Unauthorized');
       }
@@ -1119,7 +1148,8 @@ export class TradesService {
       const authorizationLog = await this.prisma.authorizationLog.findFirst({
         where: {
           tradeId: tradeId,
-          userAddress: getAddress(user.walletAddress),
+          userAddress: normalizeChainAddress(user.walletAddress),
+          ...(dto.signature ? { signature: dto.signature } : {}),
         },
         orderBy: { createdAt: 'desc' },
         include: { trade: true },
@@ -1129,10 +1159,10 @@ export class TradesService {
         throw new NotFoundException('Authorization log not found');
 
       if (
-        getAddress(authorizationLog.trade.bridgerAddress) !==
-          getAddress(user.walletAddress) &&
-        getAddress(authorizationLog.trade.adCreatorAddress) !==
-          getAddress(user.walletAddress)
+        normalizeChainAddress(authorizationLog.trade.bridgerAddress) !==
+          normalizeChainAddress(user.walletAddress) &&
+        normalizeChainAddress(authorizationLog.trade.adCreatorAddress) !==
+          normalizeChainAddress(user.walletAddress)
       ) {
         throw new ForbiddenException('Unauthorized');
       }
@@ -1202,10 +1232,11 @@ export class TradesService {
         }
       }
 
-      const caller = getAddress(user.walletAddress);
+      const caller = normalizeChainAddress(user.walletAddress);
 
       const isAdCreator =
-        caller === getAddress(authorizationLog.trade.adCreatorAddress);
+        caller ===
+        normalizeChainAddress(authorizationLog.trade.adCreatorAddress);
 
       const updatedTrade = await this.prisma.trade.update({
         where: { id: authorizationLog.tradeId },

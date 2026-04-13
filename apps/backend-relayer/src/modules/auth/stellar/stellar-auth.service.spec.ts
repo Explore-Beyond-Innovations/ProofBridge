@@ -51,11 +51,11 @@ describe('StellarAuthService (SEP-10)', () => {
 
   describe('verifyLogin', () => {
     const sign = (xdr: string, kp: Keypair) => {
-      const tx = TransactionBuilder.fromXDR(
-        xdr,
-        (process.env.STELLAR_NETWORK_PASSPHRASE as Networks) ??
-          Networks.TESTNET,
-      );
+      // Match the service's fallback: configs.ts uses `||` so an empty env
+      // var falls back to TESTNET. `??` would keep `""` and mismatch.
+      const passphrase =
+        (process.env.STELLAR_NETWORK_PASSPHRASE as Networks) || Networks.TESTNET;
+      const tx = TransactionBuilder.fromXDR(xdr, passphrase);
       tx.sign(kp);
       return tx.toEnvelope().toXDR('base64');
     };

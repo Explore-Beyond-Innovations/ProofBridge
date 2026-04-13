@@ -16,12 +16,36 @@ import {
   ConfirmAdActionDto,
   CloseAdDto,
 } from './dto/ad.dto';
-import { getAddress } from 'viem';
-import { AdStatus, Prisma } from '@prisma/client';
+import { AdStatus, ChainKind, Prisma } from '@prisma/client';
 import { Request } from 'express';
 import { ChainAdapterService } from '../../chain-adapters/chain-adapter.service';
-import { toBytes32 } from '../../providers/viem/ethers/typedData';
+import {
+  normalizeChainAddress,
+  toBytes32,
+} from '../../providers/viem/ethers/typedData';
 import { randomUUID } from 'crypto';
+
+// Caller-owns-ad check bound to the ad's chain kind.
+function assertCallerOwnsAd(
+  walletAddress: string,
+  ad: {
+    creatorAddress: string;
+    route: { adToken: { chain: { kind: ChainKind } } };
+  },
+): void {
+  let normalized: string;
+  try {
+    normalized = normalizeChainAddress(
+      walletAddress,
+      ad.route.adToken.chain.kind,
+    );
+  } catch {
+    throw new ForbiddenException('Unauthorized');
+  }
+  if (normalized !== ad.creatorAddress) {
+    throw new ForbiddenException('Unauthorized');
+  }
+}
 
 type AdQueryInput = {
   routeId?: string;
@@ -343,7 +367,7 @@ export class AdsService {
             select: {
               id: true,
               symbol: true,
-              chain: { select: { chainId: true } },
+              chain: { select: { chainId: true, kind: true } },
             },
           },
         },
@@ -387,6 +411,18 @@ export class AdsService {
         );
       }
 
+      // creatorDstAddress lives on the order chain (where the ad creator
+      // receives proceeds on unlock), so validate against that chain's kind.
+      let normalizedCreatorDst: string;
+      try {
+        normalizedCreatorDst = normalizeChainAddress(
+          dto.creatorDstAddress,
+          route.orderToken.chain.kind,
+        );
+      } catch {
+        throw new BadRequestException('Invalid creatorDstAddress');
+      }
+
       const adId = randomUUID();
 
       const reqContractDetails = await this.chainAdapters
@@ -399,15 +435,27 @@ export class AdsService {
           orderChainId: route.orderToken.chain.chainId,
           adToken: route.adToken.address as `0x${string}`,
           initialAmount: fundAmount.toFixed(0),
-          adRecipient: toBytes32(dto.creatorDstAddress),
+          adRecipient: toBytes32(normalizedCreatorDst),
         });
+
+      let normalizedCreator: string;
+      try {
+        normalizedCreator = normalizeChainAddress(
+          user.walletAddress,
+          route.adToken.chain.kind,
+        );
+      } catch {
+        throw new BadRequestException(
+          'Authenticated wallet does not match ad chain',
+        );
+      }
 
       const requestDetails = await this.prisma.$transaction(async (prisma) => {
         const ad = await prisma.ad.create({
           data: {
             id: adId,
-            creatorAddress: getAddress(user.walletAddress),
-            creatorDstAddress: getAddress(dto.creatorDstAddress),
+            creatorAddress: normalizedCreator,
+            creatorDstAddress: normalizedCreatorDst,
             routeId: route.id,
             adTokenId: route.adToken.id,
             orderTokenId: route.orderToken.id,
@@ -482,7 +530,7 @@ export class AdsService {
       if (!user) throw new ForbiddenException('Unauthorized');
 
       const ad = await this.prisma.ad.findUnique({
-        where: { id, creatorAddress: getAddress(user.walletAddress) },
+        where: { id },
         select: {
           id: true,
           creatorAddress: true,
@@ -508,6 +556,8 @@ export class AdsService {
       });
 
       if (!ad) throw new NotFoundException('Ad not found');
+
+      assertCallerOwnsAd(user.walletAddress, ad);
 
       if (ad.adUpdateLog) {
         throw new BadRequestException(
@@ -601,7 +651,7 @@ export class AdsService {
       if (!user) throw new ForbiddenException('Unauthorized');
 
       const ad = await this.prisma.ad.findUnique({
-        where: { id, creatorAddress: getAddress(user.walletAddress) },
+        where: { id },
         select: {
           id: true,
           creatorAddress: true,
@@ -628,6 +678,8 @@ export class AdsService {
 
       if (!ad) throw new NotFoundException('Ad not found');
 
+      assertCallerOwnsAd(user.walletAddress, ad);
+
       if (ad.adUpdateLog) {
         throw new BadRequestException(
           'Ad has pending update; please wait a few minutes and try again',
@@ -648,14 +700,22 @@ export class AdsService {
       const locked = lockSum._sum.amount ?? new Prisma.Decimal(0);
       const available = ad.poolAmount.sub(locked);
 
-      console.log(available, withdrawAmt);
-
       if (withdrawAmt.gt(available))
         throw new BadRequestException('Insufficient available balance');
 
       const effectiveStatus = available.sub(withdrawAmt).eq(0)
         ? 'EXHAUSTED'
         : ad.status;
+
+      let normalizedTo: string;
+      try {
+        normalizedTo = normalizeChainAddress(
+          dto.to,
+          ad.route.adToken.chain.kind,
+        );
+      } catch {
+        throw new BadRequestException('Invalid withdraw destination');
+      }
 
       const reqContractDetails = await this.chainAdapters
         .forChain(ad.route.adToken.chain.kind)
@@ -665,7 +725,7 @@ export class AdsService {
           adChainId: ad.route.adToken.chain.chainId,
           adId: ad.id,
           amount: withdrawAmt.toFixed(0),
-          to: dto.to as `0x${string}`,
+          to: normalizedTo as `0x${string}`,
         });
 
       const finalValue = ad.poolAmount.sub(withdrawAmt);
@@ -812,7 +872,7 @@ export class AdsService {
       if (!user) throw new ForbiddenException('Unauthorized');
 
       const ad = await this.prisma.ad.findFirst({
-        where: { id, creatorAddress: getAddress(user.walletAddress) },
+        where: { id },
         select: {
           id: true,
           creatorAddress: true,
@@ -838,6 +898,8 @@ export class AdsService {
       });
       if (!ad) throw new NotFoundException('Ad not found');
 
+      assertCallerOwnsAd(user.walletAddress, ad);
+
       if (ad.adUpdateLog) {
         throw new BadRequestException(
           'Ad has pending update; please wait a few minutes and try again',
@@ -861,6 +923,16 @@ export class AdsService {
         throw new BadRequestException('Ad is already closed');
       }
 
+      let normalizedTo: string;
+      try {
+        normalizedTo = normalizeChainAddress(
+          dto.to,
+          ad.route.adToken.chain.kind,
+        );
+      } catch {
+        throw new BadRequestException('Invalid close destination');
+      }
+
       const reqContractDetails = await this.chainAdapters
         .forChain(ad.route.adToken.chain.kind)
         .getCloseAdRequestContractDetails({
@@ -868,7 +940,7 @@ export class AdsService {
             .adManagerAddress as `0x${string}`,
           adChainId: ad.route.adToken.chain.chainId,
           adId: ad.id,
-          to: dto.to as `0x${string}`,
+          to: normalizedTo as `0x${string}`,
         });
 
       await this.prisma.$transaction(async (prisma) => {
@@ -926,7 +998,8 @@ export class AdsService {
   async confirmChainAction(
     req: Request,
     adId: string,
-    dto: ConfirmAdActionDto,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _dto: ConfirmAdActionDto,
   ) {
     try {
       const reqUser = req.user;
@@ -941,43 +1014,35 @@ export class AdsService {
 
       const adLogUpdate = await this.prisma.adUpdateLog.findUnique({
         where: { adId },
-        include: { ad: true, log: true },
-      });
-
-      if (!adLogUpdate) throw new NotFoundException('Ad update log not found');
-
-      if (
-        getAddress(adLogUpdate.ad.creatorAddress) !==
-        getAddress(user.walletAddress)
-      ) {
-        throw new ForbiddenException('Unauthorized');
-      }
-
-      // get ad details
-      const ad = await this.prisma.ad.findUnique({
-        where: { id: adId },
-        select: {
-          poolAmount: true,
-          status: true,
-          route: {
-            select: {
-              adToken: {
+        include: {
+          ad: {
+            include: {
+              route: {
                 select: {
-                  chain: {
+                  adToken: {
                     select: {
-                      adManagerAddress: true,
-                      chainId: true,
-                      kind: true,
+                      chain: {
+                        select: {
+                          adManagerAddress: true,
+                          chainId: true,
+                          kind: true,
+                        },
+                      },
                     },
                   },
                 },
               },
             },
           },
+          log: true,
         },
       });
 
-      if (!ad) throw new NotFoundException('Ad for Ad Id not found');
+      if (!adLogUpdate) throw new NotFoundException('Ad update log not found');
+
+      const ad = adLogUpdate.ad;
+
+      assertCallerOwnsAd(user.walletAddress, ad);
 
       // // verify adLog
       const isValidated = await this.chainAdapters
@@ -1014,8 +1079,6 @@ export class AdsService {
 
         this.prisma.adUpdateLog.delete({ where: { id: adLogUpdate.id } }),
       ]);
-
-      console.log(dto);
 
       return {
         adId: adId,

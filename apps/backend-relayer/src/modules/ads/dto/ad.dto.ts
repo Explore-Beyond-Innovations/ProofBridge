@@ -1,4 +1,11 @@
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { JsonObject, JsonArray } from '@prisma/client/runtime/library';
@@ -205,7 +212,7 @@ export class CloseAdDto {
     example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
   })
   @IsString()
-  to: string;
+  to!: string;
 }
 
 export class ConfirmAdActionDto {
@@ -326,7 +333,7 @@ export class ListAdResponseDto {
   data!: AdResponseDto[];
 
   @ApiProperty({ type: String, nullable: true })
-  nextCursor: string | null;
+  nextCursor!: string | null;
 }
 
 export class CreateAdResponseDto {
@@ -348,6 +355,12 @@ export class CreateAdResponseDto {
       '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
   })
   signature!: `0x${string}`;
+
+  @ApiPropertyOptional({
+    description:
+      'Signer public key (Stellar chains only — 0x-prefixed 32-byte hex of the relayer signer)',
+  })
+  signerPublicKey?: string;
 
   @ApiProperty({
     description: 'Request auth token',

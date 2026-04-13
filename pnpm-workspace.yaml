@@ -4,3 +4,4 @@ packages:
   - "packages/*"
   - "contracts/stellar/tests/fixtures"
   - "scripts/cross-chain-e2e"
+  - "scripts/relayer-e2e"

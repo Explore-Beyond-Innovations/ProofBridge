@@ -1,15 +1,35 @@
-import { AD_MANAGER_ABI } from '../../src/providers/viem/abis/adManager.abi';
-import { ORDER_PORTAL_ABI } from '../../src/providers/viem/abis/orderPortal.abi';
-import { MERKLE_MANAGER_ABI } from '../../src/providers/viem/abis/merkleManager.abi';
-
-import Erc20MockArtifact from '../../../../contracts/evm/out/ERC20Mock.sol/ERC20Mock.json';
+import * as fs from 'fs';
+import * as path from 'path';
 
 import { ethers } from 'ethers';
-import { ChainData, AddressLike } from './utils';
+import { EthChainData, AddressLike } from './eth.js';
+
+// Same pattern as scripts/cross-chain-e2e/lib/evm.ts — read Foundry output at
+// runtime from $ROOT_DIR/contracts/evm/out.
+const ROOT_DIR = process.env.ROOT_DIR!;
+const EVM_OUT = path.join(ROOT_DIR ?? '', 'contracts/evm/out');
+
+function loadArtifact(contractFileName: string, contractName: string) {
+  const artifactPath = path.join(
+    EVM_OUT,
+    `${contractFileName}.sol`,
+    `${contractName}.json`,
+  );
+  if (!fs.existsSync(artifactPath)) {
+    throw new Error(`Artifact not found: ${artifactPath}`);
+  }
+  const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
+  return { abi: artifact.abi, bytecode: artifact.bytecode.object };
+}
+
+const AD_MANAGER_ABI = loadArtifact('AdManager', 'AdManager').abi;
+const ORDER_PORTAL_ABI = loadArtifact('OrderPortal', 'OrderPortal').abi;
+const MERKLE_MANAGER_ABI = loadArtifact('MerkleManager', 'MerkleManager').abi;
+const ERC20_MOCK_ABI = loadArtifact('ERC20Mock', 'ERC20Mock').abi;
 import {
   T_AdManagerOrderParams,
   T_OrderPortalParams,
-} from '../../src/chain-adapters/types';
+} from '../../../apps/backend-relayer/src/chain-adapters/types.js';
 import {
   createWalletClient,
   getAddress,
@@ -23,7 +43,7 @@ const DEFAULT_ADMIN_ROLE = ethers.ZeroHash as `0x${string}`;
 export async function grantManagerRole(
   publicClient: PublicClient,
   account: PrivateKeyAccount,
-  chain: ChainData,
+  chain: EthChainData,
 ) {
   const mgrAddr = account.address;
 
@@ -77,8 +97,8 @@ export async function grantManagerRole(
 export async function setupAdManager(
   publicClient: PublicClient,
   account: PrivateKeyAccount,
-  adChain: ChainData,
-  orderChain: ChainData,
+  adChain: EthChainData,
+  orderChain: EthChainData,
 ) {
   const mgrAddr = account.address;
 
@@ -141,8 +161,8 @@ export async function setupAdManager(
 export async function setupOrderPortal(
   publicClient: PublicClient,
   account: PrivateKeyAccount,
-  adChain: ChainData,
-  orderChain: ChainData,
+  adChain: EthChainData,
+  orderChain: EthChainData,
 ) {
   const mgrAddr = account.address;
 
@@ -205,8 +225,8 @@ export async function setupOrderPortal(
 export async function adminSetup(
   publicClient: PublicClient,
   account: PrivateKeyAccount,
-  chain1: ChainData,
-  chain2: ChainData,
+  chain1: EthChainData,
+  chain2: EthChainData,
 ) {
   // On the same provider chain (chain 1)
   // Setup roles and contracts
@@ -590,7 +610,7 @@ export async function mintToken(
   const hash = await wallet.writeContract({
     chain: publicClient.chain,
     address: tokenAddress,
-    abi: Erc20MockArtifact.abi,
+    abi: ERC20_MOCK_ABI,
     functionName: 'mint',
     args: [to, amount],
   });
@@ -622,7 +642,7 @@ export async function approveToken(
   const hash = await wallet.writeContract({
     chain: publicClient.chain,
     address: tokenAddress,
-    abi: Erc20MockArtifact.abi,
+    abi: ERC20_MOCK_ABI,
     functionName: 'approve',
     args: [spender, amount],
   });

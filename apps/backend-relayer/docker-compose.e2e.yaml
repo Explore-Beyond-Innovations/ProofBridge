@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: relayer
+      POSTGRES_PASSWORD: relayer
+      POSTGRES_DB: relayer
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U relayer -d relayer"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  backend-relayer:
+    build:
+      context: ../..
+      dockerfile: apps/backend-relayer/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 2005
+      DATABASE_URL: postgresql://relayer:relayer@postgres:5432/relayer
+      JWT_ACCESS_SECRET: test-access-secret
+      JWT_REFRESH_SECRET: test-refresh-secret
+      SIGN_DOMAIN: proofbridge.xyz
+      SIGN_URI: https://proofbridge.xyz
+      STELLAR_AUTH_SECRET: ${STELLAR_AUTH_SECRET:-SA3C2KPR5TCHYJ5TNQXAY2776Z3H4CB723GDCAMEX5I2NLWP25QUYB3X}
+      SECRET_KEY: ${SECRET_KEY:-0xfdba5a242ddce02cd1d585297aa4afe5aa2831391198746c680a3e16a41676dc}
+      # Chain RPCs live on the host — rewrite localhost → host.docker.internal.
+      ETHEREUM_RPC_URL: http://host.docker.internal:9545
+      STELLAR_RPC_URL: http://host.docker.internal:8000/soroban/rpc
+      STELLAR_NETWORK_PASSPHRASE: ${STELLAR_NETWORK_PASSPHRASE:-Standalone Network ; February 2017}
+      STELLAR_ADMIN_SECRET: ${STELLAR_ADMIN_SECRET}
+      EVM_ADMIN_PRIVATE_KEY: ${EVM_ADMIN_PRIVATE_KEY}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "2005:2005"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:2005/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 3s
+      timeout: 5s
+      retries: 40

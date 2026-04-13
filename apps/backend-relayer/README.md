@@ -282,7 +282,8 @@ pnpm run start:prod
 **Core Configuration**:
 
 ```bash
-ADMIN_SECRET=""
+EVM_ADMIN_PRIVATE_KEY=""
+STELLAR_ADMIN_SECRET=""
 DATABASE_URL=""
 EVM_RPC_API_KEY=""
 JWT_EXPIRY=""

@@ -1,10 +1,14 @@
 import { TypedDataEncoder, Wallet, recoverAddress } from 'ethers';
+import { ChainKind } from '@prisma/client';
+import { StrKey } from '@stellar/stellar-sdk';
+import { getAddress, isAddress } from 'viem';
 import {
   Bytes32Hex,
   T_AdManagerOrderParams,
   T_OrderParams,
   T_OrderPortalParams,
 } from '../../../chain-adapters/types';
+import { accountIdToHex32 } from '../../stellar/utils/address';
 
 // Left-pad a 20-byte EVM address to 32 bytes (the cross-chain wire format).
 // Accepts an already-32-byte hex string and returns it unchanged. Throws on
@@ -14,6 +18,39 @@ export function toBytes32(value: string): Bytes32Hex {
   if (hex.length === 64) return `0x${hex}`;
   if (hex.length === 40) return `0x${'0'.repeat(24)}${hex}`;
   throw new Error(`toBytes32: expected 20- or 32-byte hex, got ${value}`);
+}
+
+// Chain-aware canonicalization for addresses. Returns the storage-canonical
+// form:
+//   EVM     — EIP-55 20-byte hex
+//   STELLAR — lowercased 0x-prefixed 32-byte hex of the account public key
+//
+// When `chainKind` is provided, the native form is accepted (EVM 20-byte hex
+// or Stellar G-strkey) alongside the 32-byte hex wire form.
+// When `chainKind` is omitted, the chain is inferred from the canonical
+// stored form: 40 hex chars → EVM, 64 hex chars → Stellar. Use this variant
+// for values already read from the DB where the chain is implicit.
+// Throws if the value is not a valid address for the given / inferred chain.
+export function normalizeChainAddress(
+  value: string,
+  chainKind?: ChainKind,
+): string {
+  if (chainKind === ChainKind.EVM) {
+    if (isAddress(value)) return getAddress(value);
+    throw new Error(`normalizeChainAddress: invalid EVM address ${value}`);
+  }
+  if (chainKind === ChainKind.STELLAR) {
+    if (StrKey.isValidEd25519PublicKey(value)) return accountIdToHex32(value);
+    const hex = value.replace(/^0x/i, '');
+    if (/^[a-fA-F0-9]{64}$/.test(hex)) return `0x${hex.toLowerCase()}`;
+    throw new Error(`normalizeChainAddress: invalid Stellar address ${value}`);
+  }
+  const hex = value.replace(/^0x/i, '');
+  if (hex.length === 40) return getAddress(`0x${hex}`);
+  if (hex.length === 64) return `0x${hex.toLowerCase()}`;
+  throw new Error(
+    `normalizeChainAddress: cannot infer chain from ${value}; pass chainKind`,
+  );
 }
 
 // ----------------------------

@@ -14,7 +14,10 @@ import {
   rpc,
   xdr,
 } from '@stellar/stellar-sdk';
-import { hex32ToBuffer, hex32ToContractId } from '../../src/providers/stellar/utils/address';
+import {
+  hex32ToBuffer,
+  hex32ToContractId,
+} from '../../../apps/backend-relayer/src/providers/stellar/utils/address.js';
 
 const BASE_FEE = '1000';
 
@@ -215,8 +218,8 @@ function orderParamsScVal(p: StellarOrderParams): xdr.ScVal {
     ['src_order_portal', bytesN(p.srcOrderPortal)],
   ];
   return xdr.ScVal.scvMap(
-    entries.map(([k, v]) =>
-      new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol(k), val: v }),
+    entries.map(
+      ([k, v]) => new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol(k), val: v }),
     ),
   );
 }

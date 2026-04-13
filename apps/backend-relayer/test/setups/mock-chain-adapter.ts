@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { randomBytes } from 'crypto';
 import { ChainAdapter } from '../../src/chain-adapters/adapters/chain-adapter.abstract';
 import {
@@ -24,8 +25,7 @@ import {
 
 const ZERO_32 =
   '0x0000000000000000000000000000000000000000000000000000000000000000' as const;
-const FAKE_SIG =
-  ('0x' + 'ab'.repeat(65)) as `0x${string}`;
+const FAKE_SIG = ('0x' + 'ab'.repeat(65)) as `0x${string}`;
 const ONE_HOUR_S = 3600;
 
 function uniqueHash(): `0x${string}` {
