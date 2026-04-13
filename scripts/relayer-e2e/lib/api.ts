@@ -69,7 +69,7 @@ export const apiCreateAd = (
   creatorDstAddress: string,
   fundAmount: string
 ) =>
-  request("POST", "/v1/ads", {
+  request("POST", "/v1/ads/create", {
     token,
     body: { routeId, creatorDstAddress, fundAmount },
   });
@@ -106,7 +106,7 @@ export const apiCreateOrder = (
     amount: string;
     bridgerDstAddress: string;
   }
-) => request("POST", "/v1/trades", { token, body });
+) => request("POST", "/v1/trades/create", { token, body });
 
 export const apiGetTrade = (tradeId: string) => request("GET", `/v1/trades/${tradeId}`);
 
