@@ -22,50 +22,47 @@ This document provides a comprehensive overview of the current ProofBridge syste
                     ┌────────────────────────┴────────────────────────┐
                     │                                                  │
                     ▼                                                  ▼
-    ┌───────────────────────────┐                    ┌───────────────────────────┐
-    │   CHAIN A (Sepolia)       │                    │   CHAIN B (Hedera)        │
-    │   Smart Contracts         │                    │   Smart Contracts         │
-    ├───────────────────────────┤                    ├───────────────────────────┤
-    │                           │                    │                           │
-    │  ┌─────────────────────┐  │                    │  ┌─────────────────────┐  │
-    │  │   AdManager         │  │                    │  │   AdManager         │  │
-    │  │ (Create/Fund Ads)   │  │                    │  │ (Create/Fund Ads)   │  │
-    │  └──────────┬──────────┘  │                    │  └──────────┬──────────┘  │
+    ┌────────────────────────────┐                    ┌────────────────────────────┐
+    │   CHAIN A (Sepolia)        │                    │   CHAIN B (Stellar)        │
+    │   Smart Contracts          │                    │   Smart Contracts          │
+    ├────────────────────────────┤                    ├────────────────────────────┤
+    │                            │                    │                            │
+    │  ┌─────────────────────┐   │                    │  ┌─────────────────────┐   │
+    │  │   AdManager         │   │                    │  │   AdManager         │   │
+    │  │ (Create/Fund Ads)   │   │                    │  │ (Create/Fund Ads)   │   │
+    │  └──────────┬──────────┘   │                    │  └──────────┬──────────┘   │
     │             │              │                    │             │              │
-    │  ┌──────────▼──────────┐  │                    │  ┌──────────▼──────────┐  │
-    │  │   OrderPortal       │  │                    │  │   OrderPortal       │  │
-    │  │ (Create Orders)     │◄─┼────────────────────┼─►│ (Create Orders)     │  │
-    │  └──────────┬──────────┘  │                    │  └──────────┬──────────┘  │
+    │  ┌──────────▼──────────┐   │                    │  ┌──────────▼──────────┐   │
+    │  │   OrderPortal       │   │                    │  │   OrderPortal       │   │
+    │  │ (Create Orders)     │◄──┼────────────────────┼─►│ (Create Orders)     │   │
+    │  └──────────┬──────────┘   │                    │  └──────────┬──────────┘   │
     │             │              │                    │             │              │
-    │             │ Grants       │                    │             │ Grants       │
-    │             │ MANAGER_ROLE │                    │             │ MANAGER_ROLE │
+    │             │              │                    │             │              |
+    │     Grants MANAGER_ROLE    │                    │     Grants MANAGER_ROLE    │
     │             │              │                    │             │              │
-    │  ┌──────────▼──────────┐  │                    │  ┌──────────▼──────────┐  │
-    │  │   MerkleManager     │  │                    │  │   MerkleManager     │  │
-    │  │ (MMR Tree Storage)  │  │                    │  │ (MMR Tree Storage)  │  │
-    │  └──────────┬──────────┘  │                    │  └──────────┬──────────┘  │
+    │  ┌──────────▼──────────┐   │                    │  ┌──────────▼──────────┐   │
+    │  │   MerkleManager     │   │                    │  │   MerkleManager     │   │
+    │  │ (MMR Tree Storage)  │   │                    │  │ (MMR Tree Storage)  │   │
+    │  └──────────┬──────────┘   │                    │  └──────────┬──────────┘   │
     │             │              │                    │             │              │
-    │  ┌──────────▼──────────┐  │                    │  ┌──────────▼──────────┐  │
-    │  │   Verifier          │  │                    │  │   Verifier          │  │
-    │  │ (ZK Proof Check)    │  │                    │  │ (ZK Proof Check)    │  │
-    │  └─────────────────────┘  │                    │  └─────────────────────┘  │
-    │                           │                    │                           │
-    │  ┌─────────────────────┐  │                    │  ┌─────────────────────┐  │
-    │  │  wNativeToken(WETH) │  │                    │  │  wNativeToken(WHBAR)│  │
-    │  └─────────────────────┘  │                    │  └─────────────────────┘  │
-    └───────────┬───────────────┘                    └───────────┬───────────────┘
-                │                                                │
-                │  Events                                Events  │
-                │  (OrderCreated,                   (OrderCreated,│
-                │   AdCreated,                       AdCreated,  │
-                │   Unlocked)                         Unlocked)  │
-                │                                                │
-                │                                                │
-                │  User requests                      User requests
-                │  (callbacks)                         (callbacks)│
-                │                                                │
-                └────────────────┐              ┌────────────────┘
-                                 │              │
+    │  ┌──────────▼──────────┐   │                    │  ┌──────────▼──────────┐   │
+    │  │   Verifier          │   │                    │  │   Verifier          │   │
+    │  │ (ZK Proof Check)    │   │                    │  │ (ZK Proof Check)    │   │
+    │  └─────────────────────┘   │                    │  └─────────────────────┘   │
+    │                            │                    │                            │
+    │  ┌─────────────────────┐   │                    │  ┌─────────────────────┐   │
+    │  │  wNativeToken(WETH) │   │                    │  │  XLM / SAC / SEP-41 │   │
+    │  └─────────────────────┘   │                    │  └─────────────────────┘   │
+    └───────────┬────────────────┘                    └───────────┬────────────────┘
+                │                                                 │
+             ┌────────────────────────────────────────────────────────┐ 
+             │                      Events                            │
+             │        (OrderCreated, AdCreated Unlocked)              | 
+             │                                                        │
+             └───────────────────┐              ┌─────────────────────┘
+                                 |              |
+                            User requests (callbacks)  
+                                 │              │   
                                  ▼              ▼
                     ┌────────────────────────────────────────┐
                     │                                        │
@@ -81,9 +78,7 @@ This document provides a comprehensive overview of the current ProofBridge syste
                     │                                        │
                     └───────────────┬────────────────────────┘
                                     │
-                            Proof   │  Order/Merkle
-                          Generation│  Data
-                           Requests │
+                   Proof Requests Generation Data (Order/Merkle)
                                     │
                                     ▼
                     ┌────────────────────────────────────────┐
@@ -106,8 +101,8 @@ This document provides a comprehensive overview of the current ProofBridge syste
                     │                                        │
                     └────────────┬───────────────────────────┘
                                  │
-                        Generated│ ZK Proofs
-                                 │ (sent back to relayer)
+                                 |
+                    Generated ZK Proofs (sent back to relayer)
                                  │
                                  ▼
                     ┌────────────────────────────────────────┐
@@ -120,24 +115,26 @@ This document provides a comprehensive overview of the current ProofBridge syste
                                   DATA FLOW
 ═══════════════════════════════════════════════════════════════════════════════
 
-   1. Maker creates Ad on Chain A → AdManager locks liquidity
-   2. User requests pre-authorization from Backend Relayer
-   3. Relayer pre-authorizes transaction → Returns approval to user
-   4. Bridger creates Order on Chain B → OrderPortal locks deposit
-   5. OrderPortal adds order hash → MerkleManager (MMR tree on Chain B)
-   6. User triggers relayer callback → Relayer checks transaction confirmation
-   7. Relayer fetches Merkle proof + order data from chains
-   8. Relayer triggers Proof Circuit → Generates ZK proof
-   9. Relayer submits proof to Chain A → AdManager.unlock()
-  10. Verifier validates proof → Releases funds to bridger's recipient
-  11. Relayer submits proof to Chain B → OrderPortal.unlock()
-  12. Verifier validates proof → Releases funds to maker's recipient
+  1.  Maker creates Ad on Chain A → AdManager locks liquidity
+  2.  User requests pre-authorization from Backend Relayer
+  3.  Relayer pre-authorizes transaction → Returns approval to user
+  4.  Bridger creates Order on Chain B → OrderPortal locks deposit
+  5.  OrderPortal adds order hash → MerkleManager (MMR tree on Chain B)
+  6.  Maker locks in order on Chain A -> AdManager provisions for liquidity
+  7.  Admanager adds order hash -> MerkleManager (MMR tree on Chain A)
+  8.  User triggers relayer callback → Relayer checks transaction confirmation
+  9.  Relayer fetches Merkle proof + order data from chains
+  10. Relayer triggers Proof Circuit → Generates ZK proof
+  11. Relayer submits proof to Chain A → AdManager.unlock()
+  12. Verifier validates proof → Releases funds to bridger's recipient
+  13. Relayer submits proof to Chain B → OrderPortal.unlock()
+  14. Verifier validates proof → Releases funds to maker's recipient
 
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                            TO BE ADDED (TBA)                                 │
+│                            TO BE ADDED (TBA)                                │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
+│                                                                             │
 │  ┌────────────────────────────────────────────────────────────────────┐     │
 │  │  AI AUTOMATION LAYER                                               │     │
 │  │  • Real-time monitoring of ads and orders                          │     │
@@ -147,7 +144,7 @@ This document provides a comprehensive overview of the current ProofBridge syste
 │  │  • Predictive liquidity provisioning                               │     │
 │  │  • Co-pilot relayer capabilities                                   │     │
 │  └────────────────────────────────────────────────────────────────────┘     │
-│                                                                              │
+│                                                                             │
 │  ┌────────────────────────────────────────────────────────────────────┐     │
 │  │  BLS SIGNATURE AGGREGATION                                         │     │
 │  │  • Maker + Bridger signature collection                            │     │
@@ -156,8 +153,8 @@ This document provides a comprehensive overview of the current ProofBridge syste
 │  │  • Permissionless proof submission                                 │     │
 │  │  • Multi-relayer competition                                       │     │
 │  └────────────────────────────────────────────────────────────────────┘     │
-│                                                                              │
-└──────────────────────────────────────────────────────────────────────────────┘
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Component Descriptions
@@ -173,7 +170,7 @@ The user interface layer that allows users to:
 
 ### Smart Contracts
 
-Deployed on both Ethereum Sepolia and Hedera Testnet:
+Deployed on both Ethereum Sepolia (EVM) and Stellar Testnet (Soroban):
 
 #### AdManager
 
@@ -202,9 +199,8 @@ Deployed on both Ethereum Sepolia and Hedera Testnet:
 
 #### wNativeToken
 
-- Wraps native tokens (ETH/HBAR) automatically on deposit
-- Unwraps back to native tokens on withdrawal
-- ERC20-compatible interface
+- On EVM: wraps native ETH on deposit and unwraps on withdrawal (ERC20-compatible)
+- On Stellar: native XLM is handled directly; issued assets use Stellar Asset Contracts (SAC) and custom tokens use SEP-41 contracts
 
 ### Backend Relayer (Node.js)
 
@@ -260,13 +256,13 @@ Will enable:
 
 ## Cross-Chain Flow Example
 
-**Scenario:** Bridger wants to transfer ETH from Sepolia to receive wETH on Hedera
+**Scenario:** Bridger wants to transfer ETH from Sepolia to receive XLM on Stellar
 
-1. **Maker Setup:** Maker creates an ad on Hedera's AdManager, funding it with wETH
+1. **Maker Setup:** Maker creates an ad on Stellar's AdManager (Soroban), funding it with XLM
 2. **Order Creation:** Bridger deposits ETH on Sepolia's OrderPortal (automatically wrapped to WETH)
 3. **Merkle Recording:** OrderPortal adds the order hash to Sepolia's MerkleManager MMR tree
 4. **Relayer Detection:** Backend relayer detects the OrderCreated event
 5. **Proof Generation:** Relayer requests proof circuit to generate ZK proof with Merkle inclusion
-6. **Destination Unlock:** Relayer submits proof to Hedera's AdManager, releasing wETH to bridger
+6. **Destination Unlock:** Relayer submits proof to Stellar's AdManager, releasing XLM to bridger
 7. **Source Unlock:** Relayer submits proof to Sepolia's OrderPortal, releasing WETH to maker
 8. **Completion:** Both parties receive their funds, cross-chain transfer complete
