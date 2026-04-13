@@ -60,4 +60,4 @@ EXPOSE 2005
 # `tini` keeps signal forwarding sane. Migrations run on every boot — idempotent
 # for an already-migrated DB.
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]
