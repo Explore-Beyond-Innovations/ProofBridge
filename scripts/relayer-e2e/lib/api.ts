@@ -78,7 +78,10 @@ export const apiConfirm = (adId: string, token: string, txHash: `0x${string}`) =
   request("POST", `/v1/ads/${adId}/confirm`, { token, body: { txHash } });
 
 export const apiFundAd = (adId: string, token: string, amount: string) =>
-  request("POST", `/v1/ads/${adId}/fund`, { token, body: { amount } });
+  request("POST", `/v1/ads/${adId}/fund`, {
+    token,
+    body: { poolAmountTopUp: amount },
+  });
 
 export const apiWithdraw = (
   adId: string,
@@ -88,7 +91,7 @@ export const apiWithdraw = (
 ) =>
   request("POST", `/v1/ads/${adId}/withdraw`, {
     token,
-    body: { amount, to },
+    body: { poolAmountWithdraw: amount, to },
   });
 
 export const apiGetAd = (adId: string) => request("GET", `/v1/ads/${adId}`);
