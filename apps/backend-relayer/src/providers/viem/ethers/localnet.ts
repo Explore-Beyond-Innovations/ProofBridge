@@ -1,5 +1,7 @@
 import { Chain, defineChain } from 'viem';
 
+// Defaults target a host-local anvil/hedera. In containerized e2e the host is
+// reachable via `host.docker.internal`, so honor env overrides when present.
 export const ethLocalnet: Chain = defineChain({
   id: 31337,
   name: 'ETH LOCALNET',
@@ -10,7 +12,7 @@ export const ethLocalnet: Chain = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ['http://localhost:9545'],
+      http: [process.env.ETHEREUM_RPC_URL || 'http://localhost:9545'],
     },
   },
 });
@@ -25,7 +27,7 @@ export const hederaLocalnet: Chain = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ['http://localhost:7546'],
+      http: [process.env.HEDERA_RPC_URL || 'http://localhost:7546'],
     },
   },
 });

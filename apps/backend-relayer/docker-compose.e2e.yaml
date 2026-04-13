@@ -35,6 +35,7 @@ services:
       STELLAR_RPC_URL: http://host.docker.internal:8000/soroban/rpc
       STELLAR_NETWORK_PASSPHRASE: ${STELLAR_NETWORK_PASSPHRASE:-Standalone Network ; February 2017}
       STELLAR_ADMIN_SECRET: ${STELLAR_ADMIN_SECRET}
+      EVM_ADMIN_PRIVATE_KEY: ${EVM_ADMIN_PRIVATE_KEY}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
