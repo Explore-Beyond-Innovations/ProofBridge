@@ -5,9 +5,9 @@ set -euo pipefail
 # Relayer is exposed at http://localhost:2005 on success.
 #
 # Contract artifacts (Stellar WASMs, EVM ABIs, deposit VK) are pulled from
-# the public `contracts-latest` GitHub Release by default — no host
-# toolchain required. Override with:
-#   CONTRACTS_BUNDLE_TAG=contracts-<sha>   pin a specific build
+# the public Proofbridge-Contracts `latest` GitHub Release by default — no
+# host toolchain required. Override with:
+#   CONTRACTS_BUNDLE_TAG=<short-sha>       pin a specific build
 #   up.sh --local                          use the repo's locally-built tree
 #                                          (skips download; assumes you ran
 #                                          `stellar contract build`, `forge
@@ -29,7 +29,7 @@ if [[ -f "$SCRIPT_DIR/.env" ]]; then
 fi
 
 GH_REPO="${CONTRACTS_BUNDLE_REPO:-Explore-Beyond-Innovations/ProofBridge}"
-BUNDLE_TAG="${CONTRACTS_BUNDLE_TAG:-contracts-latest}"
+BUNDLE_TAG="${CONTRACTS_BUNDLE_TAG:-latest}"
 
 USE_LOCAL=0
 for arg in "$@"; do
@@ -90,7 +90,7 @@ download_bundle() {
   echo "[up.sh] downloading $BUNDLE_TAG from $GH_REPO…"
   if ! curl -fsSL "$url" -o "$tmp/bundle.tgz"; then
     echo "[up.sh] failed to fetch $url" >&2
-    echo "[up.sh] (is the tag published? try \`CONTRACTS_BUNDLE_TAG=contracts-latest\` or \`--local\`)" >&2
+    echo "[up.sh] (is the tag published? try \`CONTRACTS_BUNDLE_TAG=latest\` or \`--local\`)" >&2
     exit 1
   fi
 

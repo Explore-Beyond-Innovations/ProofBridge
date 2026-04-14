@@ -11,7 +11,7 @@ relayer DB with chains/tokens/routes, and runs `backend-relayer` on
 - `curl` (used by `up.sh` to fetch the contracts bundle)
 
 No rust / foundry / nargo / stellar CLI needed on the host — contract
-artifacts are downloaded from the public `contracts-latest` GitHub Release
+artifacts are downloaded from the public Proofbridge-Contracts `latest` GitHub Release
 and bind-mounted into the deployer container.
 
 ## Usage
@@ -57,16 +57,16 @@ Leaving either variable unset skips that chain. Reruns are idempotent:
 
 ### Pinning a specific build
 
-`up.sh` defaults to the rolling `contracts-latest` tag, which is updated
-by `.github/workflows/contracts-release.yml` on every push to `main`.
-To pin a specific commit's artifacts:
+`up.sh` defaults to the rolling `latest` tag on the Proofbridge-Contracts
+release, which is updated by `.github/workflows/contracts-release.yml` on
+every push to `main`. To pin a specific commit's artifacts:
 
 ```bash
-CONTRACTS_BUNDLE_TAG=contracts-<short-sha> bash scripts/docker-local/up.sh
+CONTRACTS_BUNDLE_TAG=<short-sha> bash scripts/docker-local/up.sh
 ```
 
-Every `main` build also publishes an immutable `contracts-<short-sha>`
-release, so bisecting regressions is cheap.
+Every `main` build also publishes an immutable `<short-sha>` release,
+so bisecting regressions is cheap.
 
 ### Iterating on contracts locally
 
@@ -132,7 +132,7 @@ URLs above.
   (anvil + stellar are ephemeral), written to a docker volume, and read
   by the relayer at start. `down -r` clears it; plain `down` keeps it.
 - To refresh artifacts without touching containers: delete `.artifacts/`
-  and re-run `up.sh`, or set `CONTRACTS_BUNDLE_TAG=contracts-latest`
-  explicitly to force a download.
+  and re-run `up.sh`, or set `CONTRACTS_BUNDLE_TAG=latest` explicitly
+  to force a download.
 - The relayer image reuses `apps/backend-relayer/Dockerfile` — the same
   one the CI e2e and production builds use.
