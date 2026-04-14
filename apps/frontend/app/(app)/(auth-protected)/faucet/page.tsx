@@ -101,7 +101,7 @@ const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
 const FaucetPage: React.FC = () => {
   const { data: chainsData, isLoading } = useGetAllChains({ limit: 20 })
 
-  const chains = chainsData?.rows || []
+  const chains = chainsData?.data || []
   const firstTwo = chains.slice(0, 2)
 
   return (

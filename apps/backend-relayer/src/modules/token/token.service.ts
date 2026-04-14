@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   HttpException,
   HttpStatus,
@@ -13,6 +14,36 @@ import {
 } from './dto/token.dto';
 import { TokenRow } from '../../types';
 import { getAddress } from 'ethers';
+import { StrKey } from '@stellar/stellar-sdk';
+
+/**
+ * `assetIssuer` is only meaningful for SAC tokens, which wrap a classic
+ * Stellar asset. Enforce both presence (for SAC) and absence (for the other
+ * kinds) at the service boundary so data stays consistent.
+ */
+function validateAssetIssuer(
+  kind: string | undefined,
+  assetIssuer: string | undefined,
+): void {
+  if (kind === 'SAC') {
+    if (!assetIssuer) {
+      throw new BadRequestException(
+        'assetIssuer is required for SAC tokens (classic-asset issuer G-strkey)',
+      );
+    }
+    if (!StrKey.isValidEd25519PublicKey(assetIssuer)) {
+      throw new BadRequestException(
+        'assetIssuer must be a valid Stellar G-strkey',
+      );
+    }
+    return;
+  }
+  if (assetIssuer) {
+    throw new BadRequestException(
+      'assetIssuer is only allowed for SAC tokens',
+    );
+  }
+}
 
 @Injectable()
 export class TokenService {
@@ -64,9 +95,10 @@ export class TokenService {
           address: true,
           decimals: true,
           kind: true,
+          assetIssuer: true,
           createdAt: true,
           updatedAt: true,
-          chain: { select: { id: true, name: true, chainId: true } },
+          chain: { select: { id: true, name: true, chainId: true, kind: true } },
         },
       });
 
@@ -105,9 +137,10 @@ export class TokenService {
           address: true,
           decimals: true,
           kind: true,
+          assetIssuer: true,
           createdAt: true,
           updatedAt: true,
-          chain: { select: { id: true, name: true, chainId: true } },
+          chain: { select: { id: true, name: true, chainId: true, kind: true } },
         },
       });
       if (!row) throw new NotFoundException('Token not found');
@@ -130,6 +163,7 @@ export class TokenService {
   }
 
   async create(dto: CreateTokenDto) {
+    validateAssetIssuer(dto.kind, dto.assetIssuer);
     try {
       const created = await this.prisma.token.create({
         data: {
@@ -139,6 +173,7 @@ export class TokenService {
           address: dto.address.toLowerCase(),
           decimals: dto.decimals,
           kind: dto.kind,
+          assetIssuer: dto.assetIssuer,
         },
         select: {
           id: true,
@@ -147,9 +182,10 @@ export class TokenService {
           address: true,
           decimals: true,
           kind: true,
+          assetIssuer: true,
           createdAt: true,
           updatedAt: true,
-          chain: { select: { id: true, name: true, chainId: true } },
+          chain: { select: { id: true, name: true, chainId: true, kind: true } },
         },
       });
       return this.serialize(created);
@@ -167,9 +203,27 @@ export class TokenService {
   async update(id: string, dto: UpdateTokenDto) {
     const exists = await this.prisma.token.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, kind: true },
     });
     if (!exists) throw new NotFoundException('Token not found');
+
+    // Compute the post-update kind so we validate against the row's final
+    // state, not just what the DTO partially carries.
+    const nextKind = dto.kind ?? exists.kind;
+    if (dto.assetIssuer !== undefined) {
+      validateAssetIssuer(
+        nextKind,
+        dto.assetIssuer === '' ? undefined : dto.assetIssuer,
+      );
+    } else if (dto.kind && dto.kind !== exists.kind) {
+      // Kind is changing without touching assetIssuer. Only SAC rows carry an
+      // issuer, so require explicit clearing when moving SAC → non-SAC.
+      if (exists.kind === 'SAC' && dto.kind !== 'SAC') {
+        throw new BadRequestException(
+          'Changing kind away from SAC requires clearing assetIssuer (pass an empty string)',
+        );
+      }
+    }
 
     try {
       const updated = await this.prisma.token.update({
@@ -181,6 +235,9 @@ export class TokenService {
           ...(dto.address ? { address: dto.address.toLowerCase() } : {}),
           ...(dto.decimals !== undefined ? { decimals: dto.decimals } : {}),
           ...(dto.kind ? { kind: dto.kind } : {}),
+          ...(dto.assetIssuer !== undefined
+            ? { assetIssuer: dto.assetIssuer === '' ? null : dto.assetIssuer }
+            : {}),
         },
         select: {
           id: true,
@@ -189,9 +246,10 @@ export class TokenService {
           address: true,
           decimals: true,
           kind: true,
+          assetIssuer: true,
           createdAt: true,
           updatedAt: true,
-          chain: { select: { id: true, name: true, chainId: true } },
+          chain: { select: { id: true, name: true, chainId: true, kind: true } },
         },
       });
       return this.serialize(updated);
@@ -217,15 +275,18 @@ export class TokenService {
       id: row.id,
       symbol: row.symbol,
       name: row.name,
-      address: getAddress(row.address),
+      address:
+        row.chain.kind === 'EVM' ? getAddress(row.address) : row.address,
       decimals: row.decimals,
       kind: row.kind,
+      assetIssuer: row.assetIssuer,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
       chain: {
         id: row.chain.id,
         name: row.chain.name,
         chainId: row.chain.chainId.toString(),
+        kind: row.chain.kind,
       },
     };
   }

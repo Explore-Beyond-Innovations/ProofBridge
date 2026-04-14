@@ -58,8 +58,11 @@ export const apiAuthLogin = (body: Record<string, unknown>) =>
 
 // ── routes ────────────────────────────────────────────────────────────
 
-export const getRoutes = (fromChainId: string, toChainId: string) =>
-  request("GET", `/v1/routes?fromChainId=${fromChainId}&toChainId=${toChainId}`);
+export const getRoutes = (adChainId: string, orderChainId: string) =>
+  request(
+    "GET",
+    `/v1/routes?adChainId=${adChainId}&orderChainId=${orderChainId}`,
+  );
 
 // ── ads ───────────────────────────────────────────────────────────────
 

@@ -11,6 +11,7 @@ import {
 } from "@/hooks/useTrades"
 import { useAccount } from "wagmi"
 import { truncateString } from "@/utils/truncate-string"
+import { formatChainAddressShort } from "@/utils/format-address"
 import { Status } from "../shared/Status"
 import moment from "moment"
 import { formatUnits } from "viem"
@@ -55,14 +56,18 @@ export const OrdersTable: React.FC<{ type?: "incoming" | "outgoing" }> = ({
         title: "Bridger",
         dataIndex: "bridgerAddress",
         render: (value, rowData) => {
-          return <p>{truncateString(value, 3, 3)}</p>
+          // Bridger pays on the order chain.
+          const kind = rowData.route.orderToken.chain.kind
+          return <p>{formatChainAddressShort(value, kind, 3, 3)}</p>
         },
       }
       : {
         title: "Ad Creator",
         dataIndex: "adCreatorAddress",
         render: (value, rowData) => {
-          return <p>{truncateString(value, 3, 3)}</p>
+          // Ad creator funds on the ad chain.
+          const kind = rowData.route.adToken.chain.kind
+          return <p>{formatChainAddressShort(value, kind, 3, 3)}</p>
         },
       },
     {
@@ -107,26 +112,10 @@ export const OrdersTable: React.FC<{ type?: "incoming" | "outgoing" }> = ({
       dataIndex: "status",
       showSorterTooltip: { target: "full-header" },
       filters: [
-        {
-          text: "ACTIVE",
-          value: "ACTIVE",
-        },
-        {
-          text: "LOCKED",
-          value: "LOCKED",
-        },
-        {
-          text: "INACTIVE",
-          value: "INACTIVE",
-        },
-        {
-          text: "EXHAUSTED",
-          value: "EXHAUSTED",
-        },
-        {
-          text: "CLOSED",
-          value: "CLOSED",
-        },
+        { text: "ACTIVE", value: "ACTIVE" },
+        { text: "LOCKED", value: "LOCKED" },
+        { text: "INACTIVE", value: "INACTIVE" },
+        { text: "COMPLETED", value: "COMPLETED" },
       ],
       onFilter: (value, record) => record.status.indexOf(value as string) === 0,
       sortDirections: ["descend"],
@@ -299,7 +288,12 @@ export const OrdersTable: React.FC<{ type?: "incoming" | "outgoing" }> = ({
               <div className="flex justify-between items-center">
                 <span className="text-grey-300">Bridger</span>
                 <span className="font-medium">
-                  {truncateString(tradeInfo.bridgerAddress, 4, 4)}
+                  {formatChainAddressShort(
+                    tradeInfo.bridgerAddress,
+                    tradeInfo.route.orderToken.chain.kind,
+                    4,
+                    4,
+                  )}
                 </span>
               </div>
 

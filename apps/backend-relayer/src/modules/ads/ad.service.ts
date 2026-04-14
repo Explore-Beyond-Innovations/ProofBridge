@@ -116,22 +116,24 @@ export class AdsService {
           maxAmount: true,
           adToken: {
             select: {
-              chain: { select: { chainId: true } },
+              chain: { select: { chainId: true, kind: true } },
               address: true,
               symbol: true,
               name: true,
               decimals: true,
               kind: true,
+              assetIssuer: true,
             },
           },
           orderToken: {
             select: {
-              chain: { select: { chainId: true } },
+              chain: { select: { chainId: true, kind: true } },
               address: true,
               symbol: true,
               name: true,
               decimals: true,
               kind: true,
+              assetIssuer: true,
             },
           },
           status: true,
@@ -197,7 +199,9 @@ export class AdsService {
             address: i.adToken.address,
             decimals: i.adToken.decimals,
             chainId: i.adToken.chain.chainId.toString(),
+            chainKind: i.adToken.chain.kind as string,
             kind: i.adToken.kind as string,
+            assetIssuer: i.adToken.assetIssuer,
           },
           orderToken: {
             name: i.orderToken.name,
@@ -205,7 +209,9 @@ export class AdsService {
             address: i.orderToken.address,
             decimals: i.orderToken.decimals,
             chainId: i.orderToken.chain.chainId.toString(),
+            chainKind: i.orderToken.chain.kind as string,
             kind: i.orderToken.kind as string,
+            assetIssuer: i.orderToken.assetIssuer,
           },
         };
       });
@@ -244,22 +250,24 @@ export class AdsService {
           metadata: true,
           adToken: {
             select: {
-              chain: { select: { chainId: true } },
+              chain: { select: { chainId: true, kind: true } },
               address: true,
               symbol: true,
               name: true,
               decimals: true,
               kind: true,
+              assetIssuer: true,
             },
           },
           orderToken: {
             select: {
-              chain: { select: { chainId: true } },
+              chain: { select: { chainId: true, kind: true } },
               address: true,
               symbol: true,
               name: true,
               decimals: true,
               kind: true,
+              assetIssuer: true,
             },
           },
           createdAt: true,
@@ -301,7 +309,9 @@ export class AdsService {
           address: ad.adToken.address,
           decimals: ad.adToken.decimals,
           chainId: ad.adToken.chain.chainId.toString(),
+          chainKind: ad.adToken.chain.kind as string,
           kind: ad.adToken.kind as string,
+          assetIssuer: ad.adToken.assetIssuer,
         },
         orderToken: {
           name: ad.orderToken.name,
@@ -309,7 +319,9 @@ export class AdsService {
           address: ad.orderToken.address,
           decimals: ad.orderToken.decimals,
           chainId: ad.orderToken.chain.chainId.toString(),
+          chainKind: ad.orderToken.chain.kind as string,
           kind: ad.orderToken.kind as string,
+          assetIssuer: ad.orderToken.assetIssuer,
         },
         metadata: ad.metadata ?? null,
         createdAt: ad.createdAt.toISOString(),
@@ -497,7 +509,10 @@ export class AdsService {
         return reqContractDetails;
       });
 
-      return requestDetails;
+      return {
+        ...requestDetails,
+        chainKind: route.adToken.chain.kind as string,
+      };
     } catch (e) {
       if (e instanceof Error) {
         if (e instanceof HttpException) throw e;
@@ -618,7 +633,10 @@ export class AdsService {
         return entry;
       });
 
-      return reqContractDetails;
+      return {
+        ...reqContractDetails,
+        chainKind: ad.route.adToken.chain.kind as string,
+      };
     } catch (e) {
       if (e instanceof Error) {
         if (e instanceof HttpException) throw e;
@@ -762,7 +780,10 @@ export class AdsService {
         }
       });
 
-      return reqContractDetails;
+      return {
+        ...reqContractDetails,
+        chainKind: ad.route.adToken.chain.kind as string,
+      };
     } catch (e) {
       if (e instanceof Error) {
         if (e instanceof HttpException) throw e;
@@ -975,7 +996,10 @@ export class AdsService {
         }
       });
 
-      return reqContractDetails;
+      return {
+        ...reqContractDetails,
+        chainKind: ad.route.adToken.chain.kind as string,
+      };
     } catch (e) {
       if (e instanceof Error) {
         if (e instanceof HttpException) throw e;

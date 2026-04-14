@@ -11,10 +11,11 @@ const BridgePage = () => {
           <div className="flex items-center justify-between gap-6 w-full">
             <div>
               <h3 className="md:text-xl tracking-widest font-pixter font-medium">
-                First P2P cross-chain bridge on Hedera
+                P2P cross-chain bridge across Ethereum &amp; Stellar
               </h3>
               <p className="text-[13px]">
-                Unlocking the next generation of cross-chain bridging on Hedera.{" "}
+                Unlocking the next generation of cross-chain bridging between
+                Ethereum and Stellar.{" "}
                 <Link href={"/"} className="underline text-primary">
                   create ad
                 </Link>

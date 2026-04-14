@@ -22,17 +22,120 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAccount, useWriteContract } from "wagmi";
 import { waitForTransactionReceipt } from "wagmi/actions";
-import { getSingleToken, getTokens } from "@/services/tokens.service";
+import { getSingleToken } from "@/services/tokens.service";
 import { IToken } from "@/types/tokens";
-import { formatUnits, parseEther, parseUnits } from "viem";
+import { formatUnits, parseEther } from "viem";
+import { useStellarAdapter } from "@/lib/stellar-adapter";
+import {
+  closeAdSoroban,
+  createAdSoroban,
+  fundAdSoroban,
+  withdrawFromAdSoroban,
+} from "@/utils/stellar/actions";
+import {
+  establishTrustline,
+  hasTrustline,
+} from "@/utils/stellar/trustline";
+import type { TrustlineCtx } from "@/utils/stellar/trustline";
+import type { IAdToken } from "@/types/ads";
+
+/**
+ * Blocks Stellar SAC withdrawals/closes when the recipient pubkey has no
+ * trustline to the underlying classic asset. Soroban would otherwise revert
+ * the transfer mid-flight with a generic error; this surfaces it early.
+ */
+async function assertRecipientTrustline(
+  adToken: IAdToken,
+  toPublicKey: string,
+): Promise<void> {
+  if (adToken.chainKind !== "STELLAR") return;
+  if (adToken.kind !== "SAC") return;
+  if (!adToken.assetIssuer) {
+    throw new Error(
+      `Token ${adToken.symbol} is marked SAC but has no assetIssuer configured`,
+    );
+  }
+  const ok = await hasTrustline(
+    toPublicKey,
+    adToken.symbol,
+    adToken.assetIssuer,
+  );
+  if (!ok) {
+    throw new Error(
+      `Recipient ${toPublicKey.slice(0, 6)}… has no trustline for ${adToken.symbol}. Ask them to add the asset in their Stellar wallet (issuer ${adToken.assetIssuer.slice(0, 6)}…) before retrying.`,
+    );
+  }
+}
+
+/**
+ * For SAC tokens, the signer's account must trust the underlying classic
+ * asset or the SAC transfer will fail. Adds the trustline on-demand before
+ * the contract call. No-op for NATIVE/SEP41 and when the trustline already
+ * exists.
+ */
+async function ensureSacTrustline(
+  token: IToken,
+  ctx: TrustlineCtx,
+): Promise<void> {
+  if (token.kind !== "SAC") return;
+  if (!token.assetIssuer) {
+    throw new Error(
+      `Token ${token.symbol} is marked SAC but has no assetIssuer configured`,
+    );
+  }
+  const ok = await hasTrustline(
+    ctx.signerPublicKey,
+    token.symbol,
+    token.assetIssuer,
+    ctx.horizonUrl,
+  );
+  if (ok) return;
+  toast.info(`Establishing trustline for ${token.symbol}…`);
+  await establishTrustline(ctx, token.symbol, token.assetIssuer);
+}
 
 export const useCreateAd = () => {
   const { writeContractAsync } = useWriteContract();
+  const {
+    buildCtx: buildStellarCtx,
+    buildTrustlineCtx,
+    address: stellarAddress,
+  } = useStellarAdapter();
   return useMutation({
     mutationKey: ["create-ad"],
     mutationFn: async (data: { payload: ICreateAdRequest; token: IToken }) => {
       const response = await createAd(data.payload);
       const token = data.token;
+
+      if (response.chainKind === "STELLAR") {
+        if (!stellarAddress) throw new Error("Stellar wallet not connected");
+        await ensureSacTrustline(token, buildTrustlineCtx());
+        const txHash = await createAdSoroban(
+          buildStellarCtx(),
+          {
+            signatureHex: response.signature,
+            signerPublicKeyHex: response.signerPublicKey!,
+            authTokenHex: response.authToken,
+            timeToExpire: response.timeToExpire,
+          },
+          {
+            creatorPublicKey: stellarAddress,
+            adId: response.adId,
+            adTokenHex: response.adToken,
+            initialAmount: data.payload.fundAmount,
+            orderChainId: response.orderChainId,
+            adRecipientHex: response.adRecipient,
+            adManagerHex: response.contractAddress,
+          },
+        );
+        await confirmAdTx({
+          txHash,
+          signature: response.signature,
+          adId: response.adId,
+        });
+        return response;
+      }
+
       const performERC20Tx = async () => {
         const txHash = await writeContractAsync({
           address: response.contractAddress,
@@ -45,7 +148,7 @@ export const useCreateAd = () => {
             BigInt(response.timeToExpire),
             response.adId,
             response.adToken,
-            data.payload.fundAmount,
+            BigInt(data.payload.fundAmount),
             BigInt(response.orderChainId),
             response.adRecipient,
           ],
@@ -72,7 +175,7 @@ export const useCreateAd = () => {
           abi: ERC20_ABI,
           chainId: Number(response.chainId),
           functionName: "approve",
-          args: [response.contractAddress, data.payload.fundAmount],
+          args: [response.contractAddress, BigInt(data.payload.fundAmount)],
         });
         const approveReceipt = await waitForTransactionReceipt(config, {
           hash: approveHash,
@@ -100,7 +203,7 @@ export const useCreateAd = () => {
             BigInt(response.timeToExpire),
             response.adId,
             response.adToken,
-            data.payload.fundAmount,
+            BigInt(data.payload.fundAmount),
             BigInt(response.orderChainId),
             response.adRecipient,
           ],
@@ -125,12 +228,9 @@ export const useCreateAd = () => {
     onSuccess: () => {
       toast.success("Ad creation was successful");
     },
-    onError: function (error: any, variables, result, ctx) {
+    onError: function (error: any) {
       toast.error(
-        error.response.data.message || error.message || "Unable to create ad",
-        {
-          description: "",
-        }
+        error.response?.data?.message || error.message || "Unable to create ad",
       );
     },
   });
@@ -138,13 +238,38 @@ export const useCreateAd = () => {
 
 export const useFundAd = () => {
   const { writeContractAsync } = useWriteContract();
-  const account = useAccount();
+  const { buildCtx: buildStellarCtx, buildTrustlineCtx } = useStellarAdapter();
 
   return useMutation({
     mutationKey: ["fund-ad"],
     mutationFn: async (data: ITopUpAdRequest) => {
       const response = await fundAd(data);
       const token = await getSingleToken(data.tokenId);
+
+      if (response.chainKind === "STELLAR") {
+        await ensureSacTrustline(token, buildTrustlineCtx());
+        const txHash = await fundAdSoroban(
+          buildStellarCtx(),
+          {
+            signatureHex: response.signature,
+            signerPublicKeyHex: response.signerPublicKey!,
+            authTokenHex: response.authToken,
+            timeToExpire: response.timeToExpire,
+          },
+          {
+            adId: response.adId,
+            amount: data.amountBigInt.toString(),
+            adManagerHex: response.contractAddress,
+          },
+        );
+        await confirmAdTx({
+          txHash,
+          signature: response.signature,
+          adId: response.adId,
+        });
+        return response;
+      }
+
       if (token.kind === "ERC20") {
         const approveHash = await writeContractAsync({
           address: token.address,
@@ -233,12 +358,9 @@ export const useFundAd = () => {
     onSuccess: () => {
       toast.success("Ad top up was successful");
     },
-    onError: function (error: any, variables, result, ctx) {
+    onError: function (error: any) {
       toast.error(
-        error.response.data.message || error.message || "Unable to top up ad",
-        {
-          description: "",
-        }
+        error.response?.data?.message || error.message || "Unable to top up ad",
       );
     },
   });
@@ -246,11 +368,38 @@ export const useFundAd = () => {
 
 export const useWithdrawFunds = () => {
   const { writeContractAsync } = useWriteContract();
+  const { buildCtx: buildStellarCtx } = useStellarAdapter();
 
   return useMutation({
     mutationKey: ["withdraw-ad"],
     mutationFn: async (data: IWithdrawFromAdRequest) => {
       const response = await withdrawFromAd(data);
+
+      if (response.chainKind === "STELLAR") {
+        const ad = await getSingleAd(data.adId);
+        await assertRecipientTrustline(ad.adToken, data.to);
+        const txHash = await withdrawFromAdSoroban(
+          buildStellarCtx(),
+          {
+            signatureHex: response.signature,
+            signerPublicKeyHex: response.signerPublicKey!,
+            authTokenHex: response.authToken,
+            timeToExpire: response.timeToExpire,
+          },
+          {
+            adId: response.adId,
+            amount: data.amountBigInt.toString(),
+            toPublicKey: data.to,
+            adManagerHex: response.contractAddress,
+          },
+        );
+        await confirmAdTx({
+          txHash,
+          signature: response.signature,
+          adId: response.adId,
+        });
+        return response;
+      }
 
       const txHash = await writeContractAsync({
         address: response.contractAddress,
@@ -263,7 +412,7 @@ export const useWithdrawFunds = () => {
           BigInt(response.timeToExpire),
           response.adId,
           data.amountBigInt,
-          data.to,
+          data.to as `0x${string}`,
         ],
       });
       const receipt = await waitForTransactionReceipt(config, {
@@ -282,12 +431,9 @@ export const useWithdrawFunds = () => {
     onSuccess: () => {
       toast.success("Funds withdrawal was successful");
     },
-    onError: function (error: any, variables, result, ctx) {
+    onError: function (error: any) {
       toast.error(
-        error.response.data.message || error.message || "Unable to withdraw",
-        {
-          description: "",
-        }
+        error.response?.data?.message || error.message || "Unable to withdraw",
       );
     },
   });
@@ -295,11 +441,37 @@ export const useWithdrawFunds = () => {
 
 export const useCloseAd = () => {
   const { writeContractAsync } = useWriteContract();
+  const { buildCtx: buildStellarCtx } = useStellarAdapter();
 
   return useMutation({
     mutationKey: ["close-ad"],
     mutationFn: async (data: ICloseAdRequest) => {
       const response = await closeAd(data);
+
+      if (response.chainKind === "STELLAR") {
+        const ad = await getSingleAd(data.adId);
+        await assertRecipientTrustline(ad.adToken, data.to);
+        const txHash = await closeAdSoroban(
+          buildStellarCtx(),
+          {
+            signatureHex: response.signature,
+            signerPublicKeyHex: response.signerPublicKey!,
+            authTokenHex: response.authToken,
+            timeToExpire: response.timeToExpire,
+          },
+          {
+            adId: response.adId,
+            toPublicKey: data.to,
+            adManagerHex: response.contractAddress,
+          },
+        );
+        await confirmAdTx({
+          txHash,
+          signature: response.signature,
+          adId: response.adId,
+        });
+        return response;
+      }
 
       const txHash = await writeContractAsync({
         address: response.contractAddress,
@@ -311,7 +483,7 @@ export const useCloseAd = () => {
           response.authToken,
           BigInt(response.timeToExpire),
           response.adId,
-          data.to,
+          data.to as `0x${string}`,
         ],
       });
       const receipt = await waitForTransactionReceipt(config, {
@@ -330,12 +502,9 @@ export const useCloseAd = () => {
     onSuccess: () => {
       toast.success("Ad closed successfully");
     },
-    onError: function (error: any, variables, result, ctx) {
+    onError: function (error: any) {
       toast.error(
-        error.response.data.message || error.message || "Unable to close ad",
-        {
-          description: "",
-        }
+        error.response?.data?.message || error.message || "Unable to close ad",
       );
     },
   });
@@ -350,12 +519,9 @@ export const useConfirmAdTx = () => {
     onSuccess: () => {
       toast.success("Tx confirmed successful");
     },
-    onError: function (error: any, variables, result, ctx) {
+    onError: function (error: any) {
       toast.error(
-        error.response.data.message || error.message || "Unable to confirm ad",
-        {
-          description: "",
-        }
+        error.response?.data?.message || error.message || "Unable to confirm ad",
       );
     },
   });

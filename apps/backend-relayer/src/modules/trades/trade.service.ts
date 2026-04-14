@@ -61,7 +61,7 @@ export class TradesService {
                 select: {
                   id: true,
                   symbol: true,
-                  chain: { select: { name: true, chainId: true } },
+                  chain: { select: { name: true, chainId: true, kind: true } },
                   kind: true,
                   address: true,
                   decimals: true,
@@ -71,7 +71,7 @@ export class TradesService {
                 select: {
                   id: true,
                   symbol: true,
-                  chain: { select: { name: true, chainId: true } },
+                  chain: { select: { name: true, chainId: true, kind: true } },
                   kind: true,
                   address: true,
                   decimals: true,
@@ -187,7 +187,7 @@ export class TradesService {
                 select: {
                   id: true,
                   symbol: true,
-                  chain: { select: { name: true, chainId: true } },
+                  chain: { select: { name: true, chainId: true, kind: true } },
                   kind: true,
                   address: true,
                   decimals: true,
@@ -197,7 +197,7 @@ export class TradesService {
                 select: {
                   id: true,
                   symbol: true,
-                  chain: { select: { name: true, chainId: true } },
+                  chain: { select: { name: true, chainId: true, kind: true } },
                   kind: true,
                   address: true,
                   decimals: true,
@@ -465,7 +465,13 @@ export class TradesService {
         return { tradeId: trade.id, reqContractDetails };
       });
 
-      return result;
+      return {
+        ...result,
+        reqContractDetails: {
+          ...result.reqContractDetails,
+          chainKind: ad.route.orderToken.chain.kind as string,
+        },
+      };
     } catch (e) {
       if (e instanceof Error) {
         if (e instanceof HttpException) throw e;
@@ -505,6 +511,7 @@ export class TradesService {
           adLock: true,
           status: true,
           tradeUpdateLog: true,
+          orderHash: true,
           bridgerAddress: true,
           bridgerDstAddress: true,
           adCreatorDstAddress: true,
@@ -519,6 +526,7 @@ export class TradesService {
                       chainId: true,
                       adManagerAddress: true,
                       mmrId: true,
+                      kind: true,
                     },
                   },
                 },
@@ -530,6 +538,7 @@ export class TradesService {
                     select: {
                       chainId: true,
                       orderPortalAddress: true,
+                      kind: true,
                     },
                   },
                 },
@@ -550,6 +559,17 @@ export class TradesService {
         throw new ForbiddenException('Unauthorized');
       }
 
+      // Derive which chain this caller will unlock on. adCreator unlocks on
+      // the order chain (they're claiming bridger-provided funds there);
+      // bridger unlocks on the ad chain. The frontend uses this to pick the
+      // right signing flow (EIP-712 vs SEP-43 Stellar signMessage).
+      const isAdCreator =
+        normalizeChainAddress(trade.adCreatorAddress) ===
+        normalizeChainAddress(user.walletAddress);
+      const unlockChainKind = isAdCreator
+        ? trade.route.orderToken.chain.kind
+        : trade.route.adToken.chain.kind;
+
       // All address-like fields are declared bytes32 in the cross-chain
       // Order typed-data (EVM addresses left-padded; Stellar accounts already
       // 32 bytes), so return the padded wire form here.
@@ -567,6 +587,8 @@ export class TradesService {
         adCreator: toBytes32(trade.adCreatorAddress),
         adRecipient: toBytes32(trade.adCreatorDstAddress),
         salt: uuidToBigInt(trade.id).toString(),
+        orderHash: trade.orderHash,
+        unlockChainKind,
       };
     } catch (e) {
       if (e instanceof Error) {
@@ -716,7 +738,10 @@ export class TradesService {
         },
       });
 
-      return reqContractDetails;
+      return {
+        ...reqContractDetails,
+        chainKind: trade.route.adToken.chain.kind as string,
+      };
     } catch (e) {
       if (e instanceof Error) {
         if (e instanceof HttpException) throw e;
@@ -831,7 +856,7 @@ export class TradesService {
         .verifyOrderSignature(
           unlockSigner as `0x${string}`,
           trade.orderHash as `0x${string}`,
-          dto.signature as `0x${string}`,
+          dto.signature,
         );
 
       if (!isAuthorized) {
@@ -946,7 +971,10 @@ export class TradesService {
         },
       });
 
-      return requestContractDetails;
+      return {
+        ...requestContractDetails,
+        chainKind: unlockChain.kind as string,
+      };
     } catch (e) {
       console.log(e);
       if (e instanceof Error) {

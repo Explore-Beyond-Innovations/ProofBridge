@@ -83,7 +83,7 @@ describe('Chains E2E', () => {
         .get('/v1/chains')
         .query({ chainId: '10000' })
         .expect(200);
-      expect(res.body.rows).toEqual(
+      expect(res.body.data).toEqual(
         expect.arrayContaining([expect.objectContaining({ chainId: chainId })]),
       );
     });

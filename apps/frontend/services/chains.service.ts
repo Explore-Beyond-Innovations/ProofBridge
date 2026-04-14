@@ -11,7 +11,7 @@ export const getAllChains = async (params: {
   cursor?: string
 }) => {
   const response = await api.get(chains_route("/"), { params })
-  return response.data as { rows: IChain[]; nextCursor: string }
+  return response.data as { data: IChain[]; nextCursor: string | null }
 }
 
 export const getSingleChain = async (id: string) => {

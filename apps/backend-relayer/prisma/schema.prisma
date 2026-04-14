@@ -83,6 +83,10 @@ model Token {
   kind     TokenKind @default(ERC20)
   decimals Int
 
+  /// Stellar classic-asset issuer (G-strkey). Populated only for SAC tokens;
+  /// null for NATIVE/ERC20/SEP41. Asset code is read from `symbol`.
+  assetIssuer String?
+
   chainUid String
   chain    Chain  @relation(fields: [chainUid], references: [id], onDelete: Cascade)
 

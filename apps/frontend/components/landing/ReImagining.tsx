@@ -39,11 +39,11 @@ export const ReImagine = () => {
               <p className="md:text-[13rem] md:leading-[13rem] text-[6rem] leading-[6rem] uppercase font-mango relative pl-[5.1rem] p-5 md:p-0 md:pl-0">
                 <span className="font-mango">Imagining</span>
                 <span className="text-grey-900 absolute md:bottom-[1.5rem] bottom-[1rem] md:-right-[2rem] -right-[1rem] bg-yellow-300  px-3 pt-1 text-[2.5rem] leading-[2.5rem] rotate-[-15deg] font-mango md:scale-100 scale-[0.5]">
-                  hedera
+                  bridging
                 </span>
               </p>
               <p className="relative z-[2] bg-grey-800 md:max-w-[300px] max-w-[300px] md:text-lg leading-[22px] p-5 pt-0 md:p-0">
-                First P2P cross-chain bridge piloted by Hedera.
+                P2P cross-chain bridge connecting Ethereum and Stellar.
               </p>
             </div>
             <div className="h-full absolute top-0 right-0 opacity-10 hidden">

@@ -144,7 +144,7 @@ describe('AdminController (unit)', () => {
       chain: {} as any,
     };
 
-    const created = { id: 'tok-1', ...dto };
+    const created = { id: 'tok-1', assetIssuer: null, ...dto };
 
     const spy = jest
       .spyOn(service, 'createToken')

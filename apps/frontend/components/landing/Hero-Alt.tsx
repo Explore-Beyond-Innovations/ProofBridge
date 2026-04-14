@@ -32,7 +32,7 @@ export const HeroAlt = () => {
         <div></div>
         <div className="2xl:text-[11.75rem] lg:text-[8rem] text-[3.75rem] md:p-[40px] p-5 2xl:leading-[160px] lg:leading-[110px] leading-[85%] hero-inner-text fixed z-[20] md:bottom-[12vh] bottom-[36vh] left-0 w-full">
           <h2 className=" text-primary tracking-tight floating-text">
-            Hedera&apos;s First
+            Ethereum &amp; Stellar
           </h2>
           <h2 className="text-[#eee] tracking-tight relative inline-block">
             <span className="2xl:text-[9rem] md:text-[6.3rem] text-[3.5rem]">
@@ -40,7 +40,7 @@ export const HeroAlt = () => {
             </span>
             <span className="text-[#eeeeeeea] md:text-[16px] md:leading-[24px] text-[12px] leading-4 2xl:text-[20px] 2xl:leading-[30px] block absolute 2xl:-top-[140px] lg:-top-[85px] top-[115px] md:right-0 tracking-normal 2xl:max-w-[250px] md:max-w-[180px] max-w-[80%]">
               ProofBridge® is Unlocking the next generation of cross-chain
-              bridging on Hedera
+              bridging between Ethereum and Stellar
             </span>
           </h2>
         </div>

@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import request from 'supertest';
 import { INestApplication } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { ChainKind, PrismaClient } from '@prisma/client';
+import { Keypair } from '@stellar/stellar-sdk';
 import { createTestingApp } from '../setups/create-app';
 import { loginAsAdmin, randomAddress, seedChain } from '../setups/utils';
 import { getAddress } from 'ethers';
@@ -215,5 +216,121 @@ describe('Tokens E2E', () => {
       .expect(204);
 
     await request(app.getHttpServer()).get(`/v1/tokens/${tokId}`).expect(404);
+  });
+
+  describe('SAC tokens (Stellar)', () => {
+    let stellarChain: { id: string; name: string; chainId: bigint };
+    const randomContractHex = () =>
+      '0x' +
+      Array.from({ length: 64 }, () =>
+        Math.floor(Math.random() * 16).toString(16),
+      ).join('');
+
+    beforeAll(async () => {
+      stellarChain = await seedChain(prisma, { kind: ChainKind.STELLAR });
+    });
+
+    it('accepts SAC token with valid assetIssuer', async () => {
+      const access = await loginAsAdmin(app);
+      const issuer = Keypair.random().publicKey();
+      const address = randomContractHex();
+      const res = await request(app.getHttpServer())
+        .post('/v1/admin/tokens/create')
+        .set('Authorization', `Bearer ${access}`)
+        .send({
+          chainUid: stellarChain.id,
+          symbol: 'USDC',
+          name: 'USD Coin',
+          address,
+          decimals: 7,
+          kind: 'SAC',
+          assetIssuer: issuer,
+        })
+        .expect(201);
+
+      expect(res.body).toMatchObject({
+        symbol: 'USDC',
+        kind: 'SAC',
+        assetIssuer: issuer,
+        chain: { kind: 'STELLAR' },
+      });
+    });
+
+    it('rejects SAC token without assetIssuer (400)', async () => {
+      const access = await loginAsAdmin(app);
+      await request(app.getHttpServer())
+        .post('/v1/admin/tokens/create')
+        .set('Authorization', `Bearer ${access}`)
+        .send({
+          chainUid: stellarChain.id,
+          symbol: 'USDC',
+          name: 'USD Coin',
+          address: randomContractHex(),
+          decimals: 7,
+          kind: 'SAC',
+        })
+        .expect(400);
+    });
+
+    it('rejects malformed assetIssuer (400)', async () => {
+      const access = await loginAsAdmin(app);
+      await request(app.getHttpServer())
+        .post('/v1/admin/tokens/create')
+        .set('Authorization', `Bearer ${access}`)
+        .send({
+          chainUid: stellarChain.id,
+          symbol: 'USDC',
+          name: 'USD Coin',
+          address: randomContractHex(),
+          decimals: 7,
+          kind: 'SAC',
+          assetIssuer: 'not-a-g-strkey',
+        })
+        .expect(400);
+    });
+
+    it('rejects assetIssuer on non-SAC kinds (400)', async () => {
+      const access = await loginAsAdmin(app);
+      await request(app.getHttpServer())
+        .post('/v1/admin/tokens/create')
+        .set('Authorization', `Bearer ${access}`)
+        .send({
+          chainUid: chain.id,
+          symbol: 'ETH',
+          name: 'Ether',
+          address: randomAddress(),
+          decimals: 18,
+          kind: 'NATIVE',
+          assetIssuer: Keypair.random().publicKey(),
+        })
+        .expect(400);
+    });
+
+    it('PATCH can clear assetIssuer when moving off SAC', async () => {
+      const access = await loginAsAdmin(app);
+      const issuer = Keypair.random().publicKey();
+      const create = await request(app.getHttpServer())
+        .post('/v1/admin/tokens/create')
+        .set('Authorization', `Bearer ${access}`)
+        .send({
+          chainUid: stellarChain.id,
+          symbol: 'USDC',
+          name: 'USD Coin',
+          address: randomContractHex(),
+          decimals: 7,
+          kind: 'SAC',
+          assetIssuer: issuer,
+        })
+        .expect(201);
+
+      const tokId = create.body.id as string;
+      const updated = await request(app.getHttpServer())
+        .patch(`/v1/admin/tokens/${tokId}`)
+        .set('Authorization', `Bearer ${access}`)
+        .send({ kind: 'SEP41', assetIssuer: '' })
+        .expect(200);
+      expect(updated.body.assetIssuer).toBeNull();
+      expect(updated.body.kind).toBe('SEP41');
+    });
   });
 });

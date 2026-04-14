@@ -580,20 +580,39 @@ export class StellarService {
     return computeOrderHash(orderParams);
   }
 
-  // Verify an ed25519 signature over `orderHash` (32-byte hex). On Stellar the
-  // "address" passed in is the G-strkey or its 32-byte hex — we take the
-  // 32-byte payload as the ed25519 public key.
+  // Verify a Stellar-wallet signature over `orderHash`. Off-chain only — this
+  // authorizes the unlock request on the relayer and never goes on-chain.
+  //
+  // Wallets don't sign raw bytes; stellar-wallets-kit's `signMessage` applies
+  // SEP-43-style domain separation and sha256 before ed25519. We reconstruct
+  // the same preimage here. Frontend sends the orderHash hex string (with
+  // `0x` prefix) as the message; signature arrives base64-encoded (kit
+  // normalizes) — we also accept `0x`-hex for direct-bytes callers.
+  //
+  // "address" is the G-strkey or its 32-byte hex; the 32-byte payload is the
+  // ed25519 public key.
   verifyOrderSignature(
     address: `0x${string}`,
     orderHash: `0x${string}`,
-    signature: `0x${string}`,
+    signature: string,
   ): boolean {
-    const publicKey = hex32ToBuffer(address);
-    const msg = hex32ToBuffer(orderHash);
-    const sigBytes = Buffer.from(signature.replace(/^0x/, ''), 'hex');
-    if (sigBytes.length !== 64) return false;
     try {
-      return verifyEd25519(msg, sigBytes, publicKey);
+      const publicKey = hex32ToBuffer(address);
+      const sigBytes = signature.startsWith('0x')
+        ? Buffer.from(signature.slice(2), 'hex')
+        : Buffer.from(signature, 'base64');
+      if (sigBytes.length !== 64) return false;
+
+      const messageStr = orderHash.startsWith('0x')
+        ? orderHash
+        : `0x${orderHash}`;
+      const preimage = Buffer.concat([
+        Buffer.from('Stellar Signed Message:\n', 'utf8'),
+        Buffer.from(messageStr, 'utf8'),
+      ]);
+      // Ed25519 hashes the message internally (sha512); domain separation is
+      // just prepended bytes, not a pre-hash.
+      return verifyEd25519(preimage, sigBytes, publicKey);
     } catch {
       return false;
     }

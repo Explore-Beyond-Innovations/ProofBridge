@@ -30,7 +30,7 @@ describe('ChainController (unit)', () => {
   afterEach(() => jest.resetAllMocks());
 
   it('list -> delegates to service', async () => {
-    const mock = { rows: [], nextCursor: null };
+    const mock = { data: [], nextCursor: null };
     const spy = jest
       .spyOn(service, 'listChainsPublic')
       .mockResolvedValueOnce(mock);

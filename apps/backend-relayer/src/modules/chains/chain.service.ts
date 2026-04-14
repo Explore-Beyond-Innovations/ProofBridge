@@ -20,9 +20,9 @@ export class ChainService {
 
   async listChainsPublic(query: QueryChainsDto) {
     try {
-      const data = await this.listChains(query);
-      const rows = data.rows.map((c) => this.toPublic(c));
-      return { rows, nextCursor: data.nextCursor };
+      const listed = await this.listChains(query);
+      const data = listed.rows.map((c) => this.toPublic(c));
+      return { data, nextCursor: listed.nextCursor };
     } catch (e) {
       if (e instanceof Error) {
         const status = e.message.toLowerCase().includes('forbidden')

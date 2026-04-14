@@ -28,9 +28,21 @@ type TokenRow = {
   address: string;
   decimals: number;
   kind: string;
+  assetIssuer: string | null;
   createdAt: Date;
   updatedAt: Date;
-  chain: { id: string; name: string; chainId: bigint };
+  chain: { id: string; name: string; chainId: bigint; kind: ChainKind };
+};
+
+type RouteTokenEmbed = {
+  id: string;
+  symbol: string;
+  name: string;
+  address: string;
+  decimals: number;
+  kind: string;
+  assetIssuer: string | null;
+  chain: { id: string; name: string; chainId: bigint; kind: ChainKind };
 };
 
 type RouteRow = {
@@ -38,22 +50,6 @@ type RouteRow = {
   metadata: Prisma.JsonValue | null;
   createdAt: Date;
   updatedAt: Date;
-  adToken: {
-    id: string;
-    symbol: string;
-    name: string;
-    address: string;
-    decimals: number;
-    kind: string;
-    chain: { id: string; name: string; chainId: bigint };
-  };
-  orderToken: {
-    id: string;
-    symbol: string;
-    name: string;
-    address: string;
-    decimals: number;
-    kind: string;
-    chain: { id: string; name: string; chainId: bigint };
-  };
+  adToken: RouteTokenEmbed;
+  orderToken: RouteTokenEmbed;
 };

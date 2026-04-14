@@ -18,11 +18,7 @@ import {
   strkeyToHex,
   evmAddressToBytes32,
 } from "./stellar.js";
-import {
-  deployEvmContracts,
-  NonceTracker,
-  type EvmContracts,
-} from "./evm.js";
+import { deployEvmContracts, NonceTracker, type EvmContracts } from "./evm.js";
 
 // ── env / paths ───────────────────────────────────────────────────────
 
@@ -44,6 +40,8 @@ export interface StellarDeployResult {
   adTokenHex: string; // 0x + 64 hex
   adManager: string; // strkey
   adManagerHex: string;
+  orderPortal: string; // strkey
+  orderPortalHex: string;
   adminStrkey: string;
   chainId: bigint;
 }
@@ -87,7 +85,9 @@ export interface DeployStellarOpts {
   chainId: bigint;
 }
 
-export function deployStellarChain(opts: DeployStellarOpts): StellarDeployResult {
+export function deployStellarChain(
+  opts: DeployStellarOpts,
+): StellarDeployResult {
   const { wasmDir, vkPath, adminStrkey, chainId } = opts;
 
   console.log("Deploying Stellar Verifier...");
@@ -98,7 +98,9 @@ export function deployStellarChain(opts: DeployStellarOpts): StellarDeployResult
   console.log(`  Verifier: ${verifier}`);
 
   console.log("Deploying Stellar MerkleManager...");
-  const merkleManager = deployContract(path.join(wasmDir, "merkle_manager.wasm"));
+  const merkleManager = deployContract(
+    path.join(wasmDir, "merkle_manager.wasm"),
+  );
   console.log(`  MerkleManager: ${merkleManager}`);
   invokeContract(merkleManager, "initialize", [`--admin`, adminStrkey]);
 
@@ -123,9 +125,31 @@ export function deployStellarChain(opts: DeployStellarOpts): StellarDeployResult
     chainId.toString(),
   ]);
 
+  console.log("Deploying Stellar OrderPortal...");
+  const orderPortal = deployContract(path.join(wasmDir, "order_portal.wasm"));
+  console.log(`  OrderPortal: ${orderPortal}`);
+  invokeContract(orderPortal, "initialize", [
+    `--admin`,
+    adminStrkey,
+    `--verifier`,
+    verifier,
+    `--merkle_manager`,
+    merkleManager,
+    `--w_native_token`,
+    adToken,
+    `--chain_id`,
+    chainId.toString(),
+  ]);
+
   invokeContract(merkleManager, "set_manager", [
     `--manager`,
     adManager,
+    `--status`,
+    "true",
+  ]);
+  invokeContract(merkleManager, "set_manager", [
+    `--manager`,
+    orderPortal,
     `--status`,
     "true",
   ]);
@@ -137,6 +161,8 @@ export function deployStellarChain(opts: DeployStellarOpts): StellarDeployResult
     adTokenHex,
     adManager,
     adManagerHex: strkeyToHex(adManager),
+    orderPortal,
+    orderPortalHex: strkeyToHex(orderPortal),
     adminStrkey,
     chainId,
   };
@@ -150,7 +176,9 @@ export interface DeployEvmOpts {
   chainId: bigint;
 }
 
-export async function deployEvmChain(opts: DeployEvmOpts): Promise<EvmDeployResult> {
+export async function deployEvmChain(
+  opts: DeployEvmOpts,
+): Promise<EvmDeployResult> {
   const contracts = await deployEvmContracts(opts.rpcUrl, opts.adminPrivateKey);
   return {
     chainId: opts.chainId,
@@ -168,12 +196,17 @@ export async function linkChains(
   evm: EvmDeployResult,
 ): Promise<void> {
   const { contracts, nonces, chainId: evmChainId } = evm;
-  const stellarChainIdStr = stellar.chainId.toString();
   const evmChainIdStr = evmChainId.toString();
 
-  const evmOrderPortalBytes32 = evmAddressToBytes32(contracts.addresses.orderPortal);
+  const evmOrderPortalBytes32 = evmAddressToBytes32(
+    contracts.addresses.orderPortal,
+  );
+  const evmAdManagerBytes32 = evmAddressToBytes32(
+    contracts.addresses.adManager,
+  );
   const evmTokenBytes32 = evmAddressToBytes32(contracts.addresses.testToken);
 
+  // ── Direction A: Stellar ad-side ↔ EVM order-side ──────────────────
   console.log("Linking Stellar AdManager → EVM OrderPortal...");
   invokeContract(stellar.adManager, "set_chain", [
     `--order_chain_id`,
@@ -183,8 +216,6 @@ export async function linkChains(
     `--supported`,
     "true",
   ]);
-
-  console.log("Setting Stellar token route...");
   invokeContract(stellar.adManager, "set_token_route", [
     `--ad_token`,
     stellar.adTokenHex.replace(/^0x/, ""),
@@ -204,8 +235,6 @@ export async function linkChains(
     );
     await tx.wait();
   }
-
-  console.log("Setting EVM token route...");
   {
     const tx = await contracts.orderPortal.getFunction("setTokenRoute")(
       contracts.addresses.testToken,
@@ -216,16 +245,61 @@ export async function linkChains(
     await tx.wait();
   }
 
+  // ── Direction B: EVM ad-side ↔ Stellar order-side ──────────────────
+  console.log("Linking EVM AdManager → Stellar OrderPortal...");
+  {
+    const tx = await contracts.adManager.getFunction("setChain")(
+      stellar.chainId,
+      stellar.orderPortalHex,
+      true,
+      { nonce: nonces.next() },
+    );
+    await tx.wait();
+  }
+  {
+    // AdManager.setTokenRoute: (address adToken, bytes32 orderToken, uint256 orderChainId)
+    // Arg order differs from OrderPortal.setTokenRoute — bytes32 and uint256 are swapped.
+    const tx = await contracts.adManager.getFunction("setTokenRoute")(
+      contracts.addresses.testToken,
+      stellar.adTokenHex,
+      stellar.chainId,
+      { nonce: nonces.next() },
+    );
+    await tx.wait();
+  }
+
+  console.log("Linking Stellar OrderPortal → EVM AdManager...");
+  invokeContract(stellar.orderPortal, "set_chain", [
+    `--ad_chain_id`,
+    evmChainIdStr,
+    `--ad_manager`,
+    evmAdManagerBytes32.replace(/^0x/, ""),
+    `--supported`,
+    "true",
+  ]);
+  invokeContract(stellar.orderPortal, "set_token_route", [
+    `--order_token`,
+    stellar.adTokenHex.replace(/^0x/, ""),
+    `--ad_chain_id`,
+    evmChainIdStr,
+    `--ad_token`,
+    evmTokenBytes32.replace(/^0x/, ""),
+  ]);
+
   console.log("Cross-chain linking complete.");
 }
 
 // ── top-level ─────────────────────────────────────────────────────────
 
-export async function deployAll(opts: DeployAllOpts = {}): Promise<DeployAllResult> {
+export async function deployAll(
+  opts: DeployAllOpts = {},
+): Promise<DeployAllResult> {
   const rootDir = opts.rootDir ?? requireEnv("ROOT_DIR");
   const wasmDir =
-    opts.wasmDir ?? path.join(rootDir, "contracts/stellar/target/wasm32v1-none/release");
-  const vkPath = opts.vkPath ?? path.join(rootDir, "proof_circuits/deposits/target/vk");
+    opts.wasmDir ??
+    path.join(rootDir, "contracts/stellar/target/wasm32v1-none/release");
+  const vkPath =
+    opts.vkPath ?? path.join(rootDir, "proof_circuits/deposits/target/vk");
   const evmRpcUrl = opts.evmRpcUrl ?? requireEnv("EVM_RPC_URL");
   const evmAdminPrivateKey =
     opts.evmAdminPrivateKey ?? requireEnv("EVM_ADMIN_PRIVATE_KEY");
@@ -258,32 +332,33 @@ export function writeDeployedSnapshot(
   outPath: string,
   { stellar, evm }: DeployAllResult,
 ): void {
-  // Undeployed roles are emitted as null so consumers fail fast on a real use
-  // (instead of silently contract-calling the zero address). In this flow the
-  // EVM side only plays the order role and the Stellar side only plays the ad
-  // role, so the counterpart address on each chain stays null.
   const snapshot = {
     eth: {
       name: "AnvilLocal",
       chainId: evm.chainId.toString(),
-      adManagerAddress: null as string | null,
+      adManagerAddress: evm.addresses.adManager,
       orderPortalAddress: evm.addresses.orderPortal,
       merkleManagerAddress: evm.addresses.merkleManager,
       verifierAddress: evm.addresses.verifier,
       tokenName: "TestToken",
       tokenSymbol: "TT",
       tokenAddress: evm.addresses.testToken,
+      tokenKind: "ERC20" as const,
+      tokenDecimals: 18,
     },
     stellar: {
       name: "StellarLocal",
       chainId: stellar.chainId.toString(),
       adManagerAddress: stellar.adManagerHex,
-      orderPortalAddress: null as string | null,
+      orderPortalAddress: stellar.orderPortalHex,
       merkleManagerAddress: strkeyToHex(stellar.merkleManager),
       verifierAddress: strkeyToHex(stellar.verifier),
       tokenName: "XLM",
       tokenSymbol: "XLM",
       tokenAddress: stellar.adTokenHex,
+      tokenKind: "NATIVE" as const,
+      tokenDecimals: 7,
+      tokenAssetIssuer: null as string | null,
     },
   };
   fs.writeFileSync(outPath, JSON.stringify(snapshot, null, 2));

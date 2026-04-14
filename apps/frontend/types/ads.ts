@@ -1,4 +1,6 @@
 import { Address } from "viem"
+import type { ChainKind } from "./chains"
+import type { TokenKind } from "./tokens"
 
 export interface ICreateAdRequest {
   routeId: string
@@ -15,6 +17,7 @@ export interface ICreateAdRequest {
 export interface ICreateAdResponse {
   contractAddress: Address
   signature: Address
+  signerPublicKey?: Address
   authToken: Address
   timeToExpire: number
   adId: string
@@ -22,68 +25,72 @@ export interface ICreateAdResponse {
   orderChainId: string
   adRecipient: Address
   reqHash: Address
-  chainId: number
+  chainId: string
+  chainKind: ChainKind
 }
 
 export interface IFundAdResponse {
+  chainId: string
   contractAddress: Address
   signature: Address
+  signerPublicKey?: Address
   authToken: Address
   timeToExpire: number
   adId: string
-  adToken: Address
-  orderChainId: string
-  adRecipient: Address
+  amount: string
   reqHash: Address
-  chainId: number
-  amount: number
+  chainKind: ChainKind
 }
 
 export interface ITopUpAdRequest {
   adId: string
   poolAmountTopUp: string
-  amountBigInt: BigInt
+  amountBigInt: bigint
   tokenId: string
 }
 
 export interface IWithdrawFromAdRequest {
   adId: string
   poolAmountWithdraw: string
-  amountBigInt: BigInt
-  to: Address
+  amountBigInt: bigint
+  to: string
 }
 
 export interface IWithdrawFromAdResponse {
   chainId: string
   contractAddress: Address
   signature: Address
+  signerPublicKey?: Address
   authToken: Address
   timeToExpire: number
   adId: string
   amount: string
   to: Address
   reqHash: Address
+  chainKind: ChainKind
 }
 
 export interface ICloseAdRequest {
   adId: string
-  to: Address
+  to: string
 }
 
 export interface ICloseAdResponse {
   chainId: string
   contractAddress: Address
   signature: Address
+  signerPublicKey?: Address
   authToken: Address
   timeToExpire: number
   adId: string
   amount: string
   to: Address
   reqHash: Address
+  chainKind: ChainKind
 }
 
 export interface IUpdateAdRequest {
-  status?: "ACTIVE" | "INACTIVE"
+  status?: "ACTIVE" | "PAUSED"
   minAmount?: string
   maxAmount?: string
   metadata?: {
@@ -96,14 +103,14 @@ export interface IUpdateAdRequest {
 export interface IUpdateAdResponse {
   id: string
   creatorAddress: string
-  minAmount: {}
-  maxAmount: {}
-  metadata: {}
+  minAmount: string | null
+  maxAmount: string | null
+  metadata: { title?: string; description?: string } | null
 }
 
 export interface IConfirmAdTxRequest {
   adId: string
-  txHash: Address
+  txHash: string
   signature: Address
 }
 
@@ -115,26 +122,28 @@ export interface IAd {
   orderTokenId: string
   poolAmount: string
   availableAmount: string
-  minAmount: string
-  maxAmount: string
+  // Nullable in backend DTO — guard before BigInt()/parseToBigInt.
+  minAmount: string | null
+  maxAmount: string | null
   status: AdStatusT
   metadata: { title?: string; description?: string }
   createdAt: string
   updatedAt: string
-  adToken: {
-    name: string
-    symbol: string
-    address: Address
-    decimals: number
-    chainId: string
-  }
-  orderToken: {
-    name: string
-    symbol: string
-    address: Address
-    decimals: number
-    chainId: string
-  }
+  adToken: IAdToken
+  orderToken: IAdToken
+}
+
+export interface IAdToken {
+  name: string
+  symbol: string
+  address: Address
+  decimals: number
+  chainId: string
+  chainKind: ChainKind
+  kind: TokenKind
+  // Populated only for SAC tokens (classic-asset issuer G-strkey). Needed for
+  // trustline checks on recipients of Stellar SAC transfers.
+  assetIssuer?: string | null
 }
 
 export interface IGetAdsParams {
@@ -150,10 +159,10 @@ export interface IGetAdsParams {
 }
 
 export type AdStatusT =
+  | "INACTIVE"
   | "ACTIVE"
   | "PAUSED"
-  | "INACTIVE"
   | "EXHAUSTED"
   | "CLOSED"
-  | "LOCKED"
-  | "COMPLETED"
+
+export type TradeStatusT = "INACTIVE" | "ACTIVE" | "LOCKED" | "COMPLETED"

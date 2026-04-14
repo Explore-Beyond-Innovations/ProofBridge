@@ -26,7 +26,15 @@ async function bootstrap() {
 
   app.use(morgan('tiny'));
   app.use(express.json({ limit: 5 << 20 }));
-  app.useGlobalPipes(new ValidationPipe({ transform: true }));
+  // whitelist drops unknown fields; forbidNonWhitelisted turns them into 400s
+  // so clients get loud feedback on typos instead of silent data loss.
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
   app.useGlobalFilters(new GlobalExceptionFilter());
 
   const swaggerOptions = new DocumentBuilder()

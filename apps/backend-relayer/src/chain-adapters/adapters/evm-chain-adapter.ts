@@ -25,6 +25,8 @@ import {
 @Injectable()
 export class EvmChainAdapter extends ChainAdapter {
   private static readonly EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
+  // ECDSA signature: r(32) + s(32) + v(1) = 65 bytes → 130 hex chars.
+  private static readonly EVM_SIG_RE = /^0x[a-fA-F0-9]{130}$/;
 
   constructor(private readonly viem: ViemService) {
     super();
@@ -37,6 +39,14 @@ export class EvmChainAdapter extends ChainAdapter {
     if (!EvmChainAdapter.EVM_ADDRESS_RE.test(value)) {
       throw new Error(
         `${field}: expected EVM address (0x + 40 hex), got "${value}"`,
+      );
+    }
+  }
+
+  private assertLocalSignature(value: string, field: string): void {
+    if (!EvmChainAdapter.EVM_SIG_RE.test(value)) {
+      throw new Error(
+        `${field}: expected ECDSA signature (0x + 130 hex), got "${value}"`,
       );
     }
   }
@@ -183,13 +193,14 @@ export class EvmChainAdapter extends ChainAdapter {
   verifyOrderSignature(
     address: ChainAddress,
     orderHash: `0x${string}`,
-    signature: `0x${string}`,
+    signature: string,
   ): boolean {
     this.assertLocalAddress(address, 'address');
+    this.assertLocalSignature(signature, 'signature');
     return this.viem.verifyOrderSignature(
       address as `0x${string}`,
       orderHash,
-      signature,
+      signature as `0x${string}`,
     );
   }
 }
