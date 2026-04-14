@@ -44,9 +44,15 @@ for arg in "$@"; do
 done
 
 have_artifact() {
-  [[ -f "$ARTIFACTS_DIR/contracts/stellar/target/wasm32v1-none/release/order_portal.wasm" \
-    && -d "$ARTIFACTS_DIR/contracts/evm/out/OrderPortal.sol" \
-    && -f "$ARTIFACTS_DIR/proof_circuits/deposits/target/vk" ]]
+  local stellar_wasm="$ARTIFACTS_DIR/contracts/stellar/target/wasm32v1-none/release"
+  local evm_out="$ARTIFACTS_DIR/contracts/evm/out"
+  for w in verifier.wasm merkle_manager.wasm ad_manager.wasm order_portal.wasm; do
+    [[ -f "$stellar_wasm/$w" ]] || return 1
+  done
+  for c in OrderPortal AdManager MerkleManager Verifier wNativeToken ERC20Mock; do
+    [[ -d "$evm_out/${c}.sol" ]] || return 1
+  done
+  [[ -f "$ARTIFACTS_DIR/proof_circuits/deposits/target/vk" ]]
 }
 
 sync_from_local_tree() {

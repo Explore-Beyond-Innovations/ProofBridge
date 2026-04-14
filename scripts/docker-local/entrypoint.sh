@@ -62,15 +62,28 @@ log "generating stellar identity '$ADMIN_ACCT'…"
 stellar keys rm "$ADMIN_ACCT" >/dev/null 2>&1 || true
 stellar keys generate "$ADMIN_ACCT" --network "$STELLAR_NETWORK"
 
-log "friendbot-funding '$ADMIN_ACCT'…"
-for i in $(seq 1 30); do
-  if stellar keys fund "$ADMIN_ACCT" --network "$STELLAR_NETWORK" 2>/dev/null; then
-    break
-  fi
-  log "  friendbot not ready (try $i/30)…"
-  sleep 4
-  [[ $i -eq 30 ]] && { log "friendbot funding failed"; exit 1; }
+# Quickstart flips RPC to "healthy" well before friendbot's HTTP endpoint
+# is serving. Probe friendbot directly so we don't burn N failed
+# `stellar keys fund` RPC round-trips waiting for it.
+FRIENDBOT_URL="${STELLAR_RPC_URL%/soroban/rpc}/friendbot"
+log "waiting for friendbot at $FRIENDBOT_URL…"
+for i in $(seq 1 90); do
+  # A bare GET returns 400 ("invalid request") once friendbot is actually
+  # serving. Anything in 2xx/4xx means the backend is up; 5xx / 000 mean
+  # the quickstart proxy is up but the friendbot process isn't ready yet.
+  code="$(curl -s -o /dev/null -w '%{http_code}' "$FRIENDBOT_URL" || echo 000)"
+  case "$code" in
+    2*|4*)
+      log "friendbot up (http $code)."
+      break
+      ;;
+  esac
+  sleep 2
+  [[ $i -eq 90 ]] && { log "friendbot never became reachable (last http=$code)"; exit 1; }
 done
+
+log "friendbot-funding '$ADMIN_ACCT'…"
+stellar keys fund "$ADMIN_ACCT" --network "$STELLAR_NETWORK"
 
 ADMIN_SECRET="$(stellar keys show "$ADMIN_ACCT")"
 printf '%s' "$ADMIN_SECRET" > "$ADMIN_SECRET_PATH"
