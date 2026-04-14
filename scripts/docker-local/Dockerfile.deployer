@@ -19,6 +19,7 @@ RUN apt-get update \
       ca-certificates \
       curl \
       jq \
+      libdbus-1-3 \
  && rm -rf /var/lib/apt/lists/*
 
 # Stellar CLI — runtime `contract deploy` / `contract invoke` only.
@@ -45,15 +46,20 @@ COPY scripts/relayer-e2e/package.json scripts/relayer-e2e/
 COPY scripts/cross-chain-e2e/package.json scripts/cross-chain-e2e/
 COPY contracts/stellar/tests/fixtures/package.json contracts/stellar/tests/fixtures/
 
-RUN pnpm fetch --ignore-scripts
-
 # Sources needed at runtime: backend-relayer for prisma schema/migrations,
 # packages/* for workspace links, scripts/* for the deploy + seed CLIs.
 COPY apps/backend-relayer apps/backend-relayer
 COPY packages packages
 COPY scripts scripts
 
-RUN pnpm install --frozen-lockfile --offline --ignore-scripts \
+# BuildKit cache mount keeps the pnpm store around across rebuilds; the
+# --filter set pulls only the three workspace roots the deployer actually
+# uses plus their transitive workspace deps.
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile --ignore-scripts \
+      --filter backend-relayer \
+      --filter relayer-e2e \
+      --filter cross-chain-e2e \
  && pnpm --filter backend-relayer exec prisma generate
 
 COPY scripts/docker-local/entrypoint.sh /usr/local/bin/entrypoint.sh
