@@ -4,7 +4,7 @@
 #
 # Only the runtime deploy toolkit is baked in (stellar CLI + node + pnpm).
 # Contract artifacts (WASMs, EVM ABIs, deposit VK) are NOT built here — they
-# are pulled by `up.sh` from the `contracts-latest` GitHub Release and
+# are pulled by `up.sh` from the Proofbridge-Contracts `latest` GitHub Release and
 # bind-mounted into the container at the paths deploy.ts expects.
 #
 # Image build is ~1 min on a cold cache; rebuilds happen only when

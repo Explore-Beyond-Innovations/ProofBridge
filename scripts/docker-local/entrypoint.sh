@@ -34,8 +34,13 @@ done
 log "stellar RPC healthy."
 
 log "waiting for anvil at $EVM_RPC_URL…"
+# Slim deployer image has no `cast` — talk to anvil via raw JSON-RPC.
+# Compose already gates us on `anvil: service_healthy`, so this is a
+# sanity check more than a real wait loop.
 for i in $(seq 1 30); do
-  if cast block-number --rpc-url "$EVM_RPC_URL" >/dev/null 2>&1; then
+  if curl -sf -X POST -H 'Content-Type: application/json' \
+       -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+       "$EVM_RPC_URL" 2>/dev/null | grep -q '"result":"0x'; then
     break
   fi
   sleep 2
@@ -74,7 +79,7 @@ log "wrote admin secret → $ADMIN_SECRET_PATH"
 # ── deploy contracts ─────────────────────────────────────────────────
 #
 # WASMs, EVM artifacts, and the deposit VK are bind-mounted in from
-# $ROOT_DIR (populated by up.sh from the contracts-latest GitHub Release,
+# $ROOT_DIR (populated by up.sh from the Proofbridge-Contracts `latest` GitHub Release,
 # or from the repo's locally-built tree via `up.sh --local`). Sanity-check
 # their presence before running deploy so missing artifacts fail fast.
 

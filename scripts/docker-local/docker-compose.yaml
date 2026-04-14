@@ -73,8 +73,9 @@ services:
       DEV_STELLAR_ADDRESS: ${DEV_STELLAR_ADDRESS:-}
     volumes:
       - shared:/shared
-      # Contract artifacts are pulled by up.sh from the `contracts-latest`
-      # GitHub Release (or built locally with `up.sh --local`) and extracted
+      # Contract artifacts are pulled by up.sh from the Proofbridge-Contracts
+      # `latest` GitHub Release (or built locally with `up.sh --local`) and
+      # extracted
       # into ./.artifacts. deploy.ts reads from these paths verbatim.
       - ./.artifacts/contracts/stellar/target/wasm32v1-none/release:/repo/contracts/stellar/target/wasm32v1-none/release:ro
       - ./.artifacts/contracts/evm/out:/repo/contracts/evm/out:ro

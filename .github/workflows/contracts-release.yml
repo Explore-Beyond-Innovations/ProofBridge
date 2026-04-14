@@ -121,27 +121,27 @@ jobs:
           echo "manifest=$MANIFEST" >> "$GITHUB_OUTPUT"
 
       # ── immutable per-sha release ───────────────────────────────────
-      - name: Release contracts-${{ steps.sha.outputs.short }}
+      - name: Release ${{ steps.sha.outputs.short }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: contracts-${{ steps.sha.outputs.short }}
-          name: Contracts @ ${{ steps.sha.outputs.short }}
+          tag_name: ${{ steps.sha.outputs.short }}
+          name: Proofbridge-Contracts @ ${{ steps.sha.outputs.short }}
           body: |
             Bundled WASMs, EVM artifacts, and deposit VK built from `${{ github.sha }}`.
 
-            Consumed by `scripts/docker-local/up.sh` (defaults to `contracts-latest`;
-            pin this tag by exporting `CONTRACTS_BUNDLE_TAG=contracts-${{ steps.sha.outputs.short }}`).
+            Consumed by `scripts/docker-local/up.sh` (defaults to `latest`;
+            pin this tag by exporting `CONTRACTS_BUNDLE_TAG=${{ steps.sha.outputs.short }}`).
           files: |
             ${{ steps.bundle.outputs.tarball }}
             ${{ steps.bundle.outputs.manifest }}
           make_latest: "false"
 
       # ── rolling pointer for docker-local ────────────────────────────
-      - name: Update contracts-latest
+      - name: Update latest
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: contracts-latest
-          name: Contracts (latest main)
+          tag_name: latest
+          name: Proofbridge-Contracts
           body: |
             Rolling pointer to the most recent contracts build from `main`.
             Current commit: ${{ github.sha }}
