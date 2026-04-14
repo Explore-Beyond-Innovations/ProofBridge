@@ -3,11 +3,13 @@
 // Usage:
 //   tsx cli.ts deploy [--out <path>]
 //   tsx cli.ts seed   [--in  <path>]
+//   tsx cli.ts fund   [--in  <path>]
 //   tsx cli.ts flows
 //   tsx cli.ts all    [--out <path>]
 //
 // `deploy` brings up the on-chain state and writes a JSON snapshot.
 // `seed` feeds that snapshot into Postgres via Prisma.
+// `fund`  tops up DEV_EVM_ADDRESS / DEV_STELLAR_ADDRESS on the local chains.
 // `flows` drives the relayer over HTTP through the ad + trade lifecycles.
 // `all` runs every step in-process; intended for local dev. In CI, the shell
 // orchestrator in `e2e.sh` calls the subcommands individually so Docker can
@@ -17,6 +19,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { deploy } from "./lib/deploy.js";
 import { seedDb, type DeployedContracts } from "./lib/seed.js";
+import { fundDevWallets } from "./lib/fund.js";
 import { runAdLifecycle } from "./flows/ad-lifecycle.js";
 import { runTradeLifecycle } from "./flows/trade-lifecycle.js";
 
@@ -46,6 +49,23 @@ async function cmdSeed(argv: string[]): Promise<void> {
   await seedDb(snapshot);
 }
 
+async function cmdFund(argv: string[]): Promise<void> {
+  const inPath = parseFlag(argv, "--in") ?? defaultSnapshotPath();
+  const snapshot = readSnapshot(inPath);
+  await fundDevWallets(snapshot, {
+    devEvmAddress: process.env.DEV_EVM_ADDRESS,
+    devStellarAddress: process.env.DEV_STELLAR_ADDRESS,
+    evmRpcUrl: requireEnv("EVM_RPC_URL"),
+    stellarRpcUrl: requireEnv("STELLAR_RPC_URL"),
+  });
+}
+
+function requireEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`${name} must be set`);
+  return v;
+}
+
 async function cmdFlows(): Promise<void> {
   await runAdLifecycle();
   await runTradeLifecycle();
@@ -67,6 +87,9 @@ async function main(): Promise<void> {
       return;
     case "seed":
       await cmdSeed(rest);
+      return;
+    case "fund":
+      await cmdFund(rest);
       return;
     case "flows":
       await cmdFlows();
