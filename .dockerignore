@@ -1,0 +1,25 @@
+# Applies to every docker build rooted at the repo (apps/backend-relayer and
+# scripts/docker-local/Dockerfile.deployer both use the repo as context).
+
+node_modules
+**/node_modules
+
+contracts/stellar/target
+contracts/evm/out
+contracts/evm/cache
+
+apps/frontend/.next
+apps/backend-relayer/dist
+
+.git
+.github
+
+.chains.env
+.chains.anvil.log
+.chains.anvil.pid
+.relayer.log
+.postgres.log
+
+**/.env
+**/.env.local
+**/.env.test

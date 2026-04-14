@@ -1,0 +1,62 @@
+# syntax=docker/dockerfile:1.7
+#
+# Slim deployer image for the local docker stack.
+#
+# Only the runtime deploy toolkit is baked in (stellar CLI + node + pnpm).
+# Contract artifacts (WASMs, EVM ABIs, deposit VK) are NOT built here — they
+# are pulled by `up.sh` from the `contracts-latest` GitHub Release and
+# bind-mounted into the container at the paths deploy.ts expects.
+#
+# Image build is ~1 min on a cold cache; rebuilds happen only when
+# workspace manifests or the deploy scripts change.
+
+FROM node:20-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      ca-certificates \
+      curl \
+      jq \
+ && rm -rf /var/lib/apt/lists/*
+
+# Stellar CLI — runtime `contract deploy` / `contract invoke` only.
+ARG STELLAR_CLI_VERSION=23.3.0
+ARG STELLAR_CLI_SHA256=b3a5455d7113a53a8bd0f1ba0148a14b7aa7a46ee2f49c3b9277424775b309ad
+RUN url="https://github.com/stellar/stellar-cli/releases/download/v${STELLAR_CLI_VERSION}/stellar-cli-${STELLAR_CLI_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+ && curl -fsSL "$url" -o /tmp/stellar.tgz \
+ && echo "${STELLAR_CLI_SHA256}  /tmp/stellar.tgz" | sha256sum -c - \
+ && tar -xzf /tmp/stellar.tgz -C /usr/local/bin stellar \
+ && chmod +x /usr/local/bin/stellar \
+ && rm /tmp/stellar.tgz
+
+RUN corepack enable && corepack prepare pnpm@10.10.0 --activate
+
+WORKDIR /repo
+
+# Cache-friendly pnpm install — manifests first, then the workspace sources
+# the deployer actually executes.
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY apps/backend-relayer/package.json apps/backend-relayer/
+COPY apps/frontend/package.json apps/frontend/
+COPY packages/proofbridge_mmr/package.json packages/proofbridge_mmr/
+COPY scripts/relayer-e2e/package.json scripts/relayer-e2e/
+COPY scripts/cross-chain-e2e/package.json scripts/cross-chain-e2e/
+COPY contracts/stellar/tests/fixtures/package.json contracts/stellar/tests/fixtures/
+
+RUN pnpm fetch --ignore-scripts
+
+# Sources needed at runtime: backend-relayer for prisma schema/migrations,
+# packages/* for workspace links, scripts/* for the deploy + seed CLIs.
+COPY apps/backend-relayer apps/backend-relayer
+COPY packages packages
+COPY scripts scripts
+
+RUN pnpm install --frozen-lockfile --offline --ignore-scripts \
+ && pnpm --filter backend-relayer exec prisma generate
+
+COPY scripts/docker-local/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
