@@ -8,6 +8,7 @@ import {
   Matches,
   Max,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { TokenKind } from '@prisma/client';
@@ -131,11 +132,15 @@ export class CreateTokenDto {
 
   @ApiPropertyOptional({
     description:
-      'Stellar classic-asset issuer (G-strkey). Required only for SAC tokens.',
+      'Stellar classic-asset issuer (G-strkey). Required when kind is SAC.',
     example: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
   })
-  @IsOptional()
+  // Only SAC tokens carry a classic-asset issuer; for other kinds the field
+  // is skipped entirely (service layer rejects stray values). When SAC, we
+  // require both presence and G-strkey format at the boundary.
+  @ValidateIf((o: CreateTokenDto) => o.kind === 'SAC')
   @IsString()
+  @IsNotEmpty({ message: 'assetIssuer is required when kind is SAC' })
   @Matches(/^G[A-Z2-7]{55}$/, {
     message: 'assetIssuer must be a valid Stellar issuer (G-strkey)',
   })
@@ -204,13 +209,15 @@ export class UpdateTokenDto {
 
   @ApiPropertyOptional({
     description:
-      'Stellar classic-asset issuer (G-strkey). Pass an empty string to clear.',
+      'Stellar classic-asset issuer (G-strkey). Pass an empty string to clear (only when kind is moving off SAC).',
     example: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
   })
   @IsOptional()
   @IsString()
-  // Empty string is the explicit "clear the issuer" sentinel; service layer
-  // interprets it. Any non-empty value must be a valid G-strkey.
+  // Format gate: any non-empty value must be a valid G-strkey. Empty string
+  // is the explicit "clear the issuer" sentinel. Required-when-SAC cross-
+  // field enforcement lives in the service layer because an omitted `kind`
+  // still means SAC when the existing row is SAC.
   @Matches(/^$|^G[A-Z2-7]{55}$/, {
     message: 'assetIssuer must be empty or a valid Stellar issuer (G-strkey)',
   })

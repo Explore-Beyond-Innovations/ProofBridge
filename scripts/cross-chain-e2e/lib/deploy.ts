@@ -257,10 +257,12 @@ export async function linkChains(
     await tx.wait();
   }
   {
+    // AdManager.setTokenRoute: (address adToken, bytes32 orderToken, uint256 orderChainId)
+    // Arg order differs from OrderPortal.setTokenRoute — bytes32 and uint256 are swapped.
     const tx = await contracts.adManager.getFunction("setTokenRoute")(
       contracts.addresses.testToken,
-      stellar.chainId,
       stellar.adTokenHex,
+      stellar.chainId,
       { nonce: nonces.next() },
     );
     await tx.wait();
