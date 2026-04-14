@@ -52,6 +52,7 @@ export interface EvmContracts {
   merkleManager: ethers.Contract;
   wNativeToken: ethers.Contract;
   orderPortal: ethers.Contract;
+  adManager: ethers.Contract;
   testToken: ethers.Contract;
   signer: ethers.Wallet;
   nonces: NonceTracker;
@@ -60,6 +61,7 @@ export interface EvmContracts {
     merkleManager: string;
     wNativeToken: string;
     orderPortal: string;
+    adManager: string;
     testToken: string;
   };
 }
@@ -141,20 +143,43 @@ export async function deployEvmContracts(
     ],
   );
 
-  // Grant MANAGER_ROLE to OrderPortal on MerkleManager
-  console.log("  Granting MANAGER_ROLE to OrderPortal on MerkleManager...");
-  const tx = await merkleManager.getFunction("grantRole")(
-    MANAGER_ROLE,
-    await orderPortal.getAddress(),
-    { nonce: nonces.next() },
+  // Deploy AdManager alongside OrderPortal so this chain can play both roles
+  // (locked liquidity ad-side + order-book taker side). Both constructors
+  // share the same signature.
+  const adManager = await deploy(
+    signer,
+    nonces,
+    "AdManager",
+    "AdManager",
+    [
+      admin,
+      await verifier.getAddress(),
+      await merkleManager.getAddress(),
+      await wNativeToken.getAddress(),
+    ],
   );
-  await tx.wait();
+
+  // Grant MANAGER_ROLE to OrderPortal + AdManager on MerkleManager so both
+  // can anchor/consume MMR roots.
+  for (const { name, addr } of [
+    { name: "OrderPortal", addr: await orderPortal.getAddress() },
+    { name: "AdManager", addr: await adManager.getAddress() },
+  ]) {
+    console.log(`  Granting MANAGER_ROLE to ${name} on MerkleManager...`);
+    const tx = await merkleManager.getFunction("grantRole")(
+      MANAGER_ROLE,
+      addr,
+      { nonce: nonces.next() },
+    );
+    await tx.wait();
+  }
 
   return {
     verifier,
     merkleManager,
     wNativeToken,
     orderPortal,
+    adManager,
     testToken,
     signer,
     nonces,
@@ -163,6 +188,7 @@ export async function deployEvmContracts(
       merkleManager: await merkleManager.getAddress(),
       wNativeToken: await wNativeToken.getAddress(),
       orderPortal: await orderPortal.getAddress(),
+      adManager: await adManager.getAddress(),
       testToken: await testToken.getAddress(),
     },
   };

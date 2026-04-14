@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   Min,
 } from 'class-validator';
@@ -135,6 +136,9 @@ export class CreateTokenDto {
   })
   @IsOptional()
   @IsString()
+  @Matches(/^G[A-Z2-7]{55}$/, {
+    message: 'assetIssuer must be a valid Stellar issuer (G-strkey)',
+  })
   assetIssuer?: string;
 }
 
@@ -205,6 +209,11 @@ export class UpdateTokenDto {
   })
   @IsOptional()
   @IsString()
+  // Empty string is the explicit "clear the issuer" sentinel; service layer
+  // interprets it. Any non-empty value must be a valid G-strkey.
+  @Matches(/^$|^G[A-Z2-7]{55}$/, {
+    message: 'assetIssuer must be empty or a valid Stellar issuer (G-strkey)',
+  })
   assetIssuer?: string;
 }
 

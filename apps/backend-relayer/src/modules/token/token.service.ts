@@ -216,9 +216,9 @@ export class TokenService {
         dto.assetIssuer === '' ? undefined : dto.assetIssuer,
       );
     } else if (dto.kind && dto.kind !== exists.kind) {
-      // Kind is changing without touching assetIssuer. If moving off SAC, the
-      // caller must also clear assetIssuer explicitly.
-      if (dto.kind !== 'SAC') {
+      // Kind is changing without touching assetIssuer. Only SAC rows carry an
+      // issuer, so require explicit clearing when moving SAC → non-SAC.
+      if (exists.kind === 'SAC' && dto.kind !== 'SAC') {
         throw new BadRequestException(
           'Changing kind away from SAC requires clearing assetIssuer (pass an empty string)',
         );

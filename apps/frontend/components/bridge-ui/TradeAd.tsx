@@ -91,14 +91,11 @@ export const TradeAd = ({ ...props }: IAd) => {
     }
     if (balance.data) {
       setBalance_value(
-        formatUnits(balance?.data?.value!, balance?.data?.decimals!),
+        formatUnits(balance.data.value, balance.data.decimals),
       )
     } else if (nativeBalance.data) {
       setBalance_value(
-        formatUnits(
-          nativeBalance?.data?.value!,
-          nativeBalance?.data?.decimals!,
-        ),
+        formatUnits(nativeBalance.data.value, nativeBalance.data.decimals),
       )
     }
   }, [balance.data, nativeBalance.data, stellarBalance.data, isStellarOrder])

@@ -14,17 +14,29 @@ export function hex32ToBuffer(hex: string): Buffer {
   )
 }
 
+// Strict 32-byte-only variant. Use this for StrKey encodes (account ids,
+// contract ids) where zero-padding an EVM 20-byte address would silently
+// produce a bogus Ed25519/contract strkey.
+function hex32OnlyToBuffer(hex: string): Buffer {
+  if (!HEX32_RE.test(hex)) {
+    throw new Error(
+      `expected 0x + 64 hex (32 bytes), got ${hex} — EVM addresses are not valid Stellar keys`,
+    )
+  }
+  return Buffer.from(hex.slice(2), "hex")
+}
+
 export function bufferToHex32(buf: Buffer): `0x${string}` {
   if (buf.length !== 32) throw new Error("bufferToHex32: expected 32 bytes")
   return `0x${buf.toString("hex")}`
 }
 
 export function hex32ToContractId(hex: string): string {
-  return StrKey.encodeContract(hex32ToBuffer(hex))
+  return StrKey.encodeContract(hex32OnlyToBuffer(hex))
 }
 
 export function hex32ToAccountId(hex: string): string {
-  return StrKey.encodeEd25519PublicKey(hex32ToBuffer(hex))
+  return StrKey.encodeEd25519PublicKey(hex32OnlyToBuffer(hex))
 }
 
 export function contractIdToHex32(strkey: string): `0x${string}` {

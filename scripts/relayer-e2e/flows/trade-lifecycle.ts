@@ -54,7 +54,8 @@ export async function runTradeLifecycle(): Promise<void> {
   const adCreatorSecret = process.env.STELLAR_AD_CREATOR_SECRET!;
   const adCreator = Keypair.fromSecret(adCreatorSecret);
 
-  const adCreatorEvmKey = process.env.EVM_AD_CREATOR_PRIVATE_KEY as `0x${string}`;
+  const adCreatorEvmKey = process.env
+    .EVM_AD_CREATOR_PRIVATE_KEY as `0x${string}`;
   const adCreatorEvm = privateKeyToAccount(adCreatorEvmKey);
 
   const stellarChainId = process.env.STELLAR_CHAIN_ID!;
@@ -267,9 +268,11 @@ export async function runTradeLifecycle(): Promise<void> {
       ...bridgerOrderParams,
       salt: BigInt(bridgerOrderParams.salt),
     });
-    const bridgerSigBytes = bridgerStellar.sign(
-      Buffer.from(bridgerOrderHash.replace(/^0x/, ""), "hex"),
-    );
+    const bridgerSigPreimage = Buffer.concat([
+      Buffer.from("Stellar Signed Message:\n", "utf8"),
+      Buffer.from(bridgerOrderHash, "utf8"),
+    ]);
+    const bridgerSigBytes = bridgerStellar.sign(bridgerSigPreimage);
     const bridgerSig = `0x${bridgerSigBytes.toString("hex")}`;
 
     const unlockOnAd = expectStatus(

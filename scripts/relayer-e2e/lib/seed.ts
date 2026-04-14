@@ -1,10 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, type TokenKind } from "@prisma/client";
 import { hash as argon2hash } from "@node-rs/argon2";
 import { ethers } from "ethers";
 
-// `null` means the role wasn't deployed for this chain in the current flow;
-// the Prisma columns are non-null so we substitute a recognizable sentinel at
-// the DB boundary (see `sentinelFor`) and log a warning.
 export interface DeployedContracts {
   eth: {
     name: string;
@@ -16,6 +13,8 @@ export interface DeployedContracts {
     tokenName: string;
     tokenSymbol: string;
     tokenAddress: string;
+    tokenKind?: TokenKind; // defaults to ERC20
+    tokenDecimals?: number; // defaults to 18
   };
   stellar?: {
     name: string;
@@ -26,7 +25,10 @@ export interface DeployedContracts {
     verifierAddress: string;
     tokenName: string;
     tokenSymbol: string;
-    tokenAddress: string;
+    tokenAddress: string; // 0x + 64 hex of the SAC contract id
+    tokenKind?: TokenKind; // defaults to NATIVE
+    tokenDecimals?: number; // defaults to 7
+    tokenAssetIssuer?: string | null;
   };
 }
 
@@ -73,6 +75,8 @@ export async function seedDb(deployed: DeployedContracts): Promise<void> {
       select: { id: true },
     });
 
+    const ethTokenKind: TokenKind = deployed.eth.tokenKind ?? "ERC20";
+    const ethTokenDecimals = deployed.eth.tokenDecimals ?? 18;
     const ethToken = await prisma.token.upsert({
       where: {
         chainUid_address: {
@@ -85,14 +89,14 @@ export async function seedDb(deployed: DeployedContracts): Promise<void> {
         symbol: deployed.eth.tokenSymbol,
         name: deployed.eth.tokenName,
         address: deployed.eth.tokenAddress,
-        decimals: 18,
-        kind: "ERC20",
+        decimals: ethTokenDecimals,
+        kind: ethTokenKind,
       },
       update: {
         symbol: deployed.eth.tokenSymbol,
         name: deployed.eth.tokenName,
-        decimals: 18,
-        kind: "ERC20",
+        decimals: ethTokenDecimals,
+        kind: ethTokenKind,
       },
       select: { id: true },
     });
@@ -122,6 +126,15 @@ export async function seedDb(deployed: DeployedContracts): Promise<void> {
         select: { id: true },
       });
 
+      const stellarTokenKind: TokenKind = s.tokenKind ?? "NATIVE";
+      const stellarTokenDecimals = s.tokenDecimals ?? 7;
+      const stellarAssetIssuer =
+        stellarTokenKind === "SAC" ? (s.tokenAssetIssuer ?? null) : null;
+      if (stellarTokenKind === "SAC" && !stellarAssetIssuer) {
+        throw new Error(
+          `[seed] stellar token ${s.tokenSymbol} is SAC but tokenAssetIssuer is missing`,
+        );
+      }
       const stellarToken = await prisma.token.upsert({
         where: {
           chainUid_address: {
@@ -134,14 +147,16 @@ export async function seedDb(deployed: DeployedContracts): Promise<void> {
           symbol: s.tokenSymbol,
           name: s.tokenName,
           address: s.tokenAddress,
-          decimals: 7,
-          kind: "NATIVE",
+          decimals: stellarTokenDecimals,
+          kind: stellarTokenKind,
+          assetIssuer: stellarAssetIssuer,
         },
         update: {
           symbol: s.tokenSymbol,
           name: s.tokenName,
-          decimals: 7,
-          kind: "NATIVE",
+          decimals: stellarTokenDecimals,
+          kind: stellarTokenKind,
+          assetIssuer: stellarAssetIssuer,
         },
         select: { id: true },
       });
@@ -155,6 +170,21 @@ export async function seedDb(deployed: DeployedContracts): Promise<void> {
         create: {
           adTokenId: stellarToken.id,
           orderTokenId: ethToken.id,
+        },
+        update: {},
+      });
+      // Both chains host both roles — seed the reverse route too so orders
+      // originating on Stellar can settle against ads on EVM.
+      await prisma.route.upsert({
+        where: {
+          orderTokenId_adTokenId: {
+            orderTokenId: stellarToken.id,
+            adTokenId: ethToken.id,
+          },
+        },
+        create: {
+          adTokenId: ethToken.id,
+          orderTokenId: stellarToken.id,
         },
         update: {},
       });

@@ -25,7 +25,7 @@ export interface ICreateAdResponse {
   orderChainId: string
   adRecipient: Address
   reqHash: Address
-  chainId: number
+  chainId: string
   chainKind: ChainKind
 }
 
