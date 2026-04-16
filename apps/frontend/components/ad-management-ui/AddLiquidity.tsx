@@ -5,42 +5,47 @@ import { Handshake, Info, ShieldAlert, Text } from "lucide-react"
 import moment from "moment"
 import Link from "next/link"
 import React, { useState } from "react"
-import { Chain, parseUnits } from "viem"
+import { parseUnits } from "viem"
 import { useAccount } from "wagmi"
 import { useChainModal } from "@rainbow-me/rainbowkit"
 import { useGetAllChains } from "@/hooks/useChains"
-import { isVisibleChain } from "@/lib/chains"
+import { chains as supported_chains, isVisibleChain } from "@/lib/chains"
 import { GiCancel } from "react-icons/gi"
-import {
-  hederaTestnet,
-  sepolia,
-  polygonAmoy,
-  optimismSepolia,
-} from "viem/chains"
 import { CiWarning } from "react-icons/ci"
 import { useGetAllTokens } from "@/hooks/useTokens"
 import { useStellarWallet } from "@/components/providers/StellarWallet"
 
-const supported_chains: Record<number, Chain> = {
-  [hederaTestnet.id]: hederaTestnet,
-  [sepolia.id]: sepolia,
-  [polygonAmoy.id]: polygonAmoy,
-  [optimismSepolia.id]: optimismSepolia,
-}
-
 export const AddLiquidity = () => {
   const account = useAccount()
-  const { address: stellarAddress } = useStellarWallet()
+  const { address: stellarAddress, connect: connectStellar } =
+    useStellarWallet()
   const { data: chains, isLoading: loadingChains } = useGetAllChains({
     limit: 10,
   })
-  const [base_chain, setBase_chain] = useState<Chain>()
-  const [order_chain, setOrder_chain] = useState<Chain>()
+
+  // chainId strings are the source of truth — both EVM (numeric ids) and
+  // Stellar (the synthetic "1000001") fit in one field, so the API calls
+  // below don't have to special-case non-EVM chains.
+  const [baseChainId, setBaseChainId] = useState<string>("")
   const [orderChainId, setOrderChainId] = useState<string>("")
-  const orderChainKind = chains?.data?.find(
-    (c) => c.chainId === orderChainId,
-  )?.kind
-  const is_base_chain = base_chain?.id === account.chainId
+
+  const baseChain = chains?.data?.find((c) => c.chainId === baseChainId)
+  const orderChain = chains?.data?.find((c) => c.chainId === orderChainId)
+  const baseChainKind = baseChain?.kind
+  const orderChainKind = orderChain?.kind
+
+  // viem Chain only exists for EVM — Stellar has no equivalent, hence
+  // `undefined` when the base chain is Stellar. Used for EVM network switching.
+  const baseEvmChain =
+    baseChainKind === "EVM" ? supported_chains[baseChainId] : undefined
+
+  const baseWalletReady =
+    baseChainKind === "EVM"
+      ? baseEvmChain?.id === account.chainId
+      : baseChainKind === "STELLAR"
+        ? Boolean(stellarAddress)
+        : false
+
   const { openChainModal } = useChainModal()
   const { mutateAsync: createAd, isPending } = useCreateAd()
   const [title, setTitle] = useState("")
@@ -53,11 +58,11 @@ export const AddLiquidity = () => {
   const toggleModal = () => setOpenModal(!openModal)
   const [selectedTokenId, setSelectedTokenId] = useState<string>("")
   const { data: tokens, isLoading: loadingTokens } = useGetAllTokens({
-    chainId: String(base_chain?.id),
+    chainId: baseChainId,
   })
-  const { data: routes, isLoading: loadingRoutes } = useGetBridgeRoutes({
-    adChainId: String(base_chain?.id),
-    orderChainId: orderChainId || String(order_chain?.id),
+  const { data: routes } = useGetBridgeRoutes({
+    adChainId: baseChainId,
+    orderChainId,
     adTokenId: selectedTokenId,
   })
 
@@ -69,7 +74,7 @@ export const AddLiquidity = () => {
 
   const handleCreateAd = async () => {
     try {
-      const token = tokens?.data?.find((value) => value.id === selectedTokenId);
+      const token = tokens?.data?.find((value) => value.id === selectedTokenId)
       if (!creatorDstAddress) {
         throw new Error(
           orderChainKind === "STELLAR"
@@ -78,35 +83,26 @@ export const AddLiquidity = () => {
         )
       }
 
-      const response = await createAd({
+      await createAd({
         payload: {
           routeId: routes?.data[0]?.id!,
           creatorDstAddress,
 
-          maxAmount: parseUnits(
-            max,
-            token?.decimals!
-          ).toString(),
+          maxAmount: parseUnits(max, token?.decimals!).toString(),
 
-          minAmount: parseUnits(
-            min,
-            token?.decimals!
-          ).toString(),
+          minAmount: parseUnits(min, token?.decimals!).toString(),
 
           metadata: {
             title,
             description,
           },
-          fundAmount: parseUnits(
-            amount,
-            token?.decimals!
-          ).toString(),
+          fundAmount: parseUnits(amount, token?.decimals!).toString(),
         },
         token: token!,
       })
 
       toggleModal()
-    } catch (error) { }
+    } catch (error) {}
   }
 
   return (
@@ -125,26 +121,28 @@ export const AddLiquidity = () => {
               <Select
                 loading={loadingChains}
                 className="w-full !h-[40px]"
+                value={baseChainId || undefined}
                 options={chains?.data
                   .filter(
                     (chain) =>
                       isVisibleChain(chain.chainId) &&
-                      Number(chain.chainId) !== order_chain?.id!
+                      chain.chainId !== orderChainId,
                   )
-                  .map((chain) => {
-                    return {
-                      label: chain.name,
-                      value: chain.chainId,
-                    }
-                  })}
+                  .map((chain) => ({
+                    label: chain.name,
+                    value: chain.chainId,
+                  }))}
                 allowClear={{
                   clearIcon: <GiCancel className="text-red-500" size={15} />,
                 }}
-                onChange={(value: number) => {
-                  setBase_chain(supported_chains[value])
+                onChange={(value: string) => {
+                  setBaseChainId(value ?? "")
                   setSelectedTokenId("")
                 }}
-                onClear={() => setBase_chain(undefined)}
+                onClear={() => {
+                  setBaseChainId("")
+                  setSelectedTokenId("")
+                }}
               />
             </div>
           </div>
@@ -155,29 +153,24 @@ export const AddLiquidity = () => {
               <Select
                 loading={loadingChains}
                 className="w-full !h-[40px]"
+                value={orderChainId || undefined}
                 options={chains?.data
                   .filter(
                     (chain) =>
                       isVisibleChain(chain.chainId) &&
-                      Number(chain.chainId) !== base_chain?.id!
+                      chain.chainId !== baseChainId,
                   )
-                  .map((chain) => {
-                    return {
-                      label: chain.name,
-                      value: chain.chainId,
-                    }
-                  })}
+                  .map((chain) => ({
+                    label: chain.name,
+                    value: chain.chainId,
+                  }))}
                 allowClear={{
                   clearIcon: <GiCancel className="text-red-500" size={15} />,
                 }}
-                onChange={(value: number) => {
-                  setOrder_chain(supported_chains[value])
-                  setOrderChainId(String(value))
+                onChange={(value: string) => {
+                  setOrderChainId(value ?? "")
                 }}
-                onClear={() => {
-                  setOrder_chain(undefined)
-                  setOrderChainId("")
-                }}
+                onClear={() => setOrderChainId("")}
               />
             </div>
           </div>
@@ -188,12 +181,10 @@ export const AddLiquidity = () => {
               <Select
                 loading={loadingTokens}
                 className="w-full !h-[40px]"
-                options={tokens?.data.map((token) => {
-                  return {
-                    label: token.name,
-                    value: token.id,
-                  }
-                })}
+                options={tokens?.data.map((token) => ({
+                  label: token.name,
+                  value: token.id,
+                }))}
                 allowClear={{
                   clearIcon: <GiCancel className="text-red-500" size={15} />,
                 }}
@@ -301,20 +292,20 @@ export const AddLiquidity = () => {
           </div>
           <p className="text-sm">
             Your ad will appear as: Base{" "}
-            <span className="text-primary">{base_chain?.name || "N/A"}</span>{" "}
-            for Destination{" "}
-            <span className="text-primary">{order_chain?.name || "N/A"}</span>{" "}
+            <span className="text-primary">{baseChain?.name || "N/A"}</span> for
+            Destination{" "}
+            <span className="text-primary">{orderChain?.name || "N/A"}</span>{" "}
             with the information and trading terms specified above.
           </p>
         </div>
       </div>
       <div className="flex justify-end">
-        {!base_chain ? (
+        {!baseChainId ? (
           <div className="flex items-center gap-2 text-yellow-500">
             <CiWarning size={18} />
             <p className="">Please select Base chain.</p>
           </div>
-        ) : !order_chain ? (
+        ) : !orderChainId ? (
           <div className="flex items-center gap-2 text-yellow-500">
             <CiWarning size={18} />
             <p className="">Please select Destination chain.</p>
@@ -329,31 +320,30 @@ export const AddLiquidity = () => {
             <CiWarning size={18} />
             <p className="">Route not available.</p>
           </div>
+        ) : baseWalletReady ? (
+          <Button
+            onClick={() => {
+              if (!title || !description || !amount || !min || !max) {
+                setIsInputError(true)
+                return
+              }
+              setIsInputError(false)
+              toggleModal()
+            }}
+            type="primary"
+            size="large"
+            loading={isPending}
+          >
+            Preview Ad
+          </Button>
+        ) : baseChainKind === "STELLAR" ? (
+          <Button type="primary" size="large" onClick={() => connectStellar()}>
+            Connect Stellar
+          </Button>
         ) : (
-          <>
-            {is_base_chain ? (
-              <Button
-                onClick={() => {
-                  if (!title || !description || !amount || !min || !max) {
-                    setIsInputError(true)
-                    return
-                  }
-                  setIsInputError(false)
-                  toggleModal()
-                }}
-                className=""
-                type="primary"
-                size="large"
-                loading={isPending}
-              >
-                Preview Ad
-              </Button>
-            ) : (
-              <Button type="primary" size="large" onClick={openChainModal}>
-                Connect to {base_chain?.name}
-              </Button>
-            )}
-          </>
+          <Button type="primary" size="large" onClick={openChainModal}>
+            Connect to {baseChain?.name}
+          </Button>
         )}
       </div>
 
@@ -377,7 +367,7 @@ export const AddLiquidity = () => {
                 <p className="text-lg mb-4 underline">
                   Providing Liquidity for{" "}
                   <span className="text-primary font-semibold">
-                    {base_chain?.name}
+                    {baseChain?.name}
                   </span>
                 </p>
               </div>
@@ -390,7 +380,7 @@ export const AddLiquidity = () => {
                     {amount}{" "}
                     {
                       tokens?.data?.find(
-                        (value) => value.id === selectedTokenId
+                        (value) => value.id === selectedTokenId,
                       )?.symbol
                     }
                   </p>
@@ -403,7 +393,7 @@ export const AddLiquidity = () => {
                     {min} - {max}{" "}
                     {
                       tokens?.data?.find(
-                        (value) => value.id === selectedTokenId
+                        (value) => value.id === selectedTokenId,
                       )?.symbol
                     }
                   </p>
