@@ -172,8 +172,16 @@ async function main() {
   });
   const stellarVerifier = stellarDeploy.verifier;
   const stellarMerkle = stellarDeploy.merkleManager;
-  const stellarAdToken = stellarDeploy.adToken;
-  const stellarAdTokenHex = stellarDeploy.adTokenHex;
+  // E2E trades the XLM ↔ WXLM pair. Both ends are resolved via pairKey so
+  // the rest of this script is agnostic to the other pairs in the snapshot.
+  const stellarAdTokenEntry = stellarDeploy.tokens.find(
+    (t) => t.pairKey === "xlm",
+  );
+  if (!stellarAdTokenEntry) {
+    throw new Error("[e2e] stellar snapshot missing pairKey=xlm");
+  }
+  const stellarAdToken = stellarAdTokenEntry.contractId;
+  const stellarAdTokenHex = stellarAdTokenEntry.addressHex;
   const stellarAdManager = stellarDeploy.adManager;
   console.log("Stellar contracts deployed and initialized.");
 
@@ -228,10 +236,17 @@ async function main() {
     "OrderPortal",
     orderCreatorWallet,
   );
+  // EVM counterpart of the XLM pair (WXLM ERC20).
+  const evmOrderTokenEntry = evm.tokens.find((t) => t.pairKey === "xlm");
+  if (!evmOrderTokenEntry || evmOrderTokenEntry.kind !== "ERC20" || !evmOrderTokenEntry.contract) {
+    throw new Error("[e2e] evm snapshot missing ERC20 token for pairKey=xlm");
+  }
+  const evmOrderToken = evmOrderTokenEntry.contract;
+  const evmOrderTokenAddress = evmOrderTokenEntry.address;
   const testTokenAsCreator = getContract(
-    evm.addresses.testToken,
-    "ERC20Mock",
-    "ERC20Mock",
+    evmOrderTokenAddress,
+    "MockERC20",
+    "MockERC20",
     orderCreatorWallet,
   );
 
@@ -245,7 +260,7 @@ async function main() {
   const stellarAdManagerHex = stellarDeploy.adManagerHex;
   const stellarAdManagerBuf = hexToBuffer(stellarAdManagerHex);
   const evmOrderPortalBytes32 = evmAddressToBytes32(evm.addresses.orderPortal);
-  const evmTokenBytes32 = evmAddressToBytes32(evm.addresses.testToken);
+  const evmTokenBytes32 = evmAddressToBytes32(evmOrderTokenAddress);
 
   // ════════════════════════════════════════════════════════════════
   // Phase 4: Create Ad on Stellar
@@ -308,9 +323,9 @@ async function main() {
 
   // Admin mints test tokens to the order creator; the order creator then
   // approves OrderPortal and calls createOrder as msg.sender.
-  console.log("Minting test tokens to order creator...");
+  console.log("Minting order token to order creator...");
   {
-    const tx = await evm.testToken.getFunction("mint")(
+    const tx = await evmOrderToken.getFunction("mint")(
       orderCreatorEvm,
       AMOUNT * 10n,
       { nonce: nonces.next() },
@@ -576,8 +591,8 @@ async function main() {
   //   order creator: minted 10*AMOUNT, spent AMOUNT on createOrder → 9*AMOUNT
   //   ad creator (EVM recipient): 0 → AMOUNT after unlock
   const orderCreatorBalance =
-    await evm.testToken.getFunction("balanceOf")(orderCreatorEvm);
-  const adRecipientBalance = await evm.testToken.getFunction("balanceOf")(
+    await evmOrderToken.getFunction("balanceOf")(orderCreatorEvm);
+  const adRecipientBalance = await evmOrderToken.getFunction("balanceOf")(
     AD_CREATOR_EVM_RECIPIENT,
   );
 
@@ -647,7 +662,7 @@ async function main() {
   console.log(`  Verifier:       ${evm.addresses.verifier}`);
   console.log(`  MerkleManager:  ${evm.addresses.merkleManager}`);
   console.log(`  OrderPortal:    ${evm.addresses.orderPortal}`);
-  console.log(`  TestToken:      ${evm.addresses.testToken}`);
+  console.log(`  OrderToken:     ${evmOrderTokenAddress} (${evmOrderTokenEntry.symbol})`);
   console.log("");
   console.log("Order hash:", orderHash);
 }

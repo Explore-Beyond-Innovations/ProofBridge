@@ -33,15 +33,35 @@ export const DEFAULT_EVM_CHAIN_ID = 31337n; // Anvil default
 
 // ── types ─────────────────────────────────────────────────────────────
 
+/**
+ * A single tradeable token on the Stellar side. `pairKey` matches the same
+ * key on the EVM side so the two snapshots can be zipped into routes.
+ * `contractId` is the Soroban strkey — use the `addressHex` form (bytes32)
+ * when feeding it to AdManager / OrderPortal cross-chain configs.
+ */
+export interface StellarTokenDeployment {
+  pairKey: string;
+  name: string;
+  symbol: string;
+  contractId: string; // strkey (C...)
+  addressHex: string; // 0x + 64 hex
+  kind: "NATIVE" | "SAC" | "SEP41";
+  decimals: number;
+  /** Only set for SAC-backed classic assets. */
+  assetIssuer: string | null;
+}
+
 export interface StellarDeployResult {
   verifier: string; // contract id (strkey)
   merkleManager: string;
-  adToken: string; // native XLM SAC (strkey)
-  adTokenHex: string; // 0x + 64 hex
+  /** Native XLM SAC — used as `w_native_token` on the contracts. */
+  wNativeToken: string; // strkey
+  wNativeTokenHex: string; // 0x + 64 hex
   adManager: string; // strkey
   adManagerHex: string;
   orderPortal: string; // strkey
   orderPortalHex: string;
+  tokens: StellarTokenDeployment[];
   adminStrkey: string;
   chainId: bigint;
 }
@@ -104,10 +124,10 @@ export function deployStellarChain(
   console.log(`  MerkleManager: ${merkleManager}`);
   invokeContract(merkleManager, "initialize", [`--admin`, adminStrkey]);
 
-  console.log("Deploying native XLM SAC...");
-  const adToken = deploySAC("native");
-  const adTokenHex = strkeyToHex(adToken);
-  console.log(`  NativeXLM SAC: ${adToken}`);
+  console.log("Deploying native XLM SAC (w_native_token)...");
+  const wNativeToken = deploySAC("native");
+  const wNativeTokenHex = strkeyToHex(wNativeToken);
+  console.log(`  NativeXLM SAC: ${wNativeToken}`);
 
   console.log("Deploying Stellar AdManager...");
   const adManager = deployContract(path.join(wasmDir, "ad_manager.wasm"));
@@ -120,7 +140,7 @@ export function deployStellarChain(
     `--merkle_manager`,
     merkleManager,
     `--w_native_token`,
-    adToken,
+    wNativeToken,
     `--chain_id`,
     chainId.toString(),
   ]);
@@ -136,10 +156,66 @@ export function deployStellarChain(
     `--merkle_manager`,
     merkleManager,
     `--w_native_token`,
-    adToken,
+    wNativeToken,
     `--chain_id`,
     chainId.toString(),
   ]);
+
+  // SEP-41 tokens counter-party to the EVM side:
+  //   wETH SEP-41  ↔ EVM ETH native sentinel (wrapped through EVM wNativeToken)
+  //   PB SEP-41    ↔ EVM PB ERC20
+  const testTokenWasm = path.join(wasmDir, "test_token.wasm");
+  console.log("Deploying Stellar wETH SEP-41...");
+  const wethSep41 = deployContract(testTokenWasm, [
+    `--owner`,
+    adminStrkey,
+    `--initial_supply`,
+    "0",
+  ]);
+  console.log(`  wETH SEP-41: ${wethSep41}`);
+
+  console.log("Deploying Stellar PB SEP-41...");
+  const pbSep41 = deployContract(testTokenWasm, [
+    `--owner`,
+    adminStrkey,
+    `--initial_supply`,
+    "0",
+  ]);
+  console.log(`  PB SEP-41: ${pbSep41}`);
+
+  const STELLAR_TOKEN_DECIMALS = 7;
+  const tokens: StellarTokenDeployment[] = [
+    {
+      pairKey: "xlm",
+      name: "Stellar XLM",
+      symbol: "XLM",
+      contractId: wNativeToken,
+      addressHex: wNativeTokenHex,
+      kind: "NATIVE",
+      decimals: STELLAR_TOKEN_DECIMALS,
+      assetIssuer: null,
+    },
+    {
+      pairKey: "eth",
+      name: "Wrapped ETH",
+      symbol: "wETH",
+      contractId: wethSep41,
+      addressHex: strkeyToHex(wethSep41),
+      kind: "SEP41",
+      decimals: STELLAR_TOKEN_DECIMALS,
+      assetIssuer: null,
+    },
+    {
+      pairKey: "pb",
+      name: "ProofBridge",
+      symbol: "PB",
+      contractId: pbSep41,
+      addressHex: strkeyToHex(pbSep41),
+      kind: "SEP41",
+      decimals: STELLAR_TOKEN_DECIMALS,
+      assetIssuer: null,
+    },
+  ];
 
   invokeContract(merkleManager, "set_manager", [
     `--manager`,
@@ -157,12 +233,13 @@ export function deployStellarChain(
   return {
     verifier,
     merkleManager,
-    adToken,
-    adTokenHex,
+    wNativeToken,
+    wNativeTokenHex,
     adManager,
     adManagerHex: strkeyToHex(adManager),
     orderPortal,
     orderPortalHex: strkeyToHex(orderPortal),
+    tokens,
     adminStrkey,
     chainId,
   };
@@ -204,10 +281,9 @@ export async function linkChains(
   const evmAdManagerBytes32 = evmAddressToBytes32(
     contracts.addresses.adManager,
   );
-  const evmTokenBytes32 = evmAddressToBytes32(contracts.addresses.testToken);
 
-  // ── Direction A: Stellar ad-side ↔ EVM order-side ──────────────────
-  console.log("Linking Stellar AdManager → EVM OrderPortal...");
+  // ── Chain-level wiring (once per pair of chains) ────────────────────
+  console.log("Linking Stellar AdManager → EVM OrderPortal chain...");
   invokeContract(stellar.adManager, "set_chain", [
     `--order_chain_id`,
     evmChainIdStr,
@@ -216,16 +292,8 @@ export async function linkChains(
     `--supported`,
     "true",
   ]);
-  invokeContract(stellar.adManager, "set_token_route", [
-    `--ad_token`,
-    stellar.adTokenHex.replace(/^0x/, ""),
-    `--order_token`,
-    evmTokenBytes32.replace(/^0x/, ""),
-    `--order_chain_id`,
-    evmChainIdStr,
-  ]);
 
-  console.log("Linking EVM OrderPortal → Stellar AdManager...");
+  console.log("Linking EVM OrderPortal → Stellar AdManager chain...");
   {
     const tx = await contracts.orderPortal.getFunction("setChain")(
       stellar.chainId,
@@ -235,18 +303,8 @@ export async function linkChains(
     );
     await tx.wait();
   }
-  {
-    const tx = await contracts.orderPortal.getFunction("setTokenRoute")(
-      contracts.addresses.testToken,
-      stellar.chainId,
-      stellar.adTokenHex,
-      { nonce: nonces.next() },
-    );
-    await tx.wait();
-  }
 
-  // ── Direction B: EVM ad-side ↔ Stellar order-side ──────────────────
-  console.log("Linking EVM AdManager → Stellar OrderPortal...");
+  console.log("Linking EVM AdManager → Stellar OrderPortal chain...");
   {
     const tx = await contracts.adManager.getFunction("setChain")(
       stellar.chainId,
@@ -256,19 +314,8 @@ export async function linkChains(
     );
     await tx.wait();
   }
-  {
-    // AdManager.setTokenRoute: (address adToken, bytes32 orderToken, uint256 orderChainId)
-    // Arg order differs from OrderPortal.setTokenRoute — bytes32 and uint256 are swapped.
-    const tx = await contracts.adManager.getFunction("setTokenRoute")(
-      contracts.addresses.testToken,
-      stellar.adTokenHex,
-      stellar.chainId,
-      { nonce: nonces.next() },
-    );
-    await tx.wait();
-  }
 
-  console.log("Linking Stellar OrderPortal → EVM AdManager...");
+  console.log("Linking Stellar OrderPortal → EVM AdManager chain...");
   invokeContract(stellar.orderPortal, "set_chain", [
     `--ad_chain_id`,
     evmChainIdStr,
@@ -277,14 +324,62 @@ export async function linkChains(
     `--supported`,
     "true",
   ]);
-  invokeContract(stellar.orderPortal, "set_token_route", [
-    `--order_token`,
-    stellar.adTokenHex.replace(/^0x/, ""),
-    `--ad_chain_id`,
-    evmChainIdStr,
-    `--ad_token`,
-    evmTokenBytes32.replace(/^0x/, ""),
-  ]);
+
+  // ── Per-pair token routes (both directions) ────────────────────────
+  for (const evmToken of evm.contracts.tokens) {
+    const stellarToken = stellar.tokens.find(
+      (t) => t.pairKey === evmToken.pairKey,
+    );
+    if (!stellarToken) {
+      throw new Error(
+        `[deploy] no stellar token matched pairKey=${evmToken.pairKey}`,
+      );
+    }
+    const evmTokenBytes32 = evmAddressToBytes32(evmToken.address);
+
+    console.log(
+      `Routing pair "${evmToken.pairKey}" (${evmToken.symbol} ↔ ${stellarToken.symbol})...`,
+    );
+
+    // Direction A: Stellar is ad-side, EVM is order-side.
+    invokeContract(stellar.adManager, "set_token_route", [
+      `--ad_token`,
+      stellarToken.addressHex.replace(/^0x/, ""),
+      `--order_token`,
+      evmTokenBytes32.replace(/^0x/, ""),
+      `--order_chain_id`,
+      evmChainIdStr,
+    ]);
+    {
+      const tx = await contracts.orderPortal.getFunction("setTokenRoute")(
+        evmToken.address,
+        stellar.chainId,
+        stellarToken.addressHex,
+        { nonce: nonces.next() },
+      );
+      await tx.wait();
+    }
+
+    // Direction B: EVM is ad-side, Stellar is order-side.
+    // AdManager.setTokenRoute signature: (address adToken, bytes32 orderToken, uint256 orderChainId)
+    {
+      const tx = await contracts.adManager.getFunction("setTokenRoute")(
+        evmToken.address,
+        stellarToken.addressHex,
+        stellar.chainId,
+        { nonce: nonces.next() },
+      );
+      await tx.wait();
+    }
+    invokeContract(stellar.orderPortal, "set_token_route", [
+      `--order_token`,
+      stellarToken.addressHex.replace(/^0x/, ""),
+      `--ad_chain_id`,
+      evmChainIdStr,
+      `--ad_token`,
+      evmTokenBytes32.replace(/^0x/, ""),
+    ]);
+  }
 
   console.log("Cross-chain linking complete.");
 }
@@ -340,11 +435,15 @@ export function writeDeployedSnapshot(
       orderPortalAddress: evm.addresses.orderPortal,
       merkleManagerAddress: evm.addresses.merkleManager,
       verifierAddress: evm.addresses.verifier,
-      tokenName: "TestToken",
-      tokenSymbol: "TT",
-      tokenAddress: evm.addresses.testToken,
-      tokenKind: "ERC20" as const,
-      tokenDecimals: 18,
+      wNativeTokenAddress: evm.addresses.wNativeToken,
+      tokens: evm.contracts.tokens.map((t) => ({
+        pairKey: t.pairKey,
+        name: t.name,
+        symbol: t.symbol,
+        address: t.address,
+        kind: t.kind,
+        decimals: t.decimals,
+      })),
     },
     stellar: {
       name: "StellarLocal",
@@ -353,12 +452,17 @@ export function writeDeployedSnapshot(
       orderPortalAddress: stellar.orderPortalHex,
       merkleManagerAddress: strkeyToHex(stellar.merkleManager),
       verifierAddress: strkeyToHex(stellar.verifier),
-      tokenName: "XLM",
-      tokenSymbol: "XLM",
-      tokenAddress: stellar.adTokenHex,
-      tokenKind: "NATIVE" as const,
-      tokenDecimals: 7,
-      tokenAssetIssuer: null as string | null,
+      wNativeTokenAddress: stellar.wNativeTokenHex,
+      tokens: stellar.tokens.map((t) => ({
+        pairKey: t.pairKey,
+        name: t.name,
+        symbol: t.symbol,
+        address: t.addressHex,
+        contractId: t.contractId,
+        kind: t.kind,
+        decimals: t.decimals,
+        assetIssuer: t.assetIssuer,
+      })),
     },
   };
   fs.writeFileSync(outPath, JSON.stringify(snapshot, null, 2));
