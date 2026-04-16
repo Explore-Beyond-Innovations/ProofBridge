@@ -2,11 +2,11 @@ import {
   Asset,
   BASE_FEE,
   Horizon,
-  Networks,
   Operation,
   TransactionBuilder,
 } from "@stellar/stellar-sdk"
 import type { StellarSignFn } from "./invoke"
+import { urls } from "@/utils/urls"
 
 const DEFAULT_TESTNET_HORIZON = "https://horizon-testnet.stellar.org"
 
@@ -71,7 +71,7 @@ export async function establishTrustline(
   issuer: string,
 ): Promise<string> {
   const horizonUrl = ctx.horizonUrl ?? defaultHorizonUrl()
-  const passphrase = ctx.networkPassphrase ?? Networks.TESTNET
+  const passphrase = ctx.networkPassphrase ?? urls.STELLAR_NETWORK_PASSPHRASE
   const server = new Horizon.Server(horizonUrl)
   const source = await server.loadAccount(ctx.signerPublicKey)
 

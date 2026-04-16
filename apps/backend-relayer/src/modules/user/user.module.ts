@@ -8,5 +8,6 @@ import { UserController } from './user.controller';
   imports: [JwtModule.register({})],
   controllers: [UserController],
   providers: [UserService, PrismaService],
+  exports: [UserService],
 })
 export class UserModule {}

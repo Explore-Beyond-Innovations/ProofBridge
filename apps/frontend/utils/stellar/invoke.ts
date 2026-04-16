@@ -1,11 +1,11 @@
 import {
   Contract,
-  Networks,
   TransactionBuilder,
   rpc,
   xdr,
 } from "@stellar/stellar-sdk"
 import { hex32ToContractId } from "./address"
+import { urls } from "@/utils/urls"
 
 const BASE_FEE = "1000"
 
@@ -37,7 +37,7 @@ export async function invokeSoroban({
   pollIntervalMs = 1000,
   pollAttempts = 30,
 }: InvokeSorobanOpts): Promise<string> {
-  const passphrase = networkPassphrase ?? Networks.TESTNET
+  const passphrase = networkPassphrase ?? urls.STELLAR_NETWORK_PASSPHRASE
   const server = new rpc.Server(rpcUrl, {
     allowHttp: rpcUrl.startsWith("http://"),
   })

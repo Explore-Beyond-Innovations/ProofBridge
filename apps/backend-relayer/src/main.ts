@@ -26,8 +26,7 @@ async function bootstrap() {
 
   app.use(morgan('tiny'));
   app.use(express.json({ limit: 5 << 20 }));
-  // whitelist drops unknown fields; forbidNonWhitelisted turns them into 400s
-  // so clients get loud feedback on typos instead of silent data loss.
+
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,

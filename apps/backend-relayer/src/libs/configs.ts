@@ -29,9 +29,6 @@ export const env = {
     networkPassphrase:
       process.env.STELLAR_NETWORK_PASSPHRASE ||
       'Test SDF Network ; September 2015',
-    // SEP-10 server signing key. Separate from adminSecret so the auth
-    // surface can't move funds and a compromise is bounded to issuing
-    // challenges.
     authSecret: process.env.STELLAR_AUTH_SECRET || '',
   },
 };

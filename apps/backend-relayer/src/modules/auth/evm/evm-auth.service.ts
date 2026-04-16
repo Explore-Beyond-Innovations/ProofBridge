@@ -8,7 +8,6 @@ import { ChainKind } from '@prisma/client';
 import { SiweMessage } from 'siwe';
 import { ethers } from 'ethers';
 import { env } from '@libs/configs';
-import { generateUniqueName } from '../username.util';
 
 const CLOCK_SKEW_MS = 60_000;
 
@@ -49,18 +48,21 @@ export class EvmAuthService {
   }
 
   /**
-   * Verify a SIWE login. Returns the resolved user row; the caller is
-   * responsible for minting JWTs.
+   * Verify a SIWE login signature and consume the nonce. Returns the
+   * canonical signer address. User/wallet persistence is the caller's
+   * responsibility — this keeps the method reusable for both fresh
+   * sign-in and /auth/link.
    */
-  async verifyLogin(
+  async verifyAndConsume(
     messageRaw: string,
     signature: string,
-  ): Promise<{ id: string; username: string; walletAddress: string }> {
+  ): Promise<string> {
     const msg = this.parseSiwe(messageRaw);
     this.assertDomainAndUri(msg);
     this.assertTimeWindows(msg, Date.now());
     await this.verifySignature(msg, signature);
-    return this.consumeNonceAndUpsertUser(msg.address, msg.nonce);
+    await this.consumeNonce(msg.address, msg.nonce);
+    return msg.address;
   }
 
   private parseSiwe(messageRaw: string): SiweMessage {
@@ -111,10 +113,10 @@ export class EvmAuthService {
     }
   }
 
-  private async consumeNonceAndUpsertUser(address: string, nonce: string) {
+  private async consumeNonce(address: string, nonce: string): Promise<void> {
     const now = Date.now();
 
-    const { user } = await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       const nonceRow = await tx.authNonce.findUnique({
         where: { value: nonce, walletAddress: address },
       });
@@ -129,17 +131,6 @@ export class EvmAuthService {
         where: { value: nonce, walletAddress: address },
         data: { usedAt: new Date() },
       });
-
-      const user = await tx.user.upsert({
-        where: { walletAddress: address },
-        create: { walletAddress: address, username: generateUniqueName() },
-        update: {},
-        select: { id: true, username: true, walletAddress: true },
-      });
-
-      return { user };
     });
-
-    return user;
   }
 }

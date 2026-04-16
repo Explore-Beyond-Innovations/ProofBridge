@@ -14,6 +14,10 @@ import { GiCancel } from "react-icons/gi"
 import { CiWarning } from "react-icons/ci"
 import { useGetAllTokens } from "@/hooks/useTokens"
 import { useStellarWallet } from "@/components/providers/StellarWallet"
+import {
+  CreateAdSuccessModal,
+  type CreatedAdSummary,
+} from "./CreateAdSuccessModal"
 
 export const AddLiquidity = () => {
   const account = useAccount()
@@ -56,6 +60,8 @@ export const AddLiquidity = () => {
   const [isInputError, setIsInputError] = useState(false)
   const [openModal, setOpenModal] = useState(false)
   const toggleModal = () => setOpenModal(!openModal)
+  const [successSummary, setSuccessSummary] =
+    useState<CreatedAdSummary | null>(null)
   const [selectedTokenId, setSelectedTokenId] = useState<string>("")
   const { data: tokens, isLoading: loadingTokens } = useGetAllTokens({
     chainId: baseChainId,
@@ -101,6 +107,16 @@ export const AddLiquidity = () => {
         token: token!,
       })
 
+      setSuccessSummary({
+        title,
+        description,
+        amount,
+        min,
+        max,
+        tokenSymbol: token?.symbol ?? "",
+        baseChainName: baseChain?.name ?? "",
+        orderChainName: orderChain?.name ?? "",
+      })
       toggleModal()
     } catch (error) {}
   }
@@ -454,6 +470,12 @@ export const AddLiquidity = () => {
           </div>
         </div>
       </Modal>
+
+      <CreateAdSuccessModal
+        open={successSummary !== null}
+        summary={successSummary}
+        onClose={() => setSuccessSummary(null)}
+      />
     </div>
   )
 }

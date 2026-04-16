@@ -10,12 +10,14 @@ import { PrismaService } from '@prisma/prisma.service';
 import { ChainAdapterService } from '../../chain-adapters/chain-adapter.service';
 import { RequestFaucetDto, FaucetResponseDto } from './dto/faucet.dto';
 import { Request } from 'express';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class FaucetService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly chainAdapters: ChainAdapterService,
+    private readonly users: UserService,
   ) {}
 
   async requestFaucet(
@@ -26,12 +28,6 @@ export class FaucetService {
       const reqUser = req.user;
 
       if (!reqUser) throw new UnauthorizedException('Not authenticated');
-
-      const user = await this.prisma.user.findUnique({
-        where: { id: reqUser.sub },
-      });
-
-      if (!user) throw new UnauthorizedException('Unauthorized');
 
       const token = await this.prisma.token.findUnique({
         where: { id: dto.tokenId },
@@ -52,13 +48,18 @@ export class FaucetService {
         throw new NotFoundException(`Token with ID ${dto.tokenId} not found`);
       }
 
+      const recipient = await this.users.getWalletForChain(
+        reqUser.sub,
+        token.chain.kind,
+      );
+
       const provider = this.chainAdapters.forChain(token.chain.kind);
 
       // Check user's token balance
       const balance = await provider.checkTokenBalance({
         chainId: token.chain.chainId.toString(),
         tokenAddress: token.address as `0x${string}`,
-        account: user.walletAddress as `0x${string}`,
+        account: recipient as `0x${string}`,
       });
 
       // Define threshold (e.g., 10,000 tokens)
@@ -73,7 +74,7 @@ export class FaucetService {
       const result = await provider.mintToken({
         chainId: token.chain.chainId.toString(),
         tokenAddress: token.address as `0x${string}`,
-        receiver: user.walletAddress as `0x${string}`,
+        receiver: recipient as `0x${string}`,
       });
 
       return {

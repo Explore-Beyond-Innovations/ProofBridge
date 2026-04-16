@@ -16,7 +16,6 @@ import type { PrismaService } from '@prisma/prisma.service';
 describe('StellarAuthService (SEP-10)', () => {
   const mockPrisma = {
     authNonce: { create: jest.fn() },
-    user: { upsert: jest.fn() },
   };
 
   let service: StellarAuthService;
@@ -49,43 +48,34 @@ describe('StellarAuthService (SEP-10)', () => {
     });
   });
 
-  describe('verifyLogin', () => {
+  describe('verifyAndConsume', () => {
     const sign = (xdr: string, kp: Keypair) => {
       // Match the service's fallback: configs.ts uses `||` so an empty env
       // var falls back to TESTNET. `??` would keep `""` and mismatch.
       const passphrase =
-        (process.env.STELLAR_NETWORK_PASSPHRASE as Networks) || Networks.TESTNET;
+        (process.env.STELLAR_NETWORK_PASSPHRASE as Networks) ||
+        Networks.TESTNET;
       const tx = TransactionBuilder.fromXDR(xdr, passphrase);
       tx.sign(kp);
       return tx.toEnvelope().toXDR('base64');
     };
 
-    it('succeeds when the client co-signs the challenge and upserts the user', async () => {
+    it('returns the canonical hex32 address when the client co-signs', async () => {
       mockPrisma.authNonce.create.mockResolvedValueOnce({});
-      mockPrisma.user.upsert.mockImplementation(
-        (args: { create: { username: string; walletAddress: string } }) =>
-          Promise.resolve({
-            id: 'u1',
-            username: args.create.username,
-            walletAddress: args.create.walletAddress,
-          }),
-      );
 
       const { transaction } = service.buildChallenge(client.publicKey());
       const signedXdr = sign(transaction, client);
 
-      const user = await service.verifyLogin(signedXdr);
+      const address = await service.verifyAndConsume(signedXdr);
 
-      expect(user.id).toBe('u1');
-      expect(user.walletAddress).toBe(accountIdToHex32(client.publicKey()));
+      expect(address).toBe(accountIdToHex32(client.publicKey()));
       expect(mockPrisma.authNonce.create).toHaveBeenCalledTimes(1);
-      expect(mockPrisma.user.upsert).toHaveBeenCalledTimes(1);
     });
 
     it('rejects when the client signature is missing', async () => {
       const { transaction } = service.buildChallenge(client.publicKey());
 
-      await expect(service.verifyLogin(transaction)).rejects.toThrow(
+      await expect(service.verifyAndConsume(transaction)).rejects.toThrow(
         UnauthorizedException,
       );
       expect(mockPrisma.authNonce.create).not.toHaveBeenCalled();
@@ -96,32 +86,27 @@ describe('StellarAuthService (SEP-10)', () => {
       const { transaction } = service.buildChallenge(client.publicKey());
       const signedByImposter = sign(transaction, imposter);
 
-      await expect(service.verifyLogin(signedByImposter)).rejects.toThrow(
+      await expect(service.verifyAndConsume(signedByImposter)).rejects.toThrow(
         UnauthorizedException,
       );
     });
 
-    it('rejects replay (second login with the same XDR)', async () => {
+    it('rejects replay (second verify with the same XDR)', async () => {
       mockPrisma.authNonce.create
         .mockResolvedValueOnce({})
         .mockRejectedValueOnce(new Error('unique violation'));
-      mockPrisma.user.upsert.mockResolvedValue({
-        id: 'u1',
-        username: 'a-b',
-        walletAddress: accountIdToHex32(client.publicKey()),
-      });
 
       const { transaction } = service.buildChallenge(client.publicKey());
       const signedXdr = sign(transaction, client);
 
-      await service.verifyLogin(signedXdr);
-      await expect(service.verifyLogin(signedXdr)).rejects.toThrow(
+      await service.verifyAndConsume(signedXdr);
+      await expect(service.verifyAndConsume(signedXdr)).rejects.toThrow(
         UnauthorizedException,
       );
     });
 
     it('rejects malformed XDR', async () => {
-      await expect(service.verifyLogin('not-valid-xdr')).rejects.toThrow(
+      await expect(service.verifyAndConsume('not-valid-xdr')).rejects.toThrow(
         UnauthorizedException,
       );
     });

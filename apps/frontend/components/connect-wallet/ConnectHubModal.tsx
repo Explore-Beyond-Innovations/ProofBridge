@@ -14,6 +14,13 @@ const statusLabel: Record<ChainStatus, string> = {
   authenticated: "Signed in",
 }
 
+const rowStatusLabel = (adapter: ChainAdapter): string => {
+  if (adapter.status === "connected" && adapter.requiresLink) {
+    return "Link wallet required"
+  }
+  return statusLabel[adapter.status]
+}
+
 const statusDot: Record<ChainStatus, string> = {
   disconnected: "bg-grey-600",
   connecting: "bg-amber-400 animate-pulse",
@@ -61,6 +68,9 @@ const ActionButton: React.FC<{
   }
 
   if (status === "connected" && signIn) {
+    const needsLink = adapter.requiresLink
+    const idleLabel = needsLink ? "Link wallet" : "Sign in"
+    const busyLabel = needsLink ? "Linking…" : "Signing…"
     return (
       <div className="flex items-center gap-2">
         <button
@@ -75,10 +85,10 @@ const ActionButton: React.FC<{
           {isSigningIn ? (
             <>
               <Loader2 size={14} className="animate-spin" />
-              Signing…
+              {busyLabel}
             </>
           ) : (
-            "Sign in"
+            idleLabel
           )}
         </button>
         <Tooltip title="Disconnect">
@@ -124,7 +134,7 @@ const AdapterRow: React.FC<{
               className={`h-1.5 w-1.5 rounded-full ${statusDot[adapter.status]}`}
             />
             <span className="text-[11px] text-grey-400">
-              {statusLabel[adapter.status]}
+              {rowStatusLabel(adapter)}
             </span>
           </div>
           {adapter.address && (
@@ -145,12 +155,16 @@ interface ConnectHubModalProps {
   open: boolean
   onClose: () => void
   adapters: ChainAdapter[]
+  // Raise when the hub is opened on top of another antd Modal (default 1000)
+  // so it doesn't render behind its parent.
+  zIndex?: number
 }
 
 export const ConnectHubModal: React.FC<ConnectHubModalProps> = ({
   open,
   onClose,
   adapters,
+  zIndex,
 }) => {
   return (
     <Modal
@@ -159,6 +173,7 @@ export const ConnectHubModal: React.FC<ConnectHubModalProps> = ({
       footer={null}
       centered
       width={520}
+      zIndex={zIndex}
       title={<span className="text-base font-semibold">Connect wallets</span>}
       styles={{
         content: { background: "#121112", borderRadius: 16 },

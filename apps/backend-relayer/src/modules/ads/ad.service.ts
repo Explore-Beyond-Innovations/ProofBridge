@@ -24,6 +24,7 @@ import {
   toBytes32,
 } from '../../providers/viem/ethers/typedData';
 import { randomUUID } from 'crypto';
+import { UserService } from '../user/user.service';
 
 // Caller-owns-ad check bound to the ad's chain kind.
 function assertCallerOwnsAd(
@@ -49,7 +50,7 @@ function assertCallerOwnsAd(
 
 type AdQueryInput = {
   routeId?: string;
-  creatorAddress?: string;
+  creatorAddress?: string | { in: string[] };
   status?: AdStatus;
   adChainId?: bigint;
   orderChainId?: bigint;
@@ -74,6 +75,7 @@ export class AdsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly chainAdapters: ChainAdapterService,
+    private readonly users: UserService,
   ) {}
 
   async list(query: QueryAdsDto) {
@@ -85,7 +87,11 @@ export class AdsService {
       const where: AdQueryInput = {};
 
       if (query.routeId) where.routeId = query.routeId;
-      if (query.creatorAddress) where.creatorAddress = query.creatorAddress;
+      if (query.creatorAddresses && query.creatorAddresses.length > 0) {
+        where.creatorAddress = { in: query.creatorAddresses };
+      } else if (query.creatorAddress) {
+        where.creatorAddress = query.creatorAddress;
+      }
       if (query.status) where.status = query.status;
       if (query.adTokenId) where.adTokenId = query.adTokenId;
       if (query.orderTokenId) where.orderTokenId = query.orderTokenId;
@@ -354,12 +360,6 @@ export class AdsService {
 
       if (!reqUser) throw new ForbiddenException('Unauthorized');
 
-      const user = await this.prisma.user.findUnique({
-        where: { id: reqUser.sub },
-      });
-
-      if (!user) throw new ForbiddenException('Unauthorized');
-
       // Pull route + tokens to validate same-symbol & cross-chain
       const route = await this.prisma.route.findUnique({
         where: { id: dto.routeId },
@@ -450,16 +450,19 @@ export class AdsService {
           adRecipient: toBytes32(normalizedCreatorDst),
         });
 
+      const callerAddress = await this.users.getWalletForChain(
+        reqUser.sub,
+        route.adToken.chain.kind,
+      );
+
       let normalizedCreator: string;
       try {
         normalizedCreator = normalizeChainAddress(
-          user.walletAddress,
+          callerAddress,
           route.adToken.chain.kind,
         );
       } catch {
-        throw new BadRequestException(
-          'Authenticated wallet does not match ad chain',
-        );
+        throw new BadRequestException('Linked wallet does not match ad chain');
       }
 
       const requestDetails = await this.prisma.$transaction(async (prisma) => {
@@ -538,12 +541,6 @@ export class AdsService {
 
       if (!reqUser) throw new ForbiddenException('Unauthorized');
 
-      const user = await this.prisma.user.findUnique({
-        where: { id: reqUser.sub },
-      });
-
-      if (!user) throw new ForbiddenException('Unauthorized');
-
       const ad = await this.prisma.ad.findUnique({
         where: { id },
         select: {
@@ -572,7 +569,11 @@ export class AdsService {
 
       if (!ad) throw new NotFoundException('Ad not found');
 
-      assertCallerOwnsAd(user.walletAddress, ad);
+      const callerAddress = await this.users.getWalletForChain(
+        reqUser.sub,
+        ad.route.adToken.chain.kind,
+      );
+      assertCallerOwnsAd(callerAddress, ad);
 
       if (ad.adUpdateLog) {
         throw new BadRequestException(
@@ -662,12 +663,6 @@ export class AdsService {
 
       if (!reqUser) throw new ForbiddenException('Unauthorized');
 
-      const user = await this.prisma.user.findUnique({
-        where: { id: reqUser.sub },
-      });
-
-      if (!user) throw new ForbiddenException('Unauthorized');
-
       const ad = await this.prisma.ad.findUnique({
         where: { id },
         select: {
@@ -696,7 +691,11 @@ export class AdsService {
 
       if (!ad) throw new NotFoundException('Ad not found');
 
-      assertCallerOwnsAd(user.walletAddress, ad);
+      const callerAddress = await this.users.getWalletForChain(
+        reqUser.sub,
+        ad.route.adToken.chain.kind,
+      );
+      assertCallerOwnsAd(callerAddress, ad);
 
       if (ad.adUpdateLog) {
         throw new BadRequestException(
@@ -809,12 +808,6 @@ export class AdsService {
 
       if (!reqUser) throw new ForbiddenException('Unauthorized');
 
-      const user = await this.prisma.user.findUnique({
-        where: { id: reqUser.sub },
-      });
-
-      if (!user) throw new ForbiddenException('Unauthorized');
-
       const ad = await this.prisma.ad.findUnique({
         where: { id },
         select: {
@@ -886,12 +879,6 @@ export class AdsService {
 
       if (!reqUser) throw new ForbiddenException('Unauthorized');
 
-      const user = await this.prisma.user.findUnique({
-        where: { id: reqUser.sub },
-      });
-
-      if (!user) throw new ForbiddenException('Unauthorized');
-
       const ad = await this.prisma.ad.findFirst({
         where: { id },
         select: {
@@ -919,7 +906,11 @@ export class AdsService {
       });
       if (!ad) throw new NotFoundException('Ad not found');
 
-      assertCallerOwnsAd(user.walletAddress, ad);
+      const callerAddress = await this.users.getWalletForChain(
+        reqUser.sub,
+        ad.route.adToken.chain.kind,
+      );
+      assertCallerOwnsAd(callerAddress, ad);
 
       if (ad.adUpdateLog) {
         throw new BadRequestException(
@@ -1030,12 +1021,6 @@ export class AdsService {
 
       if (!reqUser) throw new ForbiddenException('Unauthorized');
 
-      const user = await this.prisma.user.findUnique({
-        where: { id: reqUser.sub },
-      });
-
-      if (!user) throw new ForbiddenException('Unauthorized');
-
       const adLogUpdate = await this.prisma.adUpdateLog.findUnique({
         where: { adId },
         include: {
@@ -1066,7 +1051,11 @@ export class AdsService {
 
       const ad = adLogUpdate.ad;
 
-      assertCallerOwnsAd(user.walletAddress, ad);
+      const callerAddress = await this.users.getWalletForChain(
+        reqUser.sub,
+        ad.route.adToken.chain.kind,
+      );
+      assertCallerOwnsAd(callerAddress, ad);
 
       // // verify adLog
       const isValidated = await this.chainAdapters

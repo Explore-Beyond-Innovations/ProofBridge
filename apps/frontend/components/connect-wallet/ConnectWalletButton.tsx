@@ -1,5 +1,5 @@
 "use client"
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import { Wallet } from "lucide-react"
 import { useAdapters } from "./useAdapters"
 import { ConnectHubModal } from "./ConnectHubModal"
@@ -11,9 +11,20 @@ export const ConnectWalletButton = () => {
   const adapters = useAdapters()
   const [open, setOpen] = useState(false)
 
-  const active = adapters.filter((a) => a.address)
-  const anyAuthed = adapters.some((a) => a.status === "authenticated")
-  const anyNeedsSign = adapters.some((a) => a.status === "connected")
+  // Adapters read cookies and wallet-connection state synchronously, which
+  // differs between SSR (no cookies, no wagmi store) and the first client
+  // render. Gate dynamic UI behind a mount flag so hydration matches.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
+  const active = mounted ? adapters.filter((a) => a.address) : []
+  const anyAuthed =
+    mounted && adapters.some((a) => a.status === "authenticated")
+  const anyNeedsSign =
+    mounted && adapters.some((a) => a.status === "connected")
+  const anyNeedsLink =
+    mounted &&
+    adapters.some((a) => a.status === "connected" && a.requiresLink)
 
   const buttonLabel = (() => {
     if (active.length === 0) return "Connect Wallet"
@@ -53,6 +64,11 @@ export const ConnectWalletButton = () => {
         {anyNeedsSign && !anyAuthed && (
           <span className="hidden md:inline text-[11px] font-semibold text-amber-400">
             · sign in
+          </span>
+        )}
+        {anyNeedsLink && anyAuthed && (
+          <span className="hidden md:inline text-[11px] font-semibold text-amber-400">
+            · link wallet
           </span>
         )}
       </button>

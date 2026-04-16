@@ -148,6 +148,7 @@ export interface IAdToken {
 
 export interface IGetAdsParams {
   creatorAddress?: Address
+  creatorAddresses?: string[]
   routeId?: string
   status?: AdStatusT
   cursor?: string
