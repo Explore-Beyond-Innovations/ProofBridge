@@ -148,6 +148,7 @@ stellar contract build --package verifier
 stellar contract build --package merkle-manager
 stellar contract build --package ad-manager
 stellar contract build --package order-portal
+stellar contract build --package test-token
 cd "$ROOT_DIR"
 
 echo "Building EVM contracts..."
