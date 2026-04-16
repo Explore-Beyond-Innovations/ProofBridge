@@ -2,3 +2,4 @@ node_modules
 target
 scripts/docker-local/.artifacts/
 scripts/docker-local/.env
+dump/
