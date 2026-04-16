@@ -7,8 +7,8 @@ import Image from "next/image"
 import { AdStatusT, IAd } from "@/types/ads"
 import { formatUnits, parseUnits } from "viem"
 import { parseToBigInt } from "@/lib/parse-to-bigint"
-import { chains } from "@/lib/chains"
 import moment from "moment"
+import { useGetAllChains } from "@/hooks/useChains"
 import { truncateString } from "@/utils/truncate-string"
 import { formatChainAddress } from "@/utils/format-address"
 import { Status } from "../shared/Status"
@@ -23,21 +23,25 @@ import { getStellarTokenBalance } from "@/utils/stellar/balance"
 export const TradeAd = ({ ...props }: IAd) => {
   const [openModal, setOpenModal] = useState(false)
   const toggleModal = () => setOpenModal(!openModal)
+  // Pool liquidity is funded and accounted in ad-token base units — format it
+  // with the ad-token's decimals, not the order-token's. Same for min/max caps,
+  // which are stored alongside the pool amount.
   const available_tokens = formatUnits(
     parseToBigInt(props.availableAmount),
-    props.orderToken.decimals
+    props.adToken.decimals
   )
   const minAmount = formatUnits(
     parseToBigInt(props.minAmount),
-    props.orderToken.decimals
+    props.adToken.decimals
   )
   const maxAmount = formatUnits(
     parseToBigInt(props.maxAmount),
-    props.orderToken.decimals
+    props.adToken.decimals
   )
-  const tokenSymbol = props.orderToken.symbol
-  const token = props.orderToken.name
-  // const crossChain = chains[props.orderToken.chainId]
+  const tokenSymbol = props.adToken.symbol
+  const { data: chainList } = useGetAllChains({ limit: 50 })
+  const resolveChainName = (chainId?: string) =>
+    chainList?.data?.find((c) => c.chainId === chainId)?.name ?? ""
   const txFeePercent = 1
   const [amount, setAmount] = useState("")
   const txFee = Number(amount) * (txFeePercent / 100)
@@ -123,8 +127,8 @@ export const TradeAd = ({ ...props }: IAd) => {
   // Resolve which action the primary button should perform. Priority: pay-side
   // wallet first (can't bridge without it), then destination-wallet, then the
   // bridge action itself. Keeps button state readable at a glance.
-  const orderChainName = chains[props.orderToken.chainId]?.name
-  const adChainName = chains[props.adToken.chainId]?.name
+  const orderChainName = resolveChainName(props.orderToken.chainId)
+  const adChainName = resolveChainName(props.adToken.chainId)
   const connectionAction: {
     label: string
     onClick?: () => void
@@ -229,9 +233,9 @@ export const TradeAd = ({ ...props }: IAd) => {
                     Route
                   </p>
                   <div className="flex items-center gap-2">
-                    <p>{chains[props.orderToken.chainId].name}</p>
+                    <p>{orderChainName}</p>
                     <ArrowRight size={15} className="text-yellow-500" />
-                    <p>{chains[props.adToken.chainId].name}</p>
+                    <p>{adChainName}</p>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
@@ -272,7 +276,7 @@ export const TradeAd = ({ ...props }: IAd) => {
           </div>
           <div className="bg-grey-800/60 w-full h-full md:rounded-r-[12px] p-4 md:p-6 md:py-7 space-y-3">
             <div className="flex items-center gap-4">
-              <p>{chains[props.orderToken.chainId]?.name} balance</p>
+              <p>{orderChainName} balance</p>
               <p className="font-semibold text-primary font-pixter tracking-wide">
                 {(isStellarOrder
                   ? stellarBalance.isLoading
@@ -293,13 +297,17 @@ export const TradeAd = ({ ...props }: IAd) => {
               <div className="h-[80px] w-full bg-grey-900/40 rounded-md p-4 flex flex-col justify-between">
                 <p className="text-xs text-grey-300">Amount to Bridge?</p>
                 <div className="grid [grid-template-columns:20px_1fr_20%] gap-1 items-center">
-                  <Image
-                    src={chain_icons[props.adToken.chainId]}
-                    alt=""
-                    height={20}
-                    width={20}
-                    className="rounded-full"
-                  />
+                  {chain_icons[props.adToken.chainId] ? (
+                    <Image
+                      src={chain_icons[props.adToken.chainId]}
+                      alt=""
+                      height={20}
+                      width={20}
+                      className="rounded-full"
+                    />
+                  ) : (
+                    <span className="h-5 w-5 rounded-full bg-grey-700" />
+                  )}
                   <input
                     className="w-full !border-0 outline-0 text-lg font-semibold tracking-wider disabled:cursor-not-allowed"
                     type="number"
@@ -379,9 +387,7 @@ export const TradeAd = ({ ...props }: IAd) => {
 
         <div className="flex items-baseline gap-2 mt-2">
           <p className="md:hidden block text-xs">Destination Chain: </p>
-          <p className="md:text-lg text-[16px]">
-            {chains[props?.adToken?.chainId!].name}
-          </p>
+          <p className="md:text-lg text-[16px]">{adChainName}</p>
         </div>
 
         <div className="uppercase">

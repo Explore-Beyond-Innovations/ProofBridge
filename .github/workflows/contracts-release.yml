@@ -66,6 +66,7 @@ jobs:
           stellar contract build --package merkle-manager
           stellar contract build --package ad-manager
           stellar contract build --package order-portal
+          stellar contract build --package test-token
 
       - name: Build EVM artifacts
         working-directory: contracts/evm
@@ -94,9 +95,10 @@ jobs:
           cp contracts/stellar/target/wasm32v1-none/release/order_portal.wasm    "$WASM_DIR/"
           cp contracts/stellar/target/wasm32v1-none/release/merkle_manager.wasm  "$WASM_DIR/"
           cp contracts/stellar/target/wasm32v1-none/release/verifier.wasm        "$WASM_DIR/"
+          cp contracts/stellar/target/wasm32v1-none/release/test_token.wasm      "$WASM_DIR/"
 
           # Copy only the artifacts the deployer actually loads.
-          for c in OrderPortal AdManager MerkleManager Verifier wNativeToken ERC20Mock; do
+          for c in OrderPortal AdManager MerkleManager Verifier wNativeToken MockERC20; do
             mkdir -p "$EVM_OUT/${c}.sol"
             cp contracts/evm/out/${c}.sol/*.json "$EVM_OUT/${c}.sol/"
           done

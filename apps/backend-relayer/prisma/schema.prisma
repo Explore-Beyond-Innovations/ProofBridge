@@ -23,14 +23,31 @@ model Admin {
 }
 
 model User {
-  id            String @id @default(uuid())
-  username      String @unique
-  walletAddress String @unique
+  id       String @id @default(uuid())
+  username String @unique
+
+  wallets UserWallet[]
 
   lastFaucetRequestAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model UserWallet {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address   String
+  chainKind ChainKind
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([address, chainKind])
+  @@unique([userId, chainKind])
+  @@index([address])
+  @@index([userId])
 }
 
 model AuthNonce {
@@ -83,8 +100,6 @@ model Token {
   kind     TokenKind @default(ERC20)
   decimals Int
 
-  /// Stellar classic-asset issuer (G-strkey). Populated only for SAC tokens;
-  /// null for NATIVE/ERC20/SEP41. Asset code is read from `symbol`.
   assetIssuer String?
 
   chainUid String

@@ -15,7 +15,6 @@ import { env } from '@libs/configs';
 import { PrismaService } from '@prisma/prisma.service';
 import { ChainKind } from '@prisma/client';
 import { accountIdToHex32 } from '../../../providers/stellar/utils/address';
-import { generateUniqueName } from '../username.util';
 
 const CHALLENGE_TIMEOUT_SECONDS = 300;
 
@@ -75,14 +74,11 @@ export class StellarAuthService {
   }
 
   /**
-   * Verify a co-signed SEP-10 challenge transaction and upsert the user.
-   * Returns the user row; the caller is responsible for minting JWTs.
+   * Verify a co-signed SEP-10 challenge transaction and record the tx hash
+   * to prevent replay. Returns the canonical hex32 wallet address. User /
+   * wallet persistence is the caller's responsibility.
    */
-  async verifyLogin(transactionXdr: string): Promise<{
-    id: string;
-    username: string;
-    walletAddress: string;
-  }> {
+  async verifyAndConsume(transactionXdr: string): Promise<string> {
     const { walletAddress } = this.verifyChallenge(transactionXdr);
 
     // Challenge transactions are self-contained (server-signed + timebound),
@@ -103,12 +99,7 @@ export class StellarAuthService {
       throw new UnauthorizedException('Challenge already used');
     }
 
-    return this.prisma.user.upsert({
-      where: { walletAddress },
-      create: { walletAddress, username: generateUniqueName() },
-      update: {},
-      select: { id: true, username: true, walletAddress: true },
-    });
+    return walletAddress;
   }
 
   /**

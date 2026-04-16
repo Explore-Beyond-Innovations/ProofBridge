@@ -89,12 +89,16 @@ export const BridgeTab = () => {
                       return (
                         <Select.Option key={chain.chainId} value={chain.chainId}>
                           <div className="flex items-center gap-2">
-                            <Image
-                              src={chain_icons[chain.chainId]}
-                              alt=""
-                              width={20}
-                              height={20}
-                            />
+                            {chain_icons[chain.chainId] ? (
+                              <Image
+                                src={chain_icons[chain.chainId]}
+                                alt=""
+                                width={20}
+                                height={20}
+                              />
+                            ) : (
+                              <span className="h-5 w-5 rounded-full bg-grey-700" />
+                            )}
                             <span className="text-[13px]">{chain.name}</span>
                           </div>
                         </Select.Option>
@@ -115,12 +119,16 @@ export const BridgeTab = () => {
                       return (
                         <Select.Option key={chain.chainId} value={chain.chainId}>
                           <div className="flex items-center gap-2">
-                            <Image
-                              src={chain_icons[chain.chainId]}
-                              alt=""
-                              width={20}
-                              height={20}
-                            />
+                            {chain_icons[chain.chainId] ? (
+                              <Image
+                                src={chain_icons[chain.chainId]}
+                                alt=""
+                                width={20}
+                                height={20}
+                              />
+                            ) : (
+                              <span className="h-5 w-5 rounded-full bg-grey-700" />
+                            )}
                             <span className="text-[13px]">{chain.name}</span>
                           </div>
                         </Select.Option>

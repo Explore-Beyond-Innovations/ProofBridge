@@ -113,6 +113,12 @@ export interface IConfirmTradeTxReponse {
 export interface IGetTradesParams {
   adCreatorAddress?: Address
   bridgerAddress?: Address
+  /**
+   * Matches trades where any of these addresses is either the ad creator or
+   * the bridger. Use this from the dashboard so trades tied to any of the
+   * user's linked wallets (across chains) are returned.
+   */
+  participantAddresses?: string[]
   routeId?: string
   cursor?: string
   limit?: number

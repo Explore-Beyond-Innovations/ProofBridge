@@ -95,8 +95,6 @@ export abstract class ChainAdapter {
 
   abstract orderTypeHash(orderParams: T_OrderParams): string;
 
-  // Signature is a `0x`-hex blob on EVM (EIP-712) and a base64 (or `0x`-hex)
-  // SEP-43-style signature on Stellar. Narrow per-adapter as needed.
   abstract verifyOrderSignature(
     address: ChainAddress,
     orderHash: `0x${string}`,

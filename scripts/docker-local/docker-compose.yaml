@@ -113,7 +113,7 @@ services:
       DATABASE_URL: postgresql://relayer:relayer@postgres:5432/relayer
       JWT_ACCESS_SECRET: local-access-secret
       JWT_REFRESH_SECRET: local-refresh-secret
-      SIGN_DOMAIN: localhost
+      SIGN_DOMAIN: localhost:3000
       SIGN_URI: http://localhost:3000
       ETHEREUM_RPC_URL: http://anvil:8545
       STELLAR_RPC_URL: http://stellar:8000/soroban/rpc

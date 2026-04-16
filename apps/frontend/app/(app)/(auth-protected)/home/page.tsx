@@ -6,39 +6,48 @@ import { GiTrade } from "react-icons/gi"
 import { TrendingUp } from "lucide-react"
 import { IoReceiptOutline } from "react-icons/io5"
 import { useGetAllAds } from "@/hooks/useAds"
-import { useAccount } from "wagmi"
 import { AdCard } from "@/components/dashboard/AdCard"
 import { Tabs, TabsProps } from "antd"
 import { SkeletonAdCard } from "@/components/dashboard/SkeletonAdCard"
 import AdsEmptyState from "@/components/dashboard/AdsEmptyState"
 import { useGetAllTrades } from "@/hooks/useTrades"
+import { useCurrentUser } from "@/hooks/useCurrentUser"
 
 const HomePage = () => {
-  const account = useAccount()
+  // Pull the full set of linked wallets (one per chain kind) and filter by
+  // ANY of them. Using only the EVM wallet misses ads created on Stellar —
+  // and vice versa — after a user links both sides.
+  const { data: currentUser } = useCurrentUser()
+  const linkedAddresses = React.useMemo(
+    () => currentUser?.wallets.map((w) => w.address) ?? [],
+    [currentUser],
+  )
+  const hasLinkedAddresses = linkedAddresses.length > 0
+
   const { data: all_active_ads, isLoading: loadingActive } = useGetAllAds({
     status: "ACTIVE",
-    creatorAddress: account.address!,
+    creatorAddresses: hasLinkedAddresses ? linkedAddresses : undefined,
   })
 
   const { data: all_inactive_ads, isLoading: loadingInActive } = useGetAllAds({
     status: "PAUSED",
-    creatorAddress: account.address!,
+    creatorAddresses: hasLinkedAddresses ? linkedAddresses : undefined,
   })
 
   const { data: all_exhausted_ads, isLoading: loadingExhuasted } = useGetAllAds(
     {
       status: "EXHAUSTED",
-      creatorAddress: account.address!,
+      creatorAddresses: hasLinkedAddresses ? linkedAddresses : undefined,
     }
   )
 
   const { data: all_closed_ads, isLoading: loadingClosed } = useGetAllAds({
     status: "CLOSED",
-    creatorAddress: account.address!,
+    creatorAddresses: hasLinkedAddresses ? linkedAddresses : undefined,
   })
 
   const { data: all_ads, isLoading } = useGetAllAds({
-    creatorAddress: account.address!,
+    creatorAddresses: hasLinkedAddresses ? linkedAddresses : undefined,
     limit: 50,
   })
 
@@ -186,8 +195,7 @@ const HomePage = () => {
   ]
 
   const { data: trades } = useGetAllTrades({
-    adCreatorAddress: account.address,
-    bridgerAddress: account.address,
+    participantAddresses: hasLinkedAddresses ? linkedAddresses : undefined,
   })
 
   return (

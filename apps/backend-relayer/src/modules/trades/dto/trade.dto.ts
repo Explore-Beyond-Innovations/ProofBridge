@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsInt,
   IsOptional,
   IsString,
@@ -42,6 +43,23 @@ export class QueryTradesDto {
   @IsOptional()
   @IsString()
   bridgerAddress?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Match trades where any of these addresses is the ad creator OR the bridger. Useful when the caller has multiple linked wallets across chains.',
+    type: [String],
+  })
+  @IsOptional()
+  @Transform(({ value }) =>
+    Array.isArray(value)
+      ? value
+      : typeof value === 'string'
+        ? value.split(',').filter(Boolean)
+        : value,
+  )
+  @IsArray()
+  @IsString({ each: true })
+  participantAddresses?: string[];
 
   @ApiPropertyOptional({
     example: '123e4567-e89b-12d3-a456-426614174000',

@@ -1,5 +1,6 @@
 import { urls } from "@/utils/urls"
 import axios from "axios"
+import { api } from "./api.instance"
 
 export type ChainKind = "EVM" | "STELLAR"
 
@@ -57,4 +58,18 @@ export const submitLogin = async (
 ): Promise<ILoginResponse> => {
   const res = await axios.post(auth_route("/login"), input)
   return res.data as ILoginResponse
+}
+
+export interface ILinkWalletResponse {
+  id: string
+  address: string
+  chainKind: ChainKind
+  createdAt: string
+}
+
+export const submitLinkWallet = async (
+  input: ILoginInput,
+): Promise<ILinkWalletResponse> => {
+  const res = await api.post(auth_route("/link"), input)
+  return res.data as ILinkWalletResponse
 }

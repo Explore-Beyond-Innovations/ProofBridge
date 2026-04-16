@@ -47,13 +47,37 @@ export class NonceTracker {
   }
 }
 
+/**
+ * Sentinel address used by OrderPortal / AdManager to mean "this pair trades
+ * the EVM native token; wrap it through wNativeToken on deposit". Mirrors
+ * `NATIVE_TOKEN_ADDRESS` in contracts/evm/src/{OrderPortal,AdManager}.sol.
+ */
+export const EVM_NATIVE_TOKEN_ADDRESS =
+  "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE" as const;
+
+/**
+ * A single tradeable token on the EVM side. `pairKey` matches the same
+ * key on the Stellar side so {@link EvmContracts} and the Stellar deploy
+ * result can be zipped into cross-chain routes.
+ */
+export interface EvmTokenDeployment {
+  pairKey: string;
+  name: string;
+  symbol: string;
+  address: string;
+  kind: "ERC20" | "NATIVE";
+  decimals: number;
+  /** Non-null for ERC20s; null for the native sentinel. */
+  contract: ethers.Contract | null;
+}
+
 export interface EvmContracts {
   verifier: ethers.Contract;
   merkleManager: ethers.Contract;
   wNativeToken: ethers.Contract;
   orderPortal: ethers.Contract;
   adManager: ethers.Contract;
-  testToken: ethers.Contract;
+  tokens: EvmTokenDeployment[];
   signer: ethers.Wallet;
   nonces: NonceTracker;
   addresses: {
@@ -62,7 +86,6 @@ export interface EvmContracts {
     wNativeToken: string;
     orderPortal: string;
     adManager: string;
-    testToken: string;
   };
 }
 
@@ -118,6 +141,9 @@ export async function deployEvmContracts(
     "MerkleManager",
     [admin],
   );
+  // wNativeToken is infrastructure, not a tradeable token. OrderPortal and
+  // AdManager wrap/unwrap through it whenever a route targets the native
+  // sentinel address.
   const wNativeToken = await deploy(
     signer,
     nonces,
@@ -126,8 +152,25 @@ export async function deployEvmContracts(
     ["Wrapped ETH", "WETH", 18],
   );
 
-  // Deploy test ERC20 token
-  const testToken = await deploy(signer, nonces, "ERC20Mock", "ERC20Mock");
+  // Tradeable tokens: one ERC20 per Stellar counterpart (plus ETH native).
+  //  - WXLM  ↔ Stellar XLM (NATIVE SAC)
+  //  - ETH   ↔ Stellar wETH (SEP-41) — uses native sentinel, wrapped via wNativeToken
+  //  - PB    ↔ Stellar PB (SEP-41)
+  const EVM_TOKEN_DECIMALS = 18;
+  const INITIAL_SUPPLY = 0n; // deployer holds nothing; mint on demand
+
+  const wxlm = await deploy(signer, nonces, "MockERC20", "MockERC20", [
+    "Wrapped XLM",
+    "WXLM",
+    INITIAL_SUPPLY,
+    EVM_TOKEN_DECIMALS,
+  ]);
+  const pb = await deploy(signer, nonces, "MockERC20", "MockERC20", [
+    "ProofBridge",
+    "PB",
+    INITIAL_SUPPLY,
+    EVM_TOKEN_DECIMALS,
+  ]);
 
   // Deploy OrderPortal
   const orderPortal = await deploy(
@@ -174,13 +217,43 @@ export async function deployEvmContracts(
     await tx.wait();
   }
 
+  const tokens: EvmTokenDeployment[] = [
+    {
+      pairKey: "xlm",
+      name: "Wrapped XLM",
+      symbol: "WXLM",
+      address: await wxlm.getAddress(),
+      kind: "ERC20",
+      decimals: EVM_TOKEN_DECIMALS,
+      contract: wxlm,
+    },
+    {
+      pairKey: "eth",
+      name: "Ether",
+      symbol: "ETH",
+      address: EVM_NATIVE_TOKEN_ADDRESS,
+      kind: "NATIVE",
+      decimals: EVM_TOKEN_DECIMALS,
+      contract: null,
+    },
+    {
+      pairKey: "pb",
+      name: "ProofBridge",
+      symbol: "PB",
+      address: await pb.getAddress(),
+      kind: "ERC20",
+      decimals: EVM_TOKEN_DECIMALS,
+      contract: pb,
+    },
+  ];
+
   return {
     verifier,
     merkleManager,
     wNativeToken,
     orderPortal,
     adManager,
-    testToken,
+    tokens,
     signer,
     nonces,
     addresses: {
@@ -189,7 +262,6 @@ export async function deployEvmContracts(
       wNativeToken: await wNativeToken.getAddress(),
       orderPortal: await orderPortal.getAddress(),
       adManager: await adManager.getAddress(),
-      testToken: await testToken.getAddress(),
     },
   };
 }

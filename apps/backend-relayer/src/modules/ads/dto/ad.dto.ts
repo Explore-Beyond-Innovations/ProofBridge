@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsIn,
   IsInt,
   IsOptional,
@@ -28,6 +29,27 @@ export class QueryAdsDto {
   @IsOptional()
   @IsString()
   creatorAddress?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Match any of these creator addresses (OR). Useful when the caller has multiple linked wallets across chains.',
+    type: [String],
+    example: [
+      '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
+      '0x' + '0'.repeat(64),
+    ],
+  })
+  @IsOptional()
+  @Transform(({ value }) =>
+    Array.isArray(value)
+      ? value
+      : typeof value === 'string'
+        ? value.split(',').filter(Boolean)
+        : value,
+  )
+  @IsArray()
+  @IsString({ each: true })
+  creatorAddresses?: string[];
 
   @ApiPropertyOptional({
     description: 'Chain ID of the ad token',

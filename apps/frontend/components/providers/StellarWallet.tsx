@@ -13,6 +13,9 @@ import {
   StellarWalletsKit,
   KitEventType,
 } from "@creit.tech/stellar-wallets-kit"
+import { urls } from "@/utils/urls"
+
+const NETWORK_PASSPHRASE = urls.STELLAR_NETWORK_PASSPHRASE as Networks
 import { FreighterModule } from "@creit.tech/stellar-wallets-kit/modules/freighter"
 import { AlbedoModule } from "@creit.tech/stellar-wallets-kit/modules/albedo"
 import { LobstrModule } from "@creit.tech/stellar-wallets-kit/modules/lobstr"
@@ -31,9 +34,6 @@ interface StellarWalletContextValue {
     xdr: string,
     networkPassphrase?: string,
   ) => Promise<string>
-  // SEP-43-style off-chain signature. Resolves with a base64 ed25519
-  // signature. Not all modules implement it (Ledger/Albedo/Rabet/WC throw) —
-  // surface the error to the caller.
   signMessage: (message: string) => Promise<string>
 }
 
@@ -64,7 +64,7 @@ export const StellarWalletProvider = ({
         : undefined
 
     StellarWalletsKit.init({
-      network: Networks.TESTNET,
+      network: NETWORK_PASSPHRASE,
       selectedWalletId: cachedWallet,
       modules: [
         new FreighterModule(),
@@ -158,7 +158,7 @@ export const StellarWalletProvider = ({
   const signTransaction = useCallback(
     async (xdr: string, networkPassphrase?: string) => {
       const { signedTxXdr } = await StellarWalletsKit.signTransaction(xdr, {
-        networkPassphrase: networkPassphrase ?? Networks.TESTNET,
+        networkPassphrase: networkPassphrase ?? NETWORK_PASSPHRASE,
         address: address ?? undefined,
       })
       return signedTxXdr
@@ -169,7 +169,7 @@ export const StellarWalletProvider = ({
   const signMessage = useCallback(
     async (message: string) => {
       const { signedMessage } = await StellarWalletsKit.signMessage(message, {
-        networkPassphrase: Networks.TESTNET,
+        networkPassphrase: NETWORK_PASSPHRASE,
         address: address ?? undefined,
       })
       return signedMessage
@@ -180,7 +180,7 @@ export const StellarWalletProvider = ({
   const value = useMemo<StellarWalletContextValue>(
     () => ({
       address,
-      networkPassphrase: Networks.TESTNET,
+      networkPassphrase: NETWORK_PASSPHRASE,
       isConnecting,
       isReady,
       connect,

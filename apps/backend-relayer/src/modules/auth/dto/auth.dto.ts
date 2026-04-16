@@ -68,6 +68,49 @@ export class LoginDTO {
   transaction?: string;
 }
 
+/**
+ * Same verification payload as LoginDTO — but consumed while the caller is
+ * already authenticated. The verified address gets attached to the existing
+ * user's wallet set instead of creating a new user.
+ */
+export class LinkWalletDto {
+  @ApiProperty({
+    description: 'Chain kind matching the challenge being signed',
+    enum: ChainKind,
+    example: ChainKind.STELLAR,
+  })
+  @IsEnum(ChainKind)
+  chainKind!: ChainKind;
+
+  @ApiProperty({
+    description: 'SIWE message string (EVM path only)',
+    required: false,
+  })
+  @ValidateIf((o: LinkWalletDto) => o.chainKind === ChainKind.EVM)
+  @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  message?: string;
+
+  @ApiProperty({
+    description: 'SIWE signature (EVM path only)',
+    required: false,
+  })
+  @ValidateIf((o: LinkWalletDto) => o.chainKind === ChainKind.EVM)
+  @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  signature?: string;
+
+  @ApiProperty({
+    description:
+      'Co-signed SEP-10 challenge transaction, base64 XDR (Stellar path only)',
+    required: false,
+  })
+  @ValidateIf((o: LinkWalletDto) => o.chainKind === ChainKind.STELLAR)
+  @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  transaction?: string;
+}
+
 export class RefreshDto {
   @ApiProperty({ description: 'Refresh token', example: 'eyJhbGciOiJIUzI1...' })
   @IsString()
@@ -147,6 +190,23 @@ export class LoginResponseDto {
     access: string;
     refresh: string;
   };
+}
+
+export class LinkWalletResponseDto {
+  @ApiProperty({ description: 'Newly linked wallet row id' })
+  @IsString()
+  id!: string;
+
+  @ApiProperty({ description: 'Canonical wallet address stored in DB' })
+  @IsString()
+  address!: string;
+
+  @ApiProperty({ enum: ChainKind })
+  @IsEnum(ChainKind)
+  chainKind!: ChainKind;
+
+  @ApiProperty({ description: 'Link creation timestamp (ISO8601)' })
+  createdAt!: Date;
 }
 
 export class RefreshResponseDto {

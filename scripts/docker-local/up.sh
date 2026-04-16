@@ -46,10 +46,10 @@ done
 have_artifact() {
   local stellar_wasm="$ARTIFACTS_DIR/contracts/stellar/target/wasm32v1-none/release"
   local evm_out="$ARTIFACTS_DIR/contracts/evm/out"
-  for w in verifier.wasm merkle_manager.wasm ad_manager.wasm order_portal.wasm; do
+  for w in verifier.wasm merkle_manager.wasm ad_manager.wasm order_portal.wasm test_token.wasm; do
     [[ -f "$stellar_wasm/$w" ]] || return 1
   done
-  for c in OrderPortal AdManager MerkleManager Verifier wNativeToken ERC20Mock; do
+  for c in OrderPortal AdManager MerkleManager Verifier wNativeToken MockERC20; do
     [[ -d "$evm_out/${c}.sol" ]] || return 1
   done
   [[ -f "$ARTIFACTS_DIR/proof_circuits/deposits/target/vk" ]]
@@ -61,13 +61,13 @@ sync_from_local_tree() {
   local evm_out="$ROOT_DIR/contracts/evm/out"
   local vk="$ROOT_DIR/proof_circuits/deposits/target/vk"
 
-  for f in verifier.wasm merkle_manager.wasm ad_manager.wasm order_portal.wasm; do
+  for f in verifier.wasm merkle_manager.wasm ad_manager.wasm order_portal.wasm test_token.wasm; do
     if [[ ! -f "$stellar_wasm/$f" ]]; then
       echo "[up.sh] missing $stellar_wasm/$f — run 'stellar contract build' first" >&2
       exit 1
     fi
   done
-  for c in OrderPortal AdManager MerkleManager Verifier wNativeToken ERC20Mock; do
+  for c in OrderPortal AdManager MerkleManager Verifier wNativeToken MockERC20; do
     if [[ ! -d "$evm_out/${c}.sol" ]]; then
       echo "[up.sh] missing $evm_out/${c}.sol — run 'forge build' in contracts/evm first" >&2
       exit 1

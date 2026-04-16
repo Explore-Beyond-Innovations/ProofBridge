@@ -96,12 +96,14 @@ log "wrote admin secret → $ADMIN_SECRET_PATH"
 # or from the repo's locally-built tree via `up.sh --local`). Sanity-check
 # their presence before running deploy so missing artifacts fail fast.
 
-for wasm in verifier merkle_manager ad_manager order_portal; do
+for wasm in verifier merkle_manager ad_manager order_portal test_token; do
   path="$ROOT_DIR/contracts/stellar/target/wasm32v1-none/release/${wasm}.wasm"
   [[ -f "$path" ]] || { log "missing stellar wasm: $path"; exit 1; }
 done
-[[ -d "$ROOT_DIR/contracts/evm/out/OrderPortal.sol" ]] \
-  || { log "missing EVM artifacts under $ROOT_DIR/contracts/evm/out"; exit 1; }
+for sol in OrderPortal AdManager MerkleManager Verifier wNativeToken MockERC20; do
+  [[ -d "$ROOT_DIR/contracts/evm/out/${sol}.sol" ]] \
+    || { log "missing EVM artifact: ${sol}.sol under $ROOT_DIR/contracts/evm/out"; exit 1; }
+done
 [[ -f "$ROOT_DIR/proof_circuits/deposits/target/vk" ]] \
   || { log "missing deposit VK at $ROOT_DIR/proof_circuits/deposits/target/vk"; exit 1; }
 
@@ -130,6 +132,8 @@ if [[ -n "${DEV_EVM_ADDRESS:-}" || -n "${DEV_STELLAR_ADDRESS:-}" ]]; then
   ROOT_DIR="$ROOT_DIR" \
   EVM_RPC_URL="$EVM_RPC_URL" \
   STELLAR_RPC_URL="$STELLAR_RPC_URL" \
+  STELLAR_NETWORK="$STELLAR_NETWORK" \
+  STELLAR_SOURCE_ACCOUNT="$ADMIN_ACCT" \
   EVM_ADMIN_PRIVATE_KEY="$EVM_ADMIN_PRIVATE_KEY" \
   DEV_EVM_ADDRESS="${DEV_EVM_ADDRESS:-}" \
   DEV_STELLAR_ADDRESS="${DEV_STELLAR_ADDRESS:-}" \
