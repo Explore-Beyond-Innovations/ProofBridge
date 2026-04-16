@@ -1,0 +1,7 @@
+# Force LF on shell scripts and Dockerfiles so Windows checkouts don't
+# produce CRLF files that break when executed inside Linux containers
+# (e.g. `#!/usr/bin/env bash\r` → "bash\r: No such file or directory").
+*.sh            text eol=lf
+*.bash          text eol=lf
+Dockerfile*     text eol=lf
+*.dockerfile    text eol=lf
