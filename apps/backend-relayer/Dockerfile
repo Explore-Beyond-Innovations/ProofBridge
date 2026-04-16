@@ -58,7 +58,7 @@ COPY --from=builder /out/prisma ./prisma
 RUN chown -R node:node /app
 USER node
 
-ENV NODE_ENV=production
+ENV NODE_ENV=development
 ENV PORT=2005
 EXPOSE 2005
 
