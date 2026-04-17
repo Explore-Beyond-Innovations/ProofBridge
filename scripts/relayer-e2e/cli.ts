@@ -8,18 +8,25 @@
 //   tsx cli.ts all    [--out <path>]
 //
 // `deploy` brings up the on-chain state and writes a JSON snapshot.
-// `seed` feeds that snapshot into Postgres via Prisma.
-// `fund`  tops up DEV_EVM_ADDRESS / DEV_STELLAR_ADDRESS on the local chains.
-// `flows` drives the relayer over HTTP through the ad + trade lifecycles.
-// `all` runs every step in-process; intended for local dev. In CI, the shell
-// orchestrator in `e2e.sh` calls the subcommands individually so Docker can
-// be started in between.
+// `seed`   feeds that snapshot into Postgres via Prisma.
+// `fund`   tops up every known address with native + tradeable tokens:
+//            - DEV_EVM_ADDRESS / DEV_STELLAR_ADDRESS (docker-local dev wallets;
+//              Stellar side gets a friendbot call since it may be fresh)
+//            - STELLAR_AD_CREATOR_SECRET / STELLAR_ORDER_CREATOR_SECRET
+//              (flow identities; already friendbot-funded by start_chains.sh,
+//              so only SEP-41 mints are needed)
+//          Any env var left unset is skipped.
+// `flows`  drives the relayer over HTTP through the ad + trade lifecycles.
+// `all`    runs every step in-process; intended for local dev. In CI, the
+//          shell orchestrator in `e2e.sh` calls the subcommands individually
+//          so Docker can be started in between.
 
 import * as fs from "fs";
 import * as path from "path";
+import { Keypair } from "@stellar/stellar-sdk";
 import { deploy } from "./lib/deploy.js";
 import { seedDb, type DeployedContracts } from "./lib/seed.js";
-import { fundDevWallets } from "./lib/fund.js";
+import { fundWallets, type StellarFundTarget } from "./lib/fund.js";
 import { runAdLifecycle } from "./flows/ad-lifecycle.js";
 import { runTradeLifecycle } from "./flows/trade-lifecycle.js";
 
@@ -52,9 +59,35 @@ async function cmdSeed(argv: string[]): Promise<void> {
 async function cmdFund(argv: string[]): Promise<void> {
   const inPath = parseFlag(argv, "--in") ?? defaultSnapshotPath();
   const snapshot = readSnapshot(inPath);
-  await fundDevWallets(snapshot, {
-    devEvmAddress: process.env.DEV_EVM_ADDRESS,
-    devStellarAddress: process.env.DEV_STELLAR_ADDRESS,
+
+  const target = (
+    address: string | undefined,
+    friendbot: boolean,
+  ): StellarFundTarget[] => (address ? [{ address, friendbot }] : []);
+
+  const fromSecret = (secret: string | undefined): string | undefined =>
+    secret ? Keypair.fromSecret(secret).publicKey() : undefined;
+
+  const evmAddresses = [process.env.DEV_EVM_ADDRESS].filter(
+    (a): a is string => !!a,
+  );
+
+  const stellarAddresses: StellarFundTarget[] = [
+    // Dev wallet may be fresh — friendbot for XLM before minting SEP-41s.
+    ...target(process.env.DEV_STELLAR_ADDRESS, true),
+    // Flow identities are already friendbot-funded by start_chains.sh.
+    ...target(fromSecret(process.env.STELLAR_AD_CREATOR_SECRET), false),
+    ...target(fromSecret(process.env.STELLAR_ORDER_CREATOR_SECRET), false),
+  ];
+
+  if (evmAddresses.length === 0 && stellarAddresses.length === 0) {
+    console.log("[cli] fund: no addresses configured — nothing to do.");
+    return;
+  }
+
+  await fundWallets(snapshot, {
+    evmAddresses,
+    stellarAddresses,
     evmRpcUrl: requireEnv("EVM_RPC_URL"),
     stellarRpcUrl: requireEnv("STELLAR_RPC_URL"),
   });
@@ -74,8 +107,8 @@ async function cmdFlows(): Promise<void> {
 async function cmdAll(argv: string[]): Promise<void> {
   const out = parseFlag(argv, "--out") ?? defaultSnapshotPath();
   await deploy(out);
-  const snapshot = readSnapshot(out);
-  await seedDb(snapshot);
+  await cmdSeed(["--in", out]);
+  await cmdFund(["--in", out]);
   await cmdFlows();
 }
 
@@ -99,7 +132,7 @@ async function main(): Promise<void> {
       return;
     default:
       console.error(
-        `Unknown command '${cmd ?? ""}'. Usage: tsx cli.ts {deploy|seed|flows|all} [--out/--in <path>]`,
+        `Unknown command '${cmd ?? ""}'. Usage: tsx cli.ts {deploy|seed|fund|flows|all} [--out/--in <path>]`,
       );
       process.exit(2);
   }

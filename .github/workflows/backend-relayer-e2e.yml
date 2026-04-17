@@ -116,7 +116,11 @@ jobs:
       - name: Seed database
         run: DATABASE_URL="$HOST_DATABASE_URL" pnpm --filter relayer-e2e exec tsx cli.ts seed --in "$SNAPSHOT_PATH"
 
-      # ── 5. flows ─────────────────────────────────────────────────────
+      # ── 5. fund wallets ──────────────────────────────────────────────
+      - name: Fund wallets
+        run: pnpm --filter relayer-e2e exec tsx cli.ts fund --in "$SNAPSHOT_PATH"
+
+      # ── 6. flows ─────────────────────────────────────────────────────
       - name: Run lifecycle flows
         run: pnpm --filter relayer-e2e exec tsx cli.ts flows
 

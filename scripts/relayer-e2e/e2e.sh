@@ -7,8 +7,10 @@ set -euo pipefail
 #   3. docker compose up       — postgres + backend-relayer (relayer runs
 #                                prisma migrate deploy on boot)
 #   4. cli.ts seed             — seed Postgres from deployed.json
-#   5. cli.ts flows            — exercise ad + trade lifecycles over HTTP
-#   6. teardown                — compose down + stop_chains.sh
+#   5. cli.ts fund             — mint SEP-41s / ERC20s to every configured
+#                                address (dev wallets + flow identities)
+#   6. cli.ts flows            — exercise ad + trade lifecycles over HTTP
+#   7. teardown                — compose down + stop_chains.sh
 #
 # Controlled via env:
 #   SKIP_START_CHAINS=1        — assume chains are already running and
@@ -75,7 +77,15 @@ pnpm --filter backend-relayer exec prisma generate >/dev/null
 DATABASE_URL="$HOST_DATABASE_URL" \
   pnpm --filter relayer-e2e exec tsx cli.ts seed --in "$SNAPSHOT_PATH"
 
-# ── 5. flows ──────────────────────────────────────────────────────────
+# ── 5. fund wallets ──────────────────────────────────────────────────
+# Mint every tradeable token to every configured address. Flow identities
+# (STELLAR_{AD,ORDER}_CREATOR_SECRET) only hold XLM out of friendbot, so
+# this is what unblocks routes[0] landing on a SEP-41 pair (wETH, PB).
+# DEV_{EVM,STELLAR}_ADDRESS are also funded here when set.
+echo "[e2e.sh] funding wallets…"
+pnpm --filter relayer-e2e exec tsx cli.ts fund --in "$SNAPSHOT_PATH"
+
+# ── 6. flows ──────────────────────────────────────────────────────────
 echo "[e2e.sh] running flows…"
 RELAYER_URL="${RELAYER_URL:-http://localhost:2005}" \
 STELLAR_CHAIN_ID="${STELLAR_CHAIN_ID:-1000001}" \
