@@ -25,7 +25,7 @@ function loadArtifact(contractFileName: string, contractName: string) {
 const AD_MANAGER_ABI = loadArtifact('AdManager', 'AdManager').abi;
 const ORDER_PORTAL_ABI = loadArtifact('OrderPortal', 'OrderPortal').abi;
 const MERKLE_MANAGER_ABI = loadArtifact('MerkleManager', 'MerkleManager').abi;
-const ERC20_MOCK_ABI = loadArtifact('ERC20Mock', 'ERC20Mock').abi;
+const ERC20_MOCK_ABI = loadArtifact('MockERC20', 'MockERC20').abi;
 import {
   T_AdManagerOrderParams,
   T_OrderPortalParams,
