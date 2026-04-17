@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ChainKind } from '@prisma/client';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { UserJwtGuard } from '../../common/guards/user-jwt.guard';
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -17,10 +18,14 @@ describe('AuthController', () => {
             challenge: jest.fn(),
             login: jest.fn(),
             refresh: jest.fn(),
+            linkWallet: jest.fn(),
           },
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(UserJwtGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<AuthController>(AuthController);
     service = module.get(AuthService);

@@ -56,15 +56,67 @@ export const apiAuthChallenge = (body: { address: string; chainKind: "EVM" | "ST
 export const apiAuthLogin = (body: Record<string, unknown>) =>
   request("POST", "/v1/auth/login", { body });
 
+export const apiAuthRefresh = (refresh: string) =>
+  request("POST", "/v1/auth/refresh", { body: { refresh } });
+
+export const apiAuthLink = (token: string, body: Record<string, unknown>) =>
+  request("POST", "/v1/auth/link", { token, body });
+
 // ── routes ────────────────────────────────────────────────────────────
 
-export const getRoutes = (adChainId: string, orderChainId: string) =>
-  request(
-    "GET",
-    `/v1/routes?adChainId=${adChainId}&orderChainId=${orderChainId}`,
-  );
+export interface RouteQuery {
+  adTokenId?: string;
+  orderTokenId?: string;
+  adChainId?: string;
+  orderChainId?: string;
+  symbol?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export const getRoutes = (
+  adChainIdOrQuery: string | RouteQuery,
+  orderChainId?: string,
+) => {
+  const q: RouteQuery =
+    typeof adChainIdOrQuery === "string"
+      ? { adChainId: adChainIdOrQuery, orderChainId }
+      : adChainIdOrQuery;
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(q)) {
+    if (v !== undefined && v !== null) qs.set(k, String(v));
+  }
+  const suffix = qs.toString();
+  return request("GET", `/v1/routes${suffix ? `?${suffix}` : ""}`);
+};
+
+export const apiGetRoute = (routeId: string) =>
+  request("GET", `/v1/routes/${routeId}`);
 
 // ── ads ───────────────────────────────────────────────────────────────
+
+export interface AdQuery {
+  routeId?: string;
+  creatorAddress?: string;
+  creatorAddresses?: string[] | string;
+  adChainId?: number | string;
+  orderChainId?: number | string;
+  adTokenId?: string;
+  orderTokenId?: string;
+  status?: "ACTIVE" | "PAUSED" | "EXHAUSTED" | "CLOSED";
+  cursor?: string;
+  limit?: number;
+}
+
+export const apiListAds = (query: AdQuery = {}) => {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(query)) {
+    if (v === undefined || v === null) continue;
+    qs.set(k, Array.isArray(v) ? v.join(",") : String(v));
+  }
+  const suffix = qs.toString();
+  return request("GET", `/v1/ads${suffix ? `?${suffix}` : ""}`);
+};
 
 export const apiCreateAd = (
   token: string,
@@ -76,6 +128,17 @@ export const apiCreateAd = (
     token,
     body: { routeId, creatorDstAddress, fundAmount },
   });
+
+export const apiUpdateAd = (
+  adId: string,
+  token: string,
+  body: {
+    status?: "ACTIVE" | "PAUSED";
+    minAmount?: string;
+    maxAmount?: string;
+    metadata?: Record<string, unknown>;
+  },
+) => request("PATCH", `/v1/ads/${adId}/update`, { token, body });
 
 export const apiConfirm = (adId: string, token: string, txHash: `0x${string}`) =>
   request("POST", `/v1/ads/${adId}/confirm`, { token, body: { txHash } });
@@ -103,6 +166,30 @@ export const apiCloseAd = (adId: string, token: string, body: { to: string }) =>
   request("POST", `/v1/ads/${adId}/close`, { token, body });
 
 // ── trades ────────────────────────────────────────────────────────────
+
+export interface TradeQuery {
+  routeId?: string;
+  adId?: string;
+  adCreatorAddress?: string;
+  bridgerAddress?: string;
+  participantAddresses?: string[] | string;
+  adTokenId?: string;
+  orderTokenId?: string;
+  minAmount?: string;
+  maxAmount?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export const apiListTrades = (query: TradeQuery = {}) => {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(query)) {
+    if (v === undefined || v === null) continue;
+    qs.set(k, Array.isArray(v) ? v.join(",") : String(v));
+  }
+  const suffix = qs.toString();
+  return request("GET", `/v1/trades/all${suffix ? `?${suffix}` : ""}`);
+};
 
 export const apiCreateOrder = (
   token: string,

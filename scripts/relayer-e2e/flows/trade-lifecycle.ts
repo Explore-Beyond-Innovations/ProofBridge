@@ -21,7 +21,7 @@ import {
   getRoutes,
   expectStatus,
 } from "../lib/api.js";
-import { loginStellar, loginEvm } from "../lib/auth.js";
+import { loginStellar, loginEvm, linkEvm, linkStellar } from "../lib/auth.js";
 import { toBaseUnits } from "../lib/amount.js";
 import { assert, assertObject, note, phase, step } from "../lib/assert.js";
 import {
@@ -89,6 +89,12 @@ export async function runTradeLifecycle(): Promise<void> {
     loginStellar(adCreator),
   );
 
+  // Ad creator unlocks on EVM later; backend resolves their EVM wallet from
+  // the user record, so link it before the unlock phase.
+  await step("link ad creator evm wallet", () =>
+    linkEvm(adAccess, adCreatorEvmKey),
+  );
+
   const INITIAL = toBaseUnits("50", "STELLAR");
   const adId = await step(`seed ad (${INITIAL} base units)`, async () => {
     const create = expectStatus(
@@ -123,6 +129,12 @@ export async function runTradeLifecycle(): Promise<void> {
 
   const bridgerAccess = await step("login bridger (evm SIWE)", () =>
     loginEvm(bridgerKey),
+  );
+
+  // Bridger unlocks on Stellar later; link their Stellar wallet so the
+  // unlock endpoint can resolve it from the user record.
+  await step("link bridger stellar wallet", () =>
+    linkStellar(bridgerAccess, bridgerStellar),
   );
 
   const { tradeId, orderReq, orderPortalAddress, tokenAddr20 } = await step(
