@@ -3,4 +3,3 @@ target
 scripts/docker-local/.artifacts/
 scripts/docker-local/.env
 dump/
-.chains*

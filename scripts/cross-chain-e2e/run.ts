@@ -437,8 +437,9 @@ async function main() {
     order_decimals: ORDER_DECIMALS,
     ad_decimals: AD_DECIMALS,
   };
-
-  const stellarOrderParamsJson = JSON.stringify(stellarOrderParams);
+  // Wrap in single quotes so bash preserves the JSON's double quotes when
+  // execSync passes the command through /bin/sh -c.
+  const stellarOrderParamsJson = `'${JSON.stringify(stellarOrderParams)}'`;
 
   {
     const authToken = authCounter.next();
