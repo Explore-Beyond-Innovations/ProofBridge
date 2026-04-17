@@ -144,7 +144,7 @@ export async function runTradeLifecycle(): Promise<void> {
         await apiCreateOrder(bridgerAccess, {
           adId,
           routeId: route.id,
-          amount: toBaseUnits("10", "STELLAR"),
+          amount: toBaseUnits("10", "EVM"),
           bridgerDstAddress: bridgerStellar.publicKey(),
         }),
         201,
