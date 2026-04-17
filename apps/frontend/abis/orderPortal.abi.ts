@@ -61,45 +61,6 @@ export const ORDER_PORTAL_ABI = [
   },
   {
     "type": "function",
-    "name": "DOMAIN_TYPEHASH_MIN",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "NATIVE_TOKEN_ADDRESS",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ORDER_TYPEHASH",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "chains",
     "inputs": [
       {
@@ -278,62 +239,6 @@ export const ORDER_PORTAL_ABI = [
   },
   {
     "type": "function",
-    "name": "eip712Domain",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "fields",
-        "type": "bytes1",
-        "internalType": "bytes1"
-      },
-      {
-        "name": "name",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "version",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "verifyingContract",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "salt",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "extensions",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getChainID",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getDestToken",
     "inputs": [
       {
@@ -422,30 +327,6 @@ export const ORDER_PORTAL_ABI = [
   },
   {
     "type": "function",
-    "name": "getSigner",
-    "inputs": [
-      {
-        "name": "message",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "signature",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "pure"
-  },
-  {
-    "type": "function",
     "name": "grantRole",
     "inputs": [
       {
@@ -482,40 +363,6 @@ export const ORDER_PORTAL_ABI = [
         "name": "",
         "type": "bool",
         "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "hashRequest",
-    "inputs": [
-      {
-        "name": "authToken",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "timeToExpire",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_action",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "_params",
-        "type": "bytes[]",
-        "internalType": "bytes[]"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
       }
     ],
     "stateMutability": "view"
@@ -923,7 +770,7 @@ export const ORDER_PORTAL_ABI = [
       }
     ],
     "outputs": [],
-    "stateMutability": "payable"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1000,12 +847,6 @@ export const ORDER_PORTAL_ABI = [
         "internalType": "bool"
       }
     ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "EIP712DomainChanged",
-    "inputs": [],
     "anonymous": false
   },
   {
@@ -1261,6 +1102,33 @@ export const ORDER_PORTAL_ABI = [
   },
   {
     "type": "error",
+    "name": "AddressCast__NotEvmAddress",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "DecimalScaling__DecimalsMismatch",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "provided",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "DecimalScaling__DecimalsOutOfRange",
     "inputs": [
       {
@@ -1296,11 +1164,6 @@ export const ORDER_PORTAL_ABI = [
         "internalType": "bytes32"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "InvalidShortString",
-    "inputs": []
   },
   {
     "type": "error",
@@ -1341,16 +1204,6 @@ export const ORDER_PORTAL_ABI = [
   },
   {
     "type": "error",
-    "name": "OrderPortal__InvalidAdRecipient",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "OrderPortal__InvalidMessage",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "OrderPortal__InvalidProof",
     "inputs": []
   },
@@ -1371,39 +1224,12 @@ export const ORDER_PORTAL_ABI = [
   },
   {
     "type": "error",
-    "name": "OrderPortal__NotEvmAddress",
-    "inputs": [
-      {
-        "name": "value",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "OrderPortal__NullifierUsed",
     "inputs": [
       {
         "name": "nullifierHash",
         "type": "bytes32",
         "internalType": "bytes32"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "OrderPortal__OrderDecimalsMismatch",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "uint8",
-        "internalType": "uint8"
-      },
-      {
-        "name": "provided",
-        "type": "uint8",
-        "internalType": "uint8"
       }
     ]
   },
@@ -1432,11 +1258,6 @@ export const ORDER_PORTAL_ABI = [
   {
     "type": "error",
     "name": "OrderPortal__RequestHashedProcessed",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "OrderPortal__RequestTokenExpired",
     "inputs": []
   },
   {
@@ -1472,12 +1293,22 @@ export const ORDER_PORTAL_ABI = [
   },
   {
     "type": "error",
-    "name": "OrderPortal__ZeroSigner",
+    "name": "ReentrancyGuardReentrantCall",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "ReentrancyGuardReentrantCall",
+    "name": "RequestAuth__Expired",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "RequestAuth__InvalidMessage",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "RequestAuth__ZeroSigner",
     "inputs": []
   },
   {
@@ -1490,16 +1321,6 @@ export const ORDER_PORTAL_ABI = [
         "internalType": "address"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "StringTooLong",
-    "inputs": [
-      {
-        "name": "str",
-        "type": "string",
-        "internalType": "string"
-      }
-    ]
   }
-] as const;
+]
+ as const;

@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { Avatar, Button, Modal, Skeleton } from "antd"
 import { ArrowRight, Info, Verified } from "lucide-react"
 import Link from "next/link"
@@ -17,6 +17,10 @@ import { useChainModal, useConnectModal } from "@rainbow-me/rainbowkit"
 import { useStellarWallet } from "@/components/providers/StellarWallet"
 import { useQuery } from "@tanstack/react-query"
 import { getStellarTokenBalance } from "@/utils/stellar/balance"
+import {
+  NonExactDownscaleError,
+  scale as scaleDecimals,
+} from "@/utils/decimal-scaling"
 
 export const TradeAd = ({ ...props }: IAd) => {
   const [openModal, setOpenModal] = useState(false)
@@ -81,6 +85,14 @@ export const TradeAd = ({ ...props }: IAd) => {
     enabled: isStellarOrder && !!stellarAddress,
   })
 
+  // Raw order-chain balance in order-token base units — needed to compare
+  // against the scaled order-chain amount without floating-point rounding.
+  const orderBalanceRaw: bigint | undefined = isStellarOrder
+    ? stellarBalance.data?.value
+    : props.orderToken.kind === "ERC20"
+      ? balance.data?.value
+      : nativeBalance.data?.value
+
   const [balance_value, setBalance_value] = useState("")
   useEffect(() => {
     if (isStellarOrder) {
@@ -102,6 +114,52 @@ export const TradeAd = ({ ...props }: IAd) => {
     }
   }, [balance.data, nativeBalance.data, stellarBalance.data, isStellarOrder])
 
+  // The input is denominated in the ad-token (the asset the bridger receives
+  // and what the ad is posted in). The wire / on-chain `amount` is denominated
+  // in the order-token. Scale here using the same DecimalScaling rules the
+  // contracts enforce so a user-side error surfaces before signing.
+  type ScaledResult =
+    | { ok: true; adAmount: bigint; orderAmount: bigint }
+    | { ok: false; error: string }
+  const scaled = useMemo((): ScaledResult | null => {
+    if (!amount || amount.trim() === "") return null
+    let adAmount: bigint
+    try {
+      adAmount = parseUnits(amount, props.adToken.decimals)
+    } catch {
+      return { ok: false, error: "Invalid amount" }
+    }
+    if (adAmount <= BigInt(0)) return null
+    try {
+      const orderAmount = scaleDecimals(
+        adAmount,
+        props.adToken.decimals,
+        props.orderToken.decimals,
+      )
+      return { ok: true, adAmount, orderAmount }
+    } catch (err) {
+      if (err instanceof NonExactDownscaleError) {
+        return {
+          ok: false,
+          error: `Amount too precise for ${props.orderToken.symbol} decimals — use a coarser value`,
+        }
+      }
+      return { ok: false, error: "Unsupported decimals configuration" }
+    }
+  }, [amount, props.adToken.decimals, props.orderToken.decimals, props.orderToken.symbol])
+
+  const orderAmountDisplay =
+    scaled && scaled.ok
+      ? formatUnits(scaled.orderAmount, props.orderToken.decimals)
+      : ""
+  const insufficientBalance = Boolean(
+    scaled &&
+      scaled.ok &&
+      orderBalanceRaw !== undefined &&
+      scaled.orderAmount > orderBalanceRaw,
+  )
+  const amountError = scaled && !scaled.ok ? scaled.error : null
+
   // Bridger's receive address lives on the *ad chain* (the destination).
   // Pick the wallet that matches its kind so we don't send an EVM 0x address
   // as a Stellar G-strkey (or vice versa).
@@ -110,11 +168,12 @@ export const TradeAd = ({ ...props }: IAd) => {
 
   const handleCreateTrade = async () => {
     if (!bridgerDstAddress) return
+    if (!scaled || !scaled.ok) return
     await mutateAsync({
       payload: {
         adId: props.id,
         routeId: props.routeId,
-        amount: parseUnits(amount, props.orderToken.decimals).toString(),
+        amount: scaled.orderAmount.toString(),
         bridgerDstAddress,
       },
       orderTokenId: props.orderTokenId,
@@ -309,21 +368,35 @@ export const TradeAd = ({ ...props }: IAd) => {
                     </span>
                   </p>
                 </div>
-                {Number(balance_value) < Number(amount) && (
+                {amountError && (
+                  <p className="text-red-400 my-1">{amountError}</p>
+                )}
+                {!amountError && insufficientBalance && (
                   <p className="text-red-400 my-1">
                     Insuffient funds in wallet
                   </p>
                 )}
               </div>
-              {amount && (
+              {scaled && scaled.ok && (
                 <div className="w-full bg-grey-900/40 rounded-md p-4 flex flex-col justify-between space-y-2">
                   <div className="flex items-center justify-between w-full">
+                    <p>You pay</p>
+                    <p>
+                      {Number(orderAmountDisplay).toLocaleString()}{" "}
+                      {props.orderToken.symbol}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between w-full">
                     <p>Transaction Fee</p>
-                    <p>{txFee} </p>
+                    <p>
+                      {txFee} {props.adToken.symbol}
+                    </p>
                   </div>
                   <div className="flex items-center justify-between w-full">
                     <p>You&apos;ll get</p>
-                    <p>{Number(amount) - txFee} </p>
+                    <p>
+                      {Number(amount) - txFee} {props.adToken.symbol}
+                    </p>
                   </div>
                 </div>
               )}
@@ -338,8 +411,7 @@ export const TradeAd = ({ ...props }: IAd) => {
                   props.status !== "ACTIVE" ||
                   isPending ||
                   (connectionAction.isBridge &&
-                    (Number(balance_value) < Number(amount) ||
-                      Number(amount) <= 0))
+                    (!scaled || !scaled.ok || insufficientBalance))
                 }
                 onClick={connectionAction.onClick}
                 loading={connectionAction.isBridge && isPending}

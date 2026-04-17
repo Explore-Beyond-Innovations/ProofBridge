@@ -57,14 +57,17 @@ export const BridgeTab = () => {
   useEffect(() => {
     const visible = chains?.data?.filter((c) => isVisibleChain(c.chainId)) ?? []
     if (!visible.length || !selectedBaseChainId) return
-    setSelectedDstChainId((prev) =>
-      prev &&
-      prev !== selectedBaseChainId &&
-      visible.some((c) => c.chainId === prev)
-        ? prev
-        : (visible.find((c) => c.chainId !== selectedBaseChainId) ??
-            visible[0]).chainId,
-    )
+    setSelectedDstChainId((prev) => {
+      if (
+        prev &&
+        prev !== selectedBaseChainId &&
+        visible.some((c) => c.chainId === prev)
+      ) {
+        return prev
+      }
+      const next = visible.find((c) => c.chainId !== selectedBaseChainId)
+      return next ? next.chainId : ""
+    })
   }, [chains, selectedBaseChainId])
 
   useEffect(() => {
