@@ -812,4 +812,16 @@ export class OrderParamsResponseDto {
   })
   @IsString()
   adManager?: string;
+
+  @ApiProperty({
+    example: 18,
+    description: 'Decimals of the order-chain token',
+  })
+  orderDecimals!: number;
+
+  @ApiProperty({
+    example: 7,
+    description: 'Decimals of the ad-chain token',
+  })
+  adDecimals!: number;
 }

@@ -545,6 +545,7 @@ export class TradesService {
               adToken: {
                 select: {
                   address: true,
+                  decimals: true,
                   chain: {
                     select: {
                       chainId: true,
@@ -558,6 +559,7 @@ export class TradesService {
               orderToken: {
                 select: {
                   address: true,
+                  decimals: true,
                   chain: {
                     select: {
                       chainId: true,
@@ -604,6 +606,8 @@ export class TradesService {
         adCreator: toBytes32(trade.adCreatorAddress),
         adRecipient: toBytes32(trade.adCreatorDstAddress),
         salt: uuidToBigInt(trade.id).toString(),
+        orderDecimals: trade.route.orderToken.decimals,
+        adDecimals: trade.route.adToken.decimals,
         orderHash: trade.orderHash,
         unlockChainKind,
       };
