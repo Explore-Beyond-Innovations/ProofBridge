@@ -107,13 +107,13 @@ export class CreateTokenDto {
   @ApiProperty({
     description: 'Token decimals',
     minimum: 0,
-    maximum: 255,
+    maximum: 30,
     example: 18,
   })
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(255)
+  @Max(30)
   decimals!: number;
 
   @ApiPropertyOptional({
@@ -183,14 +183,14 @@ export class UpdateTokenDto {
   @ApiPropertyOptional({
     description: 'Token decimals',
     minimum: 0,
-    maximum: 255,
+    maximum: 30,
     example: 18,
   })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(255)
+  @Max(30)
   decimals?: number;
 
   @ApiPropertyOptional({

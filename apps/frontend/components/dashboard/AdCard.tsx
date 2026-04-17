@@ -1,12 +1,13 @@
 "use client"
 import { chain_icons } from "@/lib/chain-icons"
+import { getChainName } from "@/lib/chains"
 import { IAd } from "@/types/ads"
 import { truncateString } from "@/utils/truncate-string"
 import { ArrowRight, Dot, Shield } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import React, { useState } from "react"
-import { Chain, hederaTestnet, sepolia } from "viem/chains"
+import { hederaTestnet, sepolia } from "viem/chains"
 import { VscVerifiedFilled } from "react-icons/vsc"
 import { Status } from "../shared/Status"
 import { formatUnits } from "viem"
@@ -19,11 +20,6 @@ import { parseToBigInt } from "@/lib/parse-to-bigint"
 const explorer_urls: Record<string, string> = {
   [hederaTestnet.id]: hederaTestnet.blockExplorers.default.url,
   [sepolia.id]: sepolia.blockExplorers.default.url,
-}
-
-const chains: Record<string, Chain> = {
-  [hederaTestnet.id]: hederaTestnet,
-  [sepolia.id]: sepolia,
 }
 
 export const AdCard = ({ ad }: { ad: IAd }) => {
@@ -65,7 +61,7 @@ export const AdCard = ({ ad }: { ad: IAd }) => {
               <div className="text-sm flex gap-1">
                 <p>
                   <span className="text-grey-300">Chain:</span>{" "}
-                  {chains[ad?.adToken?.chainId]?.name}
+                  {getChainName(ad?.adToken?.chainId)}
                 </p>
                 <Dot className="text-grey-300" />
                 <div className="flex items-center gap-1">
@@ -82,12 +78,14 @@ export const AdCard = ({ ad }: { ad: IAd }) => {
           <div className="">
             <p className="text-sm text-grey-300">Bridge Route</p>
             <div className="md:text-2xl text-lg flex items-center gap-2">
-              <h3>{chains[ad?.adToken?.chainId]?.name}</h3>
+              <h3>{getChainName(ad?.orderToken?.chainId)}</h3>
               <ArrowRight size={15} />
-              <h3>{chains[ad?.orderToken.chainId]?.name}</h3>
+              <h3>{getChainName(ad?.adToken?.chainId)}</h3>
             </div>
-            <p className="text-[12px] text-grey-300">
-              {ad?.adToken?.symbol}/{ad?.orderToken.symbol}
+            <p className="text-[12px] text-grey-300 flex items-center gap-1">
+              <span>{ad?.orderToken?.symbol}</span>
+              <ArrowRight size={10} />
+              <span>{ad?.adToken?.symbol}</span>
             </p>
           </div>
 
@@ -117,6 +115,7 @@ export const AdCard = ({ ad }: { ad: IAd }) => {
                   parseToBigInt(ad?.maxAmount || "0"),
                   ad?.adToken?.decimals
                 )}
+                <span className="text-[16px] pl-2">{ad?.adToken?.symbol}</span>
               </h3>
             </div>
             <p className="text-[12px] text-grey-300">Per order</p>
@@ -182,7 +181,7 @@ export const AdCard = ({ ad }: { ad: IAd }) => {
         toggleOpen={toggleModal}
         actionType={actionType!}
         ad={ad}
-        chain={chains[ad?.adToken?.chainId]?.name}
+        chain={getChainName(ad?.adToken?.chainId)}
       />
     </>
   )

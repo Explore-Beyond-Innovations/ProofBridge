@@ -2,11 +2,7 @@ export const AD_MANAGER_ABI = [
   {
     type: 'constructor',
     inputs: [
-      {
-        name: 'admin',
-        type: 'address',
-        internalType: 'address',
-      },
+      { name: 'admin', type: 'address', internalType: 'address' },
       {
         name: '_verifier',
         type: 'address',
@@ -25,305 +21,114 @@ export const AD_MANAGER_ABI = [
     ],
     stateMutability: 'nonpayable',
   },
-  {
-    type: 'fallback',
-    stateMutability: 'payable',
-  },
-  {
-    type: 'receive',
-    stateMutability: 'payable',
-  },
+  { type: 'fallback', stateMutability: 'payable' },
+  { type: 'receive', stateMutability: 'payable' },
   {
     type: 'function',
     name: 'ADMIN_ROLE',
     inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
+    outputs: [{ name: '', type: 'bytes32', internalType: 'bytes32' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'DEFAULT_ADMIN_ROLE',
     inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'DOMAIN_TYPEHASH_MIN',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'NATIVE_TOKEN_ADDRESS',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'ORDER_TYPEHASH',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
+    outputs: [{ name: '', type: 'bytes32', internalType: 'bytes32' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'adIds',
-    inputs: [
-      {
-        name: '',
-        type: 'string',
-        internalType: 'string',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-        internalType: 'bool',
-      },
-    ],
+    inputs: [{ name: '', type: 'string', internalType: 'string' }],
+    outputs: [{ name: '', type: 'bool', internalType: 'bool' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'ads',
-    inputs: [
-      {
-        name: '',
-        type: 'string',
-        internalType: 'string',
-      },
-    ],
+    inputs: [{ name: '', type: 'string', internalType: 'string' }],
     outputs: [
       {
         name: 'orderChainId',
         type: 'uint256',
         internalType: 'uint256',
       },
-      {
-        name: 'adRecipient',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'maker',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'balance',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'locked',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'open',
-        type: 'bool',
-        internalType: 'bool',
-      },
+      { name: 'adRecipient', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'maker', type: 'address', internalType: 'address' },
+      { name: 'token', type: 'address', internalType: 'address' },
+      { name: 'balance', type: 'uint256', internalType: 'uint256' },
+      { name: 'locked', type: 'uint256', internalType: 'uint256' },
+      { name: 'open', type: 'bool', internalType: 'bool' },
     ],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'availableLiquidity',
-    inputs: [
-      {
-        name: 'adId',
-        type: 'string',
-        internalType: 'string',
-      },
-    ],
-    outputs: [
-      {
-        name: 'amount',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
+    inputs: [{ name: 'adId', type: 'string', internalType: 'string' }],
+    outputs: [{ name: 'amount', type: 'uint256', internalType: 'uint256' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'chains',
-    inputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
+    inputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
     outputs: [
-      {
-        name: 'supported',
-        type: 'bool',
-        internalType: 'bool',
-      },
-      {
-        name: 'orderPortal',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
+      { name: 'supported', type: 'bool', internalType: 'bool' },
+      { name: 'orderPortal', type: 'bytes32', internalType: 'bytes32' },
     ],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'checkRequestHashExists',
-    inputs: [
-      {
-        name: 'message',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-        internalType: 'bool',
-      },
-    ],
+    inputs: [{ name: 'message', type: 'bytes32', internalType: 'bytes32' }],
+    outputs: [{ name: '', type: 'bool', internalType: 'bool' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'closeAd',
     inputs: [
-      {
-        name: 'signature',
-        type: 'bytes',
-        internalType: 'bytes',
-      },
-      {
-        name: 'authToken',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
+      { name: 'signature', type: 'bytes', internalType: 'bytes' },
+      { name: 'authToken', type: 'bytes32', internalType: 'bytes32' },
       {
         name: 'timeToExpire',
         type: 'uint256',
         internalType: 'uint256',
       },
-      {
-        name: 'adId',
-        type: 'string',
-        internalType: 'string',
-      },
-      {
-        name: 'to',
-        type: 'address',
-        internalType: 'address',
-      },
+      { name: 'adId', type: 'string', internalType: 'string' },
+      { name: 'to', type: 'address', internalType: 'address' },
     ],
     outputs: [],
-    stateMutability: 'payable',
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
     name: 'closeAdRequestHash',
     inputs: [
-      {
-        name: 'adId',
-        type: 'string',
-        internalType: 'string',
-      },
-      {
-        name: 'to',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'authToken',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'timeToExpire',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
+      { name: 'adId', type: 'string', internalType: 'string' },
+      { name: 'to', type: 'address', internalType: 'address' },
+      { name: 'authToken', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'timeToExpire', type: 'uint256', internalType: 'uint256' },
     ],
-    outputs: [
-      {
-        name: 'message',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
+    outputs: [{ name: 'message', type: 'bytes32', internalType: 'bytes32' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'createAd',
     inputs: [
-      {
-        name: 'signature',
-        type: 'bytes',
-        internalType: 'bytes',
-      },
-      {
-        name: 'authToken',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
+      { name: 'signature', type: 'bytes', internalType: 'bytes' },
+      { name: 'authToken', type: 'bytes32', internalType: 'bytes32' },
       {
         name: 'timeToExpire',
         type: 'uint256',
         internalType: 'uint256',
       },
-      {
-        name: 'adId',
-        type: 'string',
-        internalType: 'string',
-      },
-      {
-        name: 'adToken',
-        type: 'address',
-        internalType: 'address',
-      },
+      { name: 'adId', type: 'string', internalType: 'string' },
+      { name: 'adToken', type: 'address', internalType: 'address' },
       {
         name: 'initialAmount',
         type: 'uint256',
@@ -334,11 +139,7 @@ export const AD_MANAGER_ABI = [
         type: 'uint256',
         internalType: 'uint256',
       },
-      {
-        name: 'adRecipient',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
+      { name: 'adRecipient', type: 'bytes32', internalType: 'bytes32' },
     ],
     outputs: [],
     stateMutability: 'payable',
@@ -347,16 +148,8 @@ export const AD_MANAGER_ABI = [
     type: 'function',
     name: 'createAdRequestHash',
     inputs: [
-      {
-        name: 'adId',
-        type: 'string',
-        internalType: 'string',
-      },
-      {
-        name: 'adToken',
-        type: 'address',
-        internalType: 'address',
-      },
+      { name: 'adId', type: 'string', internalType: 'string' },
+      { name: 'adToken', type: 'address', internalType: 'address' },
       {
         name: 'initialAmount',
         type: 'uint256',
@@ -367,103 +160,26 @@ export const AD_MANAGER_ABI = [
         type: 'uint256',
         internalType: 'uint256',
       },
-      {
-        name: 'adRecipient',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'authToken',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'timeToExpire',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
+      { name: 'adRecipient', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'authToken', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'timeToExpire', type: 'uint256', internalType: 'uint256' },
     ],
-    outputs: [
-      {
-        name: 'message',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'eip712Domain',
-    inputs: [],
-    outputs: [
-      {
-        name: 'fields',
-        type: 'bytes1',
-        internalType: 'bytes1',
-      },
-      {
-        name: 'name',
-        type: 'string',
-        internalType: 'string',
-      },
-      {
-        name: 'version',
-        type: 'string',
-        internalType: 'string',
-      },
-      {
-        name: 'chainId',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'verifyingContract',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'salt',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'extensions',
-        type: 'uint256[]',
-        internalType: 'uint256[]',
-      },
-    ],
+    outputs: [{ name: 'message', type: 'bytes32', internalType: 'bytes32' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'fundAd',
     inputs: [
-      {
-        name: 'signature',
-        type: 'bytes',
-        internalType: 'bytes',
-      },
-      {
-        name: 'authToken',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
+      { name: 'signature', type: 'bytes', internalType: 'bytes' },
+      { name: 'authToken', type: 'bytes32', internalType: 'bytes32' },
       {
         name: 'timeToExpire',
         type: 'uint256',
         internalType: 'uint256',
       },
-      {
-        name: 'adId',
-        type: 'string',
-        internalType: 'string',
-      },
-      {
-        name: 'amount',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
+      { name: 'adId', type: 'string', internalType: 'string' },
+      { name: 'amount', type: 'uint256', internalType: 'uint256' },
     ],
     outputs: [],
     stateMutability: 'payable',
@@ -472,151 +188,48 @@ export const AD_MANAGER_ABI = [
     type: 'function',
     name: 'fundAdRequestHash',
     inputs: [
-      {
-        name: 'adId',
-        type: 'string',
-        internalType: 'string',
-      },
-      {
-        name: 'amount',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'authToken',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'timeToExpire',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
+      { name: 'adId', type: 'string', internalType: 'string' },
+      { name: 'amount', type: 'uint256', internalType: 'uint256' },
+      { name: 'authToken', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'timeToExpire', type: 'uint256', internalType: 'uint256' },
     ],
-    outputs: [
-      {
-        name: 'message',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'getChainID',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
+    outputs: [{ name: 'message', type: 'bytes32', internalType: 'bytes32' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'getHistoricalRoot',
-    inputs: [
-      {
-        name: 'index',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    outputs: [
-      {
-        name: 'root',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
+    inputs: [{ name: 'index', type: 'uint256', internalType: 'uint256' }],
+    outputs: [{ name: 'root', type: 'bytes32', internalType: 'bytes32' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'getLatestMerkleRoot',
     inputs: [],
-    outputs: [
-      {
-        name: 'root',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
+    outputs: [{ name: 'root', type: 'bytes32', internalType: 'bytes32' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'getMerkleLeafCount',
     inputs: [],
-    outputs: [
-      {
-        name: 'count',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
+    outputs: [{ name: 'count', type: 'uint256', internalType: 'uint256' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'getRoleAdmin',
-    inputs: [
-      {
-        name: 'role',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
+    inputs: [{ name: 'role', type: 'bytes32', internalType: 'bytes32' }],
+    outputs: [{ name: '', type: 'bytes32', internalType: 'bytes32' }],
     stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'getSigner',
-    inputs: [
-      {
-        name: 'message',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'signature',
-        type: 'bytes',
-        internalType: 'bytes',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    stateMutability: 'pure',
   },
   {
     type: 'function',
     name: 'grantRole',
     inputs: [
-      {
-        name: 'role',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'account',
-        type: 'address',
-        internalType: 'address',
-      },
+      { name: 'role', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'account', type: 'address', internalType: 'address' },
     ],
     outputs: [],
     stateMutability: 'nonpayable',
@@ -625,58 +238,10 @@ export const AD_MANAGER_ABI = [
     type: 'function',
     name: 'hasRole',
     inputs: [
-      {
-        name: 'role',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'account',
-        type: 'address',
-        internalType: 'address',
-      },
+      { name: 'role', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'account', type: 'address', internalType: 'address' },
     ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-        internalType: 'bool',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'hashRequest',
-    inputs: [
-      {
-        name: 'authToken',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'timeToExpire',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: '_action',
-        type: 'string',
-        internalType: 'string',
-      },
-      {
-        name: '_params',
-        type: 'bytes[]',
-        internalType: 'bytes[]',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
+    outputs: [{ name: '', type: 'bool', internalType: 'bool' }],
     stateMutability: 'view',
   },
   {
@@ -697,11 +262,7 @@ export const AD_MANAGER_ABI = [
     name: 'i_verifier',
     inputs: [],
     outputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'contract IVerifier',
-      },
+      { name: '', type: 'address', internalType: 'contract IVerifier' },
     ],
     stateMutability: 'view',
   },
@@ -709,16 +270,8 @@ export const AD_MANAGER_ABI = [
     type: 'function',
     name: 'lockForOrder',
     inputs: [
-      {
-        name: 'signature',
-        type: 'bytes',
-        internalType: 'bytes',
-      },
-      {
-        name: 'authToken',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
+      { name: 'signature', type: 'bytes', internalType: 'bytes' },
+      { name: 'authToken', type: 'bytes32', internalType: 'bytes32' },
       {
         name: 'timeToExpire',
         type: 'uint256',
@@ -739,16 +292,8 @@ export const AD_MANAGER_ABI = [
             type: 'bytes32',
             internalType: 'bytes32',
           },
-          {
-            name: 'amount',
-            type: 'uint256',
-            internalType: 'uint256',
-          },
-          {
-            name: 'bridger',
-            type: 'bytes32',
-            internalType: 'bytes32',
-          },
+          { name: 'amount', type: 'uint256', internalType: 'uint256' },
+          { name: 'bridger', type: 'bytes32', internalType: 'bytes32' },
           {
             name: 'orderChainId',
             type: 'uint256',
@@ -764,11 +309,7 @@ export const AD_MANAGER_ABI = [
             type: 'bytes32',
             internalType: 'bytes32',
           },
-          {
-            name: 'adId',
-            type: 'string',
-            internalType: 'string',
-          },
+          { name: 'adId', type: 'string', internalType: 'string' },
           {
             name: 'adCreator',
             type: 'bytes32',
@@ -779,111 +320,51 @@ export const AD_MANAGER_ABI = [
             type: 'bytes32',
             internalType: 'bytes32',
           },
+          { name: 'salt', type: 'uint256', internalType: 'uint256' },
           {
-            name: 'salt',
-            type: 'uint256',
-            internalType: 'uint256',
+            name: 'orderDecimals',
+            type: 'uint8',
+            internalType: 'uint8',
           },
+          { name: 'adDecimals', type: 'uint8', internalType: 'uint8' },
         ],
       },
     ],
-    outputs: [
-      {
-        name: 'orderHash',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
+    outputs: [{ name: 'orderHash', type: 'bytes32', internalType: 'bytes32' }],
     stateMutability: 'nonpayable',
   },
   {
     type: 'function',
     name: 'lockForOrderRequestHash',
     inputs: [
-      {
-        name: 'adId',
-        type: 'string',
-        internalType: 'string',
-      },
-      {
-        name: 'orderHash',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'authToken',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'timeToExpire',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
+      { name: 'adId', type: 'string', internalType: 'string' },
+      { name: 'orderHash', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'authToken', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'timeToExpire', type: 'uint256', internalType: 'uint256' },
     ],
-    outputs: [
-      {
-        name: 'message',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
+    outputs: [{ name: 'message', type: 'bytes32', internalType: 'bytes32' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'managers',
-    inputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-        internalType: 'bool',
-      },
-    ],
+    inputs: [{ name: '', type: 'address', internalType: 'address' }],
+    outputs: [{ name: '', type: 'bool', internalType: 'bool' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'nullifierUsed',
-    inputs: [
-      {
-        name: '',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-        internalType: 'bool',
-      },
-    ],
+    inputs: [{ name: '', type: 'bytes32', internalType: 'bytes32' }],
+    outputs: [{ name: '', type: 'bool', internalType: 'bool' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'orders',
-    inputs: [
-      {
-        name: '',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
+    inputs: [{ name: '', type: 'bytes32', internalType: 'bytes32' }],
     outputs: [
-      {
-        name: '',
-        type: 'uint8',
-        internalType: 'enum AdManager.Status',
-      },
+      { name: '', type: 'uint8', internalType: 'enum AdManager.Status' },
     ],
     stateMutability: 'view',
   },
@@ -891,11 +372,7 @@ export const AD_MANAGER_ABI = [
     type: 'function',
     name: 'removeChain',
     inputs: [
-      {
-        name: 'orderChainId',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
+      { name: 'orderChainId', type: 'uint256', internalType: 'uint256' },
     ],
     outputs: [],
     stateMutability: 'nonpayable',
@@ -904,16 +381,8 @@ export const AD_MANAGER_ABI = [
     type: 'function',
     name: 'removeTokenRoute',
     inputs: [
-      {
-        name: 'adToken',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'orderChainId',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
+      { name: 'adToken', type: 'address', internalType: 'address' },
+      { name: 'orderChainId', type: 'uint256', internalType: 'uint256' },
     ],
     outputs: [],
     stateMutability: 'nonpayable',
@@ -922,11 +391,7 @@ export const AD_MANAGER_ABI = [
     type: 'function',
     name: 'renounceRole',
     inputs: [
-      {
-        name: 'role',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
+      { name: 'role', type: 'bytes32', internalType: 'bytes32' },
       {
         name: 'callerConfirmation',
         type: 'address',
@@ -939,55 +404,23 @@ export const AD_MANAGER_ABI = [
   {
     type: 'function',
     name: 'requestHashes',
-    inputs: [
-      {
-        name: '',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-        internalType: 'bool',
-      },
-    ],
+    inputs: [{ name: '', type: 'bytes32', internalType: 'bytes32' }],
+    outputs: [{ name: '', type: 'bool', internalType: 'bool' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'requestTokens',
-    inputs: [
-      {
-        name: '',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-        internalType: 'bool',
-      },
-    ],
+    inputs: [{ name: '', type: 'bytes32', internalType: 'bytes32' }],
+    outputs: [{ name: '', type: 'bool', internalType: 'bool' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'revokeRole',
     inputs: [
-      {
-        name: 'role',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'account',
-        type: 'address',
-        internalType: 'address',
-      },
+      { name: 'role', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'account', type: 'address', internalType: 'address' },
     ],
     outputs: [],
     stateMutability: 'nonpayable',
@@ -1001,16 +434,8 @@ export const AD_MANAGER_ABI = [
         type: 'uint256',
         internalType: 'uint256',
       },
-      {
-        name: 'orderPortal',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'supported',
-        type: 'bool',
-        internalType: 'bool',
-      },
+      { name: 'orderPortal', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'supported', type: 'bool', internalType: 'bool' },
     ],
     outputs: [],
     stateMutability: 'nonpayable',
@@ -1019,16 +444,8 @@ export const AD_MANAGER_ABI = [
     type: 'function',
     name: 'setManager',
     inputs: [
-      {
-        name: '_manager',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: '_status',
-        type: 'bool',
-        internalType: 'bool',
-      },
+      { name: '_manager', type: 'address', internalType: 'address' },
+      { name: '_status', type: 'bool', internalType: 'bool' },
     ],
     outputs: [],
     stateMutability: 'nonpayable',
@@ -1037,21 +454,9 @@ export const AD_MANAGER_ABI = [
     type: 'function',
     name: 'setTokenRoute',
     inputs: [
-      {
-        name: 'adToken',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'orderToken',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'orderChainId',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
+      { name: 'adToken', type: 'address', internalType: 'address' },
+      { name: 'orderToken', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'orderChainId', type: 'uint256', internalType: 'uint256' },
     ],
     outputs: [],
     stateMutability: 'nonpayable',
@@ -1059,60 +464,26 @@ export const AD_MANAGER_ABI = [
   {
     type: 'function',
     name: 'supportsInterface',
-    inputs: [
-      {
-        name: 'interfaceId',
-        type: 'bytes4',
-        internalType: 'bytes4',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-        internalType: 'bool',
-      },
-    ],
+    inputs: [{ name: 'interfaceId', type: 'bytes4', internalType: 'bytes4' }],
+    outputs: [{ name: '', type: 'bool', internalType: 'bool' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'tokenRoute',
     inputs: [
-      {
-        name: '',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
+      { name: '', type: 'address', internalType: 'address' },
+      { name: '', type: 'uint256', internalType: 'uint256' },
     ],
-    outputs: [
-      {
-        name: '',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
+    outputs: [{ name: '', type: 'bytes32', internalType: 'bytes32' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     name: 'unlock',
     inputs: [
-      {
-        name: 'signature',
-        type: 'bytes',
-        internalType: 'bytes',
-      },
-      {
-        name: 'authToken',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
+      { name: 'signature', type: 'bytes', internalType: 'bytes' },
+      { name: 'authToken', type: 'bytes32', internalType: 'bytes32' },
       {
         name: 'timeToExpire',
         type: 'uint256',
@@ -1133,16 +504,8 @@ export const AD_MANAGER_ABI = [
             type: 'bytes32',
             internalType: 'bytes32',
           },
-          {
-            name: 'amount',
-            type: 'uint256',
-            internalType: 'uint256',
-          },
-          {
-            name: 'bridger',
-            type: 'bytes32',
-            internalType: 'bytes32',
-          },
+          { name: 'amount', type: 'uint256', internalType: 'uint256' },
+          { name: 'bridger', type: 'bytes32', internalType: 'bytes32' },
           {
             name: 'orderChainId',
             type: 'uint256',
@@ -1158,11 +521,7 @@ export const AD_MANAGER_ABI = [
             type: 'bytes32',
             internalType: 'bytes32',
           },
-          {
-            name: 'adId',
-            type: 'string',
-            internalType: 'string',
-          },
+          { name: 'adId', type: 'string', internalType: 'string' },
           {
             name: 'adCreator',
             type: 'bytes32',
@@ -1173,11 +532,13 @@ export const AD_MANAGER_ABI = [
             type: 'bytes32',
             internalType: 'bytes32',
           },
+          { name: 'salt', type: 'uint256', internalType: 'uint256' },
           {
-            name: 'salt',
-            type: 'uint256',
-            internalType: 'uint256',
+            name: 'orderDecimals',
+            type: 'uint8',
+            internalType: 'uint8',
           },
+          { name: 'adDecimals', type: 'uint8', internalType: 'uint8' },
         ],
       },
       {
@@ -1185,57 +546,23 @@ export const AD_MANAGER_ABI = [
         type: 'bytes32',
         internalType: 'bytes32',
       },
-      {
-        name: 'targetRoot',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'proof',
-        type: 'bytes',
-        internalType: 'bytes',
-      },
+      { name: 'targetRoot', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'proof', type: 'bytes', internalType: 'bytes' },
     ],
     outputs: [],
-    stateMutability: 'payable',
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
     name: 'unlockOrderRequestHash',
     inputs: [
-      {
-        name: 'adId',
-        type: 'string',
-        internalType: 'string',
-      },
-      {
-        name: 'orderHash',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: '_targetRoot',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'authToken',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'timeToExpire',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
+      { name: 'adId', type: 'string', internalType: 'string' },
+      { name: 'orderHash', type: 'bytes32', internalType: 'bytes32' },
+      { name: '_targetRoot', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'authToken', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'timeToExpire', type: 'uint256', internalType: 'uint256' },
     ],
-    outputs: [
-      {
-        name: 'message',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
+    outputs: [{ name: 'message', type: 'bytes32', internalType: 'bytes32' }],
     stateMutability: 'view',
   },
   {
@@ -1255,77 +582,31 @@ export const AD_MANAGER_ABI = [
     type: 'function',
     name: 'withdrawFromAd',
     inputs: [
-      {
-        name: 'signature',
-        type: 'bytes',
-        internalType: 'bytes',
-      },
-      {
-        name: 'authToken',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
+      { name: 'signature', type: 'bytes', internalType: 'bytes' },
+      { name: 'authToken', type: 'bytes32', internalType: 'bytes32' },
       {
         name: 'timeToExpire',
         type: 'uint256',
         internalType: 'uint256',
       },
-      {
-        name: 'adId',
-        type: 'string',
-        internalType: 'string',
-      },
-      {
-        name: 'amount',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'to',
-        type: 'address',
-        internalType: 'address',
-      },
+      { name: 'adId', type: 'string', internalType: 'string' },
+      { name: 'amount', type: 'uint256', internalType: 'uint256' },
+      { name: 'to', type: 'address', internalType: 'address' },
     ],
     outputs: [],
-    stateMutability: 'payable',
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
     name: 'withdrawFromAdRequestHash',
     inputs: [
-      {
-        name: 'adId',
-        type: 'string',
-        internalType: 'string',
-      },
-      {
-        name: 'amount',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'to',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'authToken',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'timeToExpire',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
+      { name: 'adId', type: 'string', internalType: 'string' },
+      { name: 'amount', type: 'uint256', internalType: 'uint256' },
+      { name: 'to', type: 'address', internalType: 'address' },
+      { name: 'authToken', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'timeToExpire', type: 'uint256', internalType: 'uint256' },
     ],
-    outputs: [
-      {
-        name: 'message',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
+    outputs: [{ name: 'message', type: 'bytes32', internalType: 'bytes32' }],
     stateMutability: 'view',
   },
   {
@@ -1469,12 +750,6 @@ export const AD_MANAGER_ABI = [
         internalType: 'bool',
       },
     ],
-    anonymous: false,
-  },
-  {
-    type: 'event',
-    name: 'EIP712DomainChanged',
-    inputs: [],
     anonymous: false,
   },
   {
@@ -1695,100 +970,45 @@ export const AD_MANAGER_ABI = [
     ],
     anonymous: false,
   },
-  {
-    type: 'error',
-    name: 'AccessControlBadConfirmation',
-    inputs: [],
-  },
+  { type: 'error', name: 'AccessControlBadConfirmation', inputs: [] },
   {
     type: 'error',
     name: 'AccessControlUnauthorizedAccount',
     inputs: [
-      {
-        name: 'account',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'neededRole',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
+      { name: 'account', type: 'address', internalType: 'address' },
+      { name: 'neededRole', type: 'bytes32', internalType: 'bytes32' },
     ],
   },
-  {
-    type: 'error',
-    name: 'AdManager__AdClosed',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'AdManager__AdNotFound',
-    inputs: [],
-  },
+  { type: 'error', name: 'AdManager__AdClosed', inputs: [] },
+  { type: 'error', name: 'AdManager__AdNotFound', inputs: [] },
   {
     type: 'error',
     name: 'AdManager__AdRecipientMismatch',
     inputs: [
-      {
-        name: 'expected',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'provided',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
+      { name: 'expected', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'provided', type: 'bytes32', internalType: 'bytes32' },
     ],
   },
   {
     type: 'error',
     name: 'AdManager__AdTokenMismatch',
     inputs: [
-      {
-        name: 'expected',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'provided',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
+      { name: 'expected', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'provided', type: 'bytes32', internalType: 'bytes32' },
     ],
   },
-  {
-    type: 'error',
-    name: 'AdManager__BridgerZero',
-    inputs: [],
-  },
+  { type: 'error', name: 'AdManager__BridgerZero', inputs: [] },
   {
     type: 'error',
     name: 'AdManager__ChainNotSupported',
-    inputs: [
-      {
-        name: 'chainId',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
+    inputs: [{ name: 'chainId', type: 'uint256', internalType: 'uint256' }],
   },
   {
     type: 'error',
     name: 'AdManager__InsufficientLiquidity',
     inputs: [],
   },
-  {
-    type: 'error',
-    name: 'AdManager__InvalidMessage',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'AdManager__InvalidProof',
-    inputs: [],
-  },
+  { type: 'error', name: 'AdManager__InvalidProof', inputs: [] },
   {
     type: 'error',
     name: 'AdManager__MerkleManagerAppendFailed',
@@ -1803,29 +1023,10 @@ export const AD_MANAGER_ABI = [
         type: 'bytes32',
         internalType: 'bytes32',
       },
-      {
-        name: 'adChainId',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
+      { name: 'adChainId', type: 'uint256', internalType: 'uint256' },
     ],
   },
-  {
-    type: 'error',
-    name: 'AdManager__NotEvmAddress',
-    inputs: [
-      {
-        name: 'value',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
-  },
-  {
-    type: 'error',
-    name: 'AdManager__NotMaker',
-    inputs: [],
-  },
+  { type: 'error', name: 'AdManager__NotMaker', inputs: [] },
   {
     type: 'error',
     name: 'AdManager__NullifierUsed',
@@ -1841,122 +1042,49 @@ export const AD_MANAGER_ABI = [
     type: 'error',
     name: 'AdManager__OrderChainMismatch',
     inputs: [
-      {
-        name: 'expected',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'provided',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
+      { name: 'expected', type: 'uint256', internalType: 'uint256' },
+      { name: 'provided', type: 'uint256', internalType: 'uint256' },
     ],
   },
   {
     type: 'error',
     name: 'AdManager__OrderExists',
-    inputs: [
-      {
-        name: 'orderHash',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
+    inputs: [{ name: 'orderHash', type: 'bytes32', internalType: 'bytes32' }],
   },
   {
     type: 'error',
     name: 'AdManager__OrderNotOpen',
-    inputs: [
-      {
-        name: 'orderHash',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
+    inputs: [{ name: 'orderHash', type: 'bytes32', internalType: 'bytes32' }],
   },
   {
     type: 'error',
     name: 'AdManager__OrderPortalMismatch',
     inputs: [
-      {
-        name: 'expected',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'provided',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
+      { name: 'expected', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'provided', type: 'bytes32', internalType: 'bytes32' },
     ],
   },
   {
     type: 'error',
     name: 'AdManager__OrderTokenMismatch',
     inputs: [
-      {
-        name: 'expected',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-      {
-        name: 'provided',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
+      { name: 'expected', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'provided', type: 'bytes32', internalType: 'bytes32' },
     ],
   },
+  { type: 'error', name: 'AdManager__RecipientZero', inputs: [] },
+  { type: 'error', name: 'AdManager__TokenAlreadyUsed', inputs: [] },
+  { type: 'error', name: 'AdManager__TokenZeroAddress', inputs: [] },
+  { type: 'error', name: 'AdManager__UsedAdId', inputs: [] },
+  { type: 'error', name: 'AdManager__ZeroAddress', inputs: [] },
+  { type: 'error', name: 'AdManager__ZeroAmount', inputs: [] },
   {
     type: 'error',
-    name: 'AdManager__RecipientZero',
-    inputs: [],
+    name: 'AddressCast__NotEvmAddress',
+    inputs: [{ name: 'value', type: 'bytes32', internalType: 'bytes32' }],
   },
-  {
-    type: 'error',
-    name: 'AdManager__RequestTokenExpired',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'AdManager__TokenAlreadyUsed',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'AdManager__TokenZeroAddress',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'AdManager__UsedAdId',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'AdManager__ZeroAddress',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'AdManager__ZeroAmount',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'Admanage__ZeroSigner',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'Admanager__ActiveLocks',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'Admanager__InvalidSigner',
-    inputs: [],
-  },
+  { type: 'error', name: 'Admanager__ActiveLocks', inputs: [] },
+  { type: 'error', name: 'Admanager__InvalidSigner', inputs: [] },
   {
     type: 'error',
     name: 'Admanager__RequestHashedProcessed',
@@ -1964,61 +1092,49 @@ export const AD_MANAGER_ABI = [
   },
   {
     type: 'error',
-    name: 'ECDSAInvalidSignature',
-    inputs: [],
+    name: 'DecimalScaling__DecimalsMismatch',
+    inputs: [
+      { name: 'expected', type: 'uint8', internalType: 'uint8' },
+      { name: 'provided', type: 'uint8', internalType: 'uint8' },
+    ],
   },
   {
     type: 'error',
-    name: 'ECDSAInvalidSignatureLength',
+    name: 'DecimalScaling__DecimalsOutOfRange',
+    inputs: [{ name: 'value', type: 'uint8', internalType: 'uint8' }],
+  },
+  {
+    type: 'error',
+    name: 'DecimalScaling__DecimalsUnavailable',
+    inputs: [{ name: 'token', type: 'address', internalType: 'address' }],
+  },
+  {
+    type: 'error',
+    name: 'DecimalScaling__NonExactDownscale',
     inputs: [
-      {
-        name: 'length',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
+      { name: 'amount', type: 'uint256', internalType: 'uint256' },
+      { name: 'fromDec', type: 'uint8', internalType: 'uint8' },
+      { name: 'toDec', type: 'uint8', internalType: 'uint8' },
     ],
+  },
+  { type: 'error', name: 'ECDSAInvalidSignature', inputs: [] },
+  {
+    type: 'error',
+    name: 'ECDSAInvalidSignatureLength',
+    inputs: [{ name: 'length', type: 'uint256', internalType: 'uint256' }],
   },
   {
     type: 'error',
     name: 'ECDSAInvalidSignatureS',
-    inputs: [
-      {
-        name: 's',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
+    inputs: [{ name: 's', type: 'bytes32', internalType: 'bytes32' }],
   },
-  {
-    type: 'error',
-    name: 'InvalidShortString',
-    inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'ReentrancyGuardReentrantCall',
-    inputs: [],
-  },
+  { type: 'error', name: 'ReentrancyGuardReentrantCall', inputs: [] },
+  { type: 'error', name: 'RequestAuth__Expired', inputs: [] },
+  { type: 'error', name: 'RequestAuth__InvalidMessage', inputs: [] },
+  { type: 'error', name: 'RequestAuth__ZeroSigner', inputs: [] },
   {
     type: 'error',
     name: 'SafeERC20FailedOperation',
-    inputs: [
-      {
-        name: 'token',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
+    inputs: [{ name: 'token', type: 'address', internalType: 'address' }],
   },
-  {
-    type: 'error',
-    name: 'StringTooLong',
-    inputs: [
-      {
-        name: 'str',
-        type: 'string',
-        internalType: 'string',
-      },
-    ],
-  },
-] as const;
+];

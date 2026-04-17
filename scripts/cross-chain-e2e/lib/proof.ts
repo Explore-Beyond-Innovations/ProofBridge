@@ -51,7 +51,7 @@ const NAME_HASH = keccak256(Buffer.from("Proofbridge"));
 const VERSION_HASH = keccak256(Buffer.from("1"));
 const ORDER_TYPEHASH = keccak256(
   Buffer.from(
-    "Order(bytes32 orderChainToken,bytes32 adChainToken,uint256 amount,bytes32 bridger,uint256 orderChainId,bytes32 orderPortal,bytes32 orderRecipient,uint256 adChainId,bytes32 adManager,string adId,bytes32 adCreator,bytes32 adRecipient,uint256 salt)",
+    "Order(bytes32 orderChainToken,bytes32 adChainToken,uint256 amount,bytes32 bridger,uint256 orderChainId,bytes32 orderPortal,bytes32 orderRecipient,uint256 adChainId,bytes32 adManager,string adId,bytes32 adCreator,bytes32 adRecipient,uint256 salt,uint8 orderDecimals,uint8 adDecimals)",
   ),
 );
 
@@ -75,6 +75,8 @@ export interface OrderParams {
   adCreator: string;
   adRecipient: string;
   salt: bigint;
+  orderDecimals: number;
+  adDecimals: number;
 }
 
 /** Compute EIP-712 struct hash for Order. */
@@ -95,6 +97,8 @@ function structHashOrder(p: OrderParams): Buffer {
       abiEncodeAddress(p.adCreator),
       abiEncodeAddress(p.adRecipient),
       abiEncodeUint256(p.salt),
+      abiEncodeUint256(BigInt(p.orderDecimals)),
+      abiEncodeUint256(BigInt(p.adDecimals)),
     ]),
   );
 }

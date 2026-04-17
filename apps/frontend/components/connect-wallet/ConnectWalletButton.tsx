@@ -1,5 +1,6 @@
 "use client"
 import React, { useEffect, useState } from "react"
+import Cookies from "js-cookie"
 import { Wallet } from "lucide-react"
 import { useAdapters } from "./useAdapters"
 import { ConnectHubModal } from "./ConnectHubModal"
@@ -16,6 +17,26 @@ export const ConnectWalletButton = () => {
   // render. Gate dynamic UI behind a mount flag so hydration matches.
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
+
+  // If every adapter ends up disconnected while a session still exists (e.g.
+  // user disconnected from both wallet extensions, or revoked site access),
+  // wipe the auth cookies so the protected layout renders Unauthenticated.
+  // Debounced to let wagmi / stellar-wallets-kit rehydrate on page load
+  // before deciding nothing is connected.
+  useEffect(() => {
+    if (!mounted) return
+    const anyLive = adapters.some(
+      (a) => a.address || a.status === "connecting",
+    )
+    if (anyLive) return
+    if (!Cookies.get("auth_token") && !Cookies.get("refresh_token")) return
+    const t = setTimeout(() => {
+      Cookies.remove("auth_token")
+      Cookies.remove("refresh_token")
+      window.location.reload()
+    }, 800)
+    return () => clearTimeout(t)
+  }, [mounted, adapters])
 
   const active = mounted ? adapters.filter((a) => a.address) : []
   const anyAuthed =

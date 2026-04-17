@@ -1,15 +1,18 @@
 "use client"
 
 import React, { useState } from "react"
-import { Button, message, Spin } from "antd"
+import { App, Button, Spin, Tooltip } from "antd"
 import { useGetAllChains } from "@/hooks/useChains"
 import { useGetAllTokens } from "@/hooks/useTokens"
 import { GiWaterDrop } from "react-icons/gi"
 import useFaucet from "@/hooks/useFaucet"
 import { IToken } from "@/types/tokens"
 import { useConnectModal } from "@rainbow-me/rainbowkit"
-import { useAccount } from "wagmi"
+import { useAccount, useSwitchChain, useWalletClient } from "wagmi"
 import { IChain } from "@/types/chains"
+import { useStellarWallet } from "@/components/providers/StellarWallet"
+import { hex32ToContractId } from "@/utils/stellar/address"
+import { WalletMinimal } from "lucide-react"
 
 const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
   chainId,
@@ -17,10 +20,30 @@ const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
 }) => {
   const { data: tokens, isLoading } = useGetAllTokens({ chainId })
   const [claiming, setClaiming] = useState<Record<string, boolean>>({})
-  const { mutateAsync, isPending } = useFaucet()
+  const { mutateAsync } = useFaucet()
 
   const { openConnectModal } = useConnectModal()
-  const { address } = useAccount()
+  const { address: evmAddress } = useAccount()
+  const { data: walletClient } = useWalletClient()
+  const { switchChainAsync } = useSwitchChain()
+  const { address: stellarAddress, connect: connectStellar } =
+    useStellarWallet()
+  const { message } = App.useApp()
+
+  const isEvmChain = (token: IToken) => token.chain.kind === "EVM"
+  const isStellarChain = (token: IToken) => token.chain.kind === "STELLAR"
+  const connectedForToken = (token: IToken) =>
+    isEvmChain(token) ? !!evmAddress : isStellarChain(token) && !!stellarAddress
+
+  const addTooltip = (token: IToken): string | null => {
+    if (isEvmChain(token) && token.kind === "ERC20") {
+      return `Add ${token.symbol} to wallet`
+    }
+    if (isStellarChain(token) && (token.kind === "SAC" || token.kind === "SEP41")) {
+      return `Copy ${token.symbol} contract`
+    }
+    return null
+  }
 
   const handleClaim = async (token: IToken) => {
     const key = token.id || `${token.symbol}-${token.address}`
@@ -35,6 +58,54 @@ const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
     }
   }
 
+  const handleAddToWallet = async (token: IToken) => {
+    try {
+      if (isEvmChain(token) && token.kind === "ERC20") {
+        if (!walletClient) {
+          message.error("Connect an EVM wallet first")
+          return
+        }
+        const targetChainId = Number(token.chain.chainId)
+        if (walletClient.chain.id !== targetChainId) {
+          await switchChainAsync({ chainId: targetChainId })
+        }
+        await walletClient.watchAsset({
+          type: "ERC20",
+          options: {
+            address: token.address,
+            symbol: token.symbol,
+            decimals: token.decimals,
+          },
+        })
+        message.success(`${token.symbol} added to wallet`)
+        return
+      }
+      if (
+        isStellarChain(token) &&
+        (token.kind === "SAC" || token.kind === "SEP41")
+      ) {
+        if (!stellarAddress) {
+          message.error("Connect a Stellar wallet first")
+          return
+        }
+        const contractId = hex32ToContractId(token.address)
+        await navigator.clipboard.writeText(contractId)
+        message.success(
+          `Copied ${token.symbol} contract — paste it in Freighter's Add Asset search`,
+        )
+      }
+    } catch (err) {
+      message.error(
+        err instanceof Error ? err.message : "Failed to add token to wallet",
+      )
+    }
+  }
+
+  const claimable =
+    tokens?.data?.filter(
+      (t) => t.kind !== "NATIVE" && t.symbol.toUpperCase() !== "XLM",
+    ) ?? []
+
   if (isLoading)
     return (
       <div className="p-4 flex items-center justify-center">
@@ -42,7 +113,7 @@ const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
       </div>
     )
 
-  if (!tokens?.data || tokens.data.length === 0)
+  if (claimable.length === 0)
     return (
       <div className="p-4 text-center text-grey-400">
         No tokens on this chain
@@ -51,7 +122,7 @@ const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
 
   return (
     <div className="space-y-3">
-      {tokens.data.map((token: IToken) => {
+      {claimable.map((token: IToken) => {
         const key = token.id || `${token.symbol}-${token.address}`
 
         return (
@@ -71,20 +142,38 @@ const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              {!address ? (
-                <Button type="primary" onClick={() => openConnectModal?.()}>
-                  Connect Wallet
+            <div className="flex items-center gap-2">
+              {!connectedForToken(token) ? (
+                <Button
+                  type="primary"
+                  size="small"
+                  onClick={() =>
+                    isStellarChain(token)
+                      ? connectStellar()
+                      : openConnectModal?.()
+                  }
+                >
+                  Connect
                 </Button>
               ) : (
                 <>
+                  {addTooltip(token) && (
+                    <Tooltip title={addTooltip(token)}>
+                      <Button
+                        size="small"
+                        shape="circle"
+                        icon={<WalletMinimal size={14} />}
+                        onClick={() => handleAddToWallet(token)}
+                      />
+                    </Tooltip>
+                  )}
                   <Button
                     type="primary"
+                    size="small"
                     onClick={() => handleClaim(token)}
                     loading={!!claiming[key]}
-                    title={`Make sure your wallet is set to ${
-                      chainName || chainId
-                    } before claiming`}
+                    title={`Make sure your wallet is set to ${chainName || chainId
+                      } before claiming`}
                   >
                     Claim
                   </Button>

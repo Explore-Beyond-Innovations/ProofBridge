@@ -84,6 +84,8 @@ export const orderTypes: Record<string, { name: string; type: string }[]> = {
     { name: 'adCreator', type: 'bytes32' },
     { name: 'adRecipient', type: 'bytes32' },
     { name: 'salt', type: 'uint256' },
+    { name: 'orderDecimals', type: 'uint8' },
+    { name: 'adDecimals', type: 'uint8' },
   ],
 };
 
@@ -128,6 +130,8 @@ export function buildOrderParams(
     adCreator,
     adRecipient,
     salt,
+    orderDecimals,
+    adDecimals,
   } = orderParams;
 
   if (isAdChain) {
@@ -143,6 +147,8 @@ export function buildOrderParams(
       adCreator,
       adRecipient,
       salt: uuidToBigInt(salt).toString(),
+      orderDecimals,
+      adDecimals,
     };
     return params;
   } else {
@@ -158,6 +164,8 @@ export function buildOrderParams(
       adCreator,
       adRecipient,
       salt: uuidToBigInt(salt).toString(),
+      orderDecimals,
+      adDecimals,
     };
     return params;
   }

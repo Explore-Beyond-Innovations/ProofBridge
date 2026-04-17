@@ -165,12 +165,20 @@ export function deployStellarChain(
   //   wETH SEP-41  ↔ EVM ETH native sentinel (wrapped through EVM wNativeToken)
   //   PB SEP-41    ↔ EVM PB ERC20
   const testTokenWasm = path.join(wasmDir, "test_token.wasm");
+  const STELLAR_TOKEN_DECIMALS = 7;
+
   console.log("Deploying Stellar wETH SEP-41...");
   const wethSep41 = deployContract(testTokenWasm, [
     `--owner`,
     adminStrkey,
     `--initial_supply`,
     "0",
+    `--decimals`,
+    String(STELLAR_TOKEN_DECIMALS),
+    `--name`,
+    "Wrapped ETH",
+    `--symbol`,
+    "wETH",
   ]);
   console.log(`  wETH SEP-41: ${wethSep41}`);
 
@@ -180,10 +188,14 @@ export function deployStellarChain(
     adminStrkey,
     `--initial_supply`,
     "0",
+    `--decimals`,
+    String(STELLAR_TOKEN_DECIMALS),
+    `--name`,
+    "ProofBridge",
+    `--symbol`,
+    "PB",
   ]);
   console.log(`  PB SEP-41: ${pbSep41}`);
-
-  const STELLAR_TOKEN_DECIMALS = 7;
   const tokens: StellarTokenDeployment[] = [
     {
       pairKey: "xlm",

@@ -307,11 +307,12 @@ export const AddLiquidity = () => {
             <p>What users will see</p>
           </div>
           <p className="text-sm">
-            Your ad will appear as: Base{" "}
-            <span className="text-primary">{baseChain?.name || "N/A"}</span> for
-            Destination{" "}
+            Your ad will appear as a bridge route from{" "}
             <span className="text-primary">{orderChain?.name || "N/A"}</span>{" "}
-            with the information and trading terms specified above.
+            (Source) to{" "}
+            <span className="text-primary">{baseChain?.name || "N/A"}</span>{" "}
+            (Destination) with the information and trading terms specified
+            above.
           </p>
         </div>
       </div>

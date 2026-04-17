@@ -107,9 +107,9 @@ async function fundStellar(
   snapshot: DeployedContracts,
   opts: FundOpts,
 ): Promise<void> {
-  const targets = opts.stellarAddresses.filter(
-    (t) => t.address.trim().length > 0,
-  );
+  const targets = opts.stellarAddresses
+    .map((t) => ({ ...t, address: t.address.trim() }))
+    .filter((t) => t.address.length > 0);
   if (targets.length === 0) {
     console.log(
       "[fund] Stellar: no addresses supplied — skipping Stellar funding.",

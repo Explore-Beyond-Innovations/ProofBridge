@@ -24,3 +24,12 @@ export const VISIBLE_CHAIN_IDS: ReadonlySet<string> = new Set([
 
 export const isVisibleChain = (chainId: string | number): boolean =>
   VISIBLE_CHAIN_IDS.has(String(chainId))
+
+// Human-readable chain name for a given chainId. Falls back to `Chain {id}`
+// so missing configs stay visible in the UI instead of rendering blank.
+export const getChainName = (chainId: string | number | undefined): string => {
+  if (chainId == null) return ""
+  const id = String(chainId)
+  if (id === STELLAR_TESTNET_CHAIN_ID) return "Stellar"
+  return chains[id]?.name ?? `Chain ${id}`
+}

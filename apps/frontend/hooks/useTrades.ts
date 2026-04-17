@@ -31,12 +31,10 @@ import {
   unlockOrderPortalSoroban,
   unlockSoroban,
 } from "@/utils/stellar/actions";
-import {
-  establishTrustline,
-  hasTrustline,
-} from "@/utils/stellar/trustline";
+import { establishTrustline, hasTrustline } from "@/utils/stellar/trustline";
 import type { TrustlineCtx } from "@/utils/stellar/trustline";
 import type { IToken } from "@/types/tokens";
+import { hex32ToAddress20 } from "@/utils/evm/address";
 
 async function ensureSacTrustline(
   token: IToken,
@@ -95,6 +93,8 @@ export const useCreateTrade = () => {
               adCreator: rc.orderParams.adCreator,
               adRecipient: rc.orderParams.adRecipient,
               salt: rc.orderParams.salt,
+              orderDecimals: rc.orderParams.orderDecimals,
+              adDecimals: rc.orderParams.adDecimals,
             },
             orderPortalHex: rc.contractAddress,
           },
@@ -110,8 +110,9 @@ export const useCreateTrade = () => {
       const token = await getSingleToken(data.orderTokenId);
 
       if (token.kind === "ERC20") {
+        const orderTokenAddr = hex32ToAddress20(rc.orderParams.orderChainToken);
         const approveHash = await writeContractAsync({
-          address: rc.orderParams.orderChainToken,
+          address: orderTokenAddr,
           abi: ERC20_ABI,
           chainId: Number(token.chain.chainId),
           functionName: "approve",
@@ -144,6 +145,8 @@ export const useCreateTrade = () => {
                 adCreator: rc.orderParams.adCreator,
                 adRecipient: rc.orderParams.adRecipient,
                 salt: BigInt(rc.orderParams.salt),
+                orderDecimals: rc.orderParams.orderDecimals,
+                adDecimals: rc.orderParams.adDecimals,
               },
             ],
           });
@@ -190,6 +193,8 @@ export const useCreateTrade = () => {
               adCreator: rc.orderParams.adCreator,
               adRecipient: rc.orderParams.adRecipient,
               salt: BigInt(rc.orderParams.salt),
+              orderDecimals: rc.orderParams.orderDecimals,
+              adDecimals: rc.orderParams.adDecimals,
             },
           ],
           value: parseEther(amount),
@@ -257,6 +262,8 @@ export const useLockFunds = () => {
               adCreator: response.orderParams.adCreator,
               adRecipient: response.orderParams.adRecipient,
               salt: response.orderParams.salt,
+              orderDecimals: response.orderParams.orderDecimals,
+              adDecimals: response.orderParams.adDecimals,
             },
             adManagerHex: response.contractAddress,
           },
@@ -290,6 +297,8 @@ export const useLockFunds = () => {
             adCreator: response.orderParams.adCreator,
             adRecipient: response.orderParams.adRecipient,
             salt: BigInt(response.orderParams.salt),
+            orderDecimals: response.orderParams.orderDecimals,
+            adDecimals: response.orderParams.adDecimals,
           },
         ],
       });
@@ -362,6 +371,8 @@ export const useUnLockFunds = () => {
               { name: "adCreator", type: "bytes32" },
               { name: "adRecipient", type: "bytes32" },
               { name: "salt", type: "uint256" },
+              { name: "orderDecimals", type: "uint8" },
+              { name: "adDecimals", type: "uint8" },
             ],
           },
           primaryType: "Order",
@@ -379,6 +390,8 @@ export const useUnLockFunds = () => {
             adCreator: params.adCreator,
             adRecipient: params.adRecipient,
             salt: BigInt(params.salt),
+            orderDecimals: params.orderDecimals,
+            adDecimals: params.adDecimals,
           },
           domain: {
             name: "Proofbridge",
@@ -399,7 +412,10 @@ export const useUnLockFunds = () => {
       if (response.chainKind === "STELLAR") {
         // Relayer still emits the proof payload as hex strings; actions layer
         // converts buffer→ScVal bytes. Proof is already 0x-prefixed hex.
-        const proofBuffer = Buffer.from(response.proof.replace(/^0x/, ""), "hex");
+        const proofBuffer = Buffer.from(
+          response.proof.replace(/^0x/, ""),
+          "hex",
+        );
         const txHash = isAdCreator
           ? await unlockOrderPortalSoroban(
               buildStellarCtx(),

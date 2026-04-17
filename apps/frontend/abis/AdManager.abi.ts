@@ -61,45 +61,6 @@ export const AD_MANAGER_ABI = [
   },
   {
     "type": "function",
-    "name": "DOMAIN_TYPEHASH_MIN",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "NATIVE_TOKEN_ADDRESS",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ORDER_TYPEHASH",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "adIds",
     "inputs": [
       {
@@ -259,7 +220,7 @@ export const AD_MANAGER_ABI = [
       }
     ],
     "outputs": [],
-    "stateMutability": "payable"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -394,49 +355,6 @@ export const AD_MANAGER_ABI = [
   },
   {
     "type": "function",
-    "name": "eip712Domain",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "fields",
-        "type": "bytes1",
-        "internalType": "bytes1"
-      },
-      {
-        "name": "name",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "version",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "verifyingContract",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "salt",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "extensions",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "fundAd",
     "inputs": [
       {
@@ -498,19 +416,6 @@ export const AD_MANAGER_ABI = [
         "name": "message",
         "type": "bytes32",
         "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getChainID",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -581,30 +486,6 @@ export const AD_MANAGER_ABI = [
   },
   {
     "type": "function",
-    "name": "getSigner",
-    "inputs": [
-      {
-        "name": "message",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "signature",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "pure"
-  },
-  {
-    "type": "function",
     "name": "grantRole",
     "inputs": [
       {
@@ -641,40 +522,6 @@ export const AD_MANAGER_ABI = [
         "name": "",
         "type": "bool",
         "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "hashRequest",
-    "inputs": [
-      {
-        "name": "authToken",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "timeToExpire",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_action",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "_params",
-        "type": "bytes[]",
-        "internalType": "bytes[]"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
       }
     ],
     "stateMutability": "view"
@@ -783,6 +630,16 @@ export const AD_MANAGER_ABI = [
             "name": "salt",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "orderDecimals",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "adDecimals",
+            "type": "uint8",
+            "internalType": "uint8"
           }
         ]
       }
@@ -1177,6 +1034,16 @@ export const AD_MANAGER_ABI = [
             "name": "salt",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "orderDecimals",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "adDecimals",
+            "type": "uint8",
+            "internalType": "uint8"
           }
         ]
       },
@@ -1197,7 +1064,7 @@ export const AD_MANAGER_ABI = [
       }
     ],
     "outputs": [],
-    "stateMutability": "payable"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1287,7 +1154,7 @@ export const AD_MANAGER_ABI = [
       }
     ],
     "outputs": [],
-    "stateMutability": "payable"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1469,12 +1336,6 @@ export const AD_MANAGER_ABI = [
         "internalType": "bool"
       }
     ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "EIP712DomainChanged",
-    "inputs": [],
     "anonymous": false
   },
   {
@@ -1781,11 +1642,6 @@ export const AD_MANAGER_ABI = [
   },
   {
     "type": "error",
-    "name": "AdManager__InvalidMessage",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "AdManager__InvalidProof",
     "inputs": []
   },
@@ -1807,17 +1663,6 @@ export const AD_MANAGER_ABI = [
         "name": "adChainId",
         "type": "uint256",
         "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "AdManager__NotEvmAddress",
-    "inputs": [
-      {
-        "name": "value",
-        "type": "bytes32",
-        "internalType": "bytes32"
       }
     ]
   },
@@ -1914,11 +1759,6 @@ export const AD_MANAGER_ABI = [
   },
   {
     "type": "error",
-    "name": "AdManager__RequestTokenExpired",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "AdManager__TokenAlreadyUsed",
     "inputs": []
   },
@@ -1944,8 +1784,14 @@ export const AD_MANAGER_ABI = [
   },
   {
     "type": "error",
-    "name": "Admanage__ZeroSigner",
-    "inputs": []
+    "name": "AddressCast__NotEvmAddress",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
   },
   {
     "type": "error",
@@ -1961,6 +1807,54 @@ export const AD_MANAGER_ABI = [
     "type": "error",
     "name": "Admanager__RequestHashedProcessed",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "DecimalScaling__DecimalsMismatch",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "provided",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "DecimalScaling__DecimalsOutOfRange",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "DecimalScaling__NonExactDownscale",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "fromDec",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "toDec",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
   },
   {
     "type": "error",
@@ -1991,12 +1885,22 @@ export const AD_MANAGER_ABI = [
   },
   {
     "type": "error",
-    "name": "InvalidShortString",
+    "name": "ReentrancyGuardReentrantCall",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "ReentrancyGuardReentrantCall",
+    "name": "RequestAuth__Expired",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "RequestAuth__InvalidMessage",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "RequestAuth__ZeroSigner",
     "inputs": []
   },
   {
@@ -2009,16 +1913,6 @@ export const AD_MANAGER_ABI = [
         "internalType": "address"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "StringTooLong",
-    "inputs": [
-      {
-        "name": "str",
-        "type": "string",
-        "internalType": "string"
-      }
-    ]
   }
-] as const;
+]
+ as const;
