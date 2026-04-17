@@ -75,7 +75,11 @@ const CIRCUIT_PATH = path.join(
 );
 
 const AD_ID = "e2e-test-ad";
+// Ad-chain side: Stellar SAC uses 7-decimal stroops.
+const AD_DECIMALS = 7;
 const AMOUNT = 1_000_000_000n; // 100 XLM (stroops have 7 decimals)
+const ORDER_DECIMALS = 18;
+const ORDER_AMOUNT = AMOUNT * 10n ** BigInt(ORDER_DECIMALS - AD_DECIMALS);
 const SALT = 42n;
 
 // ── helpers ─────────────────────────────────────────────────────────
@@ -238,7 +242,11 @@ async function main() {
   );
   // EVM counterpart of the XLM pair (WXLM ERC20).
   const evmOrderTokenEntry = evm.tokens.find((t) => t.pairKey === "xlm");
-  if (!evmOrderTokenEntry || evmOrderTokenEntry.kind !== "ERC20" || !evmOrderTokenEntry.contract) {
+  if (
+    !evmOrderTokenEntry ||
+    evmOrderTokenEntry.kind !== "ERC20" ||
+    !evmOrderTokenEntry.contract
+  ) {
     throw new Error("[e2e] evm snapshot missing ERC20 token for pairKey=xlm");
   }
   const evmOrderToken = evmOrderTokenEntry.contract;
@@ -327,7 +335,7 @@ async function main() {
   {
     const tx = await evmOrderToken.getFunction("mint")(
       orderCreatorEvm,
-      AMOUNT * 10n,
+      ORDER_AMOUNT * 10n,
       { nonce: nonces.next() },
     );
     await tx.wait();
@@ -337,7 +345,7 @@ async function main() {
   {
     const tx = await testTokenAsCreator.getFunction("approve")(
       evm.addresses.orderPortal,
-      AMOUNT,
+      ORDER_AMOUNT,
       { nonce: orderCreatorNonces.next() },
     );
     await tx.wait();
@@ -346,7 +354,7 @@ async function main() {
   const evmOrderParams = {
     orderChainToken: evmTokenBytes32,
     adChainToken: stellarAdTokenHex,
-    amount: AMOUNT,
+    amount: ORDER_AMOUNT,
     bridger: orderCreatorEvmHex,
     orderRecipient: orderCreatorStellarHex,
     adChainId: STELLAR_CHAIN_ID,
@@ -355,12 +363,14 @@ async function main() {
     adCreator: adCreatorStellarHex,
     adRecipient: adCreatorEvmHex,
     salt: SALT,
+    orderDecimals: ORDER_DECIMALS,
+    adDecimals: AD_DECIMALS,
   };
 
   const orderParams: OrderParams = {
     orderChainToken: evmTokenBytes32,
     adChainToken: stellarAdTokenHex,
-    amount: AMOUNT,
+    amount: ORDER_AMOUNT,
     bridger: orderCreatorEvmHex,
     orderChainId: EVM_CHAIN_ID,
     orderPortal: evmOrderPortalBytes32,
@@ -371,6 +381,8 @@ async function main() {
     adCreator: adCreatorStellarHex,
     adRecipient: adCreatorEvmHex,
     salt: SALT,
+    orderDecimals: ORDER_DECIMALS,
+    adDecimals: AD_DECIMALS,
   };
 
   const orderHash = computeOrderHash(orderParams);
@@ -413,7 +425,7 @@ async function main() {
   const stellarOrderParams = {
     order_chain_token: evmTokenBytes32.replace(/^0x/, ""),
     ad_chain_token: stellarAdTokenHex.replace(/^0x/, ""),
-    amount: AMOUNT.toString(),
+    amount: ORDER_AMOUNT.toString(),
     bridger: orderCreatorEvmHex.replace(/^0x/, ""),
     order_chain_id: EVM_CHAIN_ID.toString(),
     src_order_portal: evmOrderPortalBytes32.replace(/^0x/, ""),
@@ -422,6 +434,8 @@ async function main() {
     ad_creator: adCreatorStellarHex.replace(/^0x/, ""),
     ad_recipient: adCreatorEvmHex.replace(/^0x/, ""),
     salt: SALT.toString(),
+    order_decimals: ORDER_DECIMALS,
+    ad_decimals: AD_DECIMALS,
   };
   // Wrap in single quotes so bash preserves the JSON's double quotes when
   // execSync passes the command through /bin/sh -c.
@@ -587,9 +601,10 @@ async function main() {
   );
   assert(adCreatorNullUsed, "Ad-creator nullifier should be consumed on EVM");
 
-  // EVM token accounting:
-  //   order creator: minted 10*AMOUNT, spent AMOUNT on createOrder → 9*AMOUNT
-  //   ad creator (EVM recipient): 0 → AMOUNT after unlock
+  // EVM token accounting (order-chain decimals):
+  //   order creator: minted 10*ORDER_AMOUNT, spent ORDER_AMOUNT on createOrder
+  //                  → 9*ORDER_AMOUNT remaining
+  //   ad creator (EVM recipient): 0 → ORDER_AMOUNT after unlock
   const orderCreatorBalance =
     await evmOrderToken.getFunction("balanceOf")(orderCreatorEvm);
   const adRecipientBalance = await evmOrderToken.getFunction("balanceOf")(
@@ -597,19 +612,19 @@ async function main() {
   );
 
   console.log(
-    `  Order creator EVM token balance:  ${orderCreatorBalance} (expected ${AMOUNT * 9n})`,
+    `  Order creator EVM token balance:  ${orderCreatorBalance} (expected ${ORDER_AMOUNT * 9n})`,
   );
   console.log(
-    `  Ad creator EVM token balance:     ${adRecipientBalance} (expected ${AMOUNT})`,
+    `  Ad creator EVM token balance:     ${adRecipientBalance} (expected ${ORDER_AMOUNT})`,
   );
 
   assert(
-    orderCreatorBalance === AMOUNT * 9n,
-    `Order creator EVM balance: expected ${AMOUNT * 9n}, got ${orderCreatorBalance}`,
+    orderCreatorBalance === ORDER_AMOUNT * 9n,
+    `Order creator EVM balance: expected ${ORDER_AMOUNT * 9n}, got ${orderCreatorBalance}`,
   );
   assert(
-    adRecipientBalance === AMOUNT,
-    `Ad creator EVM recipient did not receive order token: expected ${AMOUNT}, got ${adRecipientBalance}`,
+    adRecipientBalance === ORDER_AMOUNT,
+    `Ad creator EVM recipient did not receive order token: expected ${ORDER_AMOUNT}, got ${adRecipientBalance}`,
   );
   console.log("  ✓ Ad creator EVM recipient received the order token.");
 
@@ -662,7 +677,9 @@ async function main() {
   console.log(`  Verifier:       ${evm.addresses.verifier}`);
   console.log(`  MerkleManager:  ${evm.addresses.merkleManager}`);
   console.log(`  OrderPortal:    ${evm.addresses.orderPortal}`);
-  console.log(`  OrderToken:     ${evmOrderTokenAddress} (${evmOrderTokenEntry.symbol})`);
+  console.log(
+    `  OrderToken:     ${evmOrderTokenAddress} (${evmOrderTokenEntry.symbol})`,
+  );
   console.log("");
   console.log("Order hash:", orderHash);
 }
