@@ -34,6 +34,7 @@ import {
   unlockOrderChain,
   mintToken,
   approveToken,
+  isNativeOrderToken,
 } from "../lib/evm-actions.js";
 import { makeEthClient, fundEthAddress } from "../lib/eth.js";
 import {
@@ -163,22 +164,27 @@ export async function runTradeLifecycle(): Promise<void> {
     },
   );
 
-  await step("mint + approve EVM test token for bridger", async () => {
-    await mintToken(
-      ethClient,
-      bridger,
-      tokenAddr20,
-      bridger.address,
-      parseEther("1000"),
-    );
-    await approveToken(
-      ethClient,
-      bridger,
-      tokenAddr20,
-      orderPortalAddress,
-      parseEther("100"),
-    );
-  });
+  // Native-order routes pay via msg.value in createOrder — skip ERC20 setup,
+  // the bridger's native balance was already topped up in "fund evm participants".
+  const orderIsNative = isNativeOrderToken(orderReq.orderParams.orderChainToken);
+  if (!orderIsNative) {
+    await step("mint + approve EVM test token for bridger", async () => {
+      await mintToken(
+        ethClient,
+        bridger,
+        tokenAddr20,
+        bridger.address,
+        parseEther("1000"),
+      );
+      await approveToken(
+        ethClient,
+        bridger,
+        tokenAddr20,
+        orderPortalAddress,
+        parseEther("100"),
+      );
+    });
+  }
 
   await step("submit + confirm EVM createOrder", async () => {
     const orderCreateTx = await createOrder(

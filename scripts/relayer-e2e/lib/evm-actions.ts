@@ -40,6 +40,18 @@ import {
 
 const DEFAULT_ADMIN_ROLE = ethers.ZeroHash as `0x${string}`;
 
+// Mirrors contracts/evm/src/libraries/AddressCast.sol NATIVE_TOKEN_ADDRESS.
+const EVM_NATIVE_SENTINEL =
+  '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+
+/**
+ * OrderParams encodes addresses as 32-byte values (left-padded for EVM). The
+ * low 20 bytes match the sentinel when the order-chain token is native.
+ */
+export function isNativeOrderToken(orderChainToken32: string): boolean {
+  return orderChainToken32.slice(-40).toLowerCase() === EVM_NATIVE_SENTINEL.slice(2);
+}
+
 export async function grantManagerRole(
   publicClient: PublicClient,
   account: PrivateKeyAccount,
@@ -407,6 +419,11 @@ export async function createOrder(
     account,
   });
 
+  const amount = BigInt(orderParams.amount);
+  // OrderPortal.createOrder is payable: native-token routes must forward
+  // msg.value ≥ params.amount, non-native routes must omit value.
+  const isNative = isNativeOrderToken(orderParams.orderChainToken);
+
   const hash = await wallet.writeContract({
     chain: publicClient.chain,
     address: orderPortalAddress as AddressLike,
@@ -418,11 +435,12 @@ export async function createOrder(
       BigInt(timeToExpire),
       {
         ...orderParams,
-        amount: BigInt(orderParams.amount),
+        amount,
         adChainId: BigInt(orderParams.adChainId),
         salt: BigInt(orderParams.salt),
       },
     ],
+    ...(isNative ? { value: amount } : {}),
   });
 
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
