@@ -24,6 +24,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { Keypair } from "@stellar/stellar-sdk";
+import { privateKeyToAddress } from "viem/accounts";
 import { deploy } from "./lib/deploy.js";
 import { seedDb, type DeployedContracts } from "./lib/seed.js";
 import { fundWallets, type StellarFundTarget } from "./lib/fund.js";
@@ -65,19 +66,26 @@ async function cmdFund(argv: string[]): Promise<void> {
     friendbot: boolean,
   ): StellarFundTarget[] => (address ? [{ address, friendbot }] : []);
 
-  const fromSecret = (secret: string | undefined): string | undefined =>
+  const fromStellarSecret = (secret: string | undefined): string | undefined =>
     secret ? Keypair.fromSecret(secret).publicKey() : undefined;
 
-  const evmAddresses = [process.env.DEV_EVM_ADDRESS].filter(
-    (a): a is string => !!a,
-  );
+  const fromEvmKey = (key: string | undefined): string | undefined =>
+    key ? privateKeyToAddress(key as `0x${string}`) : undefined;
+
+  const evmAddresses = [
+    process.env.DEV_EVM_ADDRESS,
+    // Flow identities used by the trade-lifecycle — anvil pre-funds ETH but
+    // the flow-specific ERC20s (wETH, PB) still need mints.
+    fromEvmKey(process.env.EVM_AD_CREATOR_PRIVATE_KEY),
+    fromEvmKey(process.env.EVM_ORDER_CREATOR_PRIVATE_KEY),
+  ].filter((a): a is string => !!a);
 
   const stellarAddresses: StellarFundTarget[] = [
     // Dev wallet may be fresh — friendbot for XLM before minting SEP-41s.
     ...target(process.env.DEV_STELLAR_ADDRESS, true),
     // Flow identities are already friendbot-funded by start_chains.sh.
-    ...target(fromSecret(process.env.STELLAR_AD_CREATOR_SECRET), false),
-    ...target(fromSecret(process.env.STELLAR_ORDER_CREATOR_SECRET), false),
+    ...target(fromStellarSecret(process.env.STELLAR_AD_CREATOR_SECRET), false),
+    ...target(fromStellarSecret(process.env.STELLAR_ORDER_CREATOR_SECRET), false),
   ];
 
   if (evmAddresses.length === 0 && stellarAddresses.length === 0) {
