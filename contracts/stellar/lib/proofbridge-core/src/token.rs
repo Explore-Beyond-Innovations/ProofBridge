@@ -45,16 +45,26 @@ pub fn bytes32_to_token_address(env: &Env, bytes: &BytesN<32>) -> Option<Address
     Some(Address::from_string(&soroban_str))
 }
 
-/// Convert BytesN<32> account address (Ed25519 public key) to Soroban Address
-pub fn bytes32_to_account_address(env: &Env, bytes: &BytesN<32>) -> Address {
+/// Re-encode a BytesN<32> Ed25519 pubkey as a Soroban `G...` account `Address`.
+///
+/// Rejects the all-zero 32-byte pubkey with `E::invalid_account_address()`.
+/// Any other 32-byte value is deterministically strkey-encoded and wrapped as
+/// an `Address`; this does NOT verify the key corresponds to a funded or
+/// existing Stellar account, and it only produces account (`G...`) addresses —
+/// Soroban contract (`C...`) addresses are not supported here.
+pub fn bytes32_to_account_address<E: ProofBridgeError>(
+    env: &Env,
+    bytes: &BytesN<32>,
+) -> Result<Address, E> {
     use stellar_strkey::ed25519::PublicKey;
 
-    let pubkey = PublicKey(bytes.to_array());
-    let strkey = pubkey.to_string();
+    if bytes.to_array().iter().all(|&b| b == 0) {
+        return Err(E::invalid_account_address());
+    }
 
-    let strkey_bytes = strkey.as_bytes();
-    let soroban_str = SorobanString::from_str(env, core::str::from_utf8(strkey_bytes).unwrap());
-    Address::from_string(&soroban_str)
+    let strkey = PublicKey(bytes.to_array()).to_string();
+    let soroban_str = SorobanString::from_str(env, strkey.as_str());
+    Ok(Address::from_string(&soroban_str))
 }
 
 // =============================================================================
@@ -121,10 +131,6 @@ pub fn transfer_to_user_bytes32<E: ProofBridgeError>(
 }
 
 /// Query the `decimals()` view of a token referenced by BytesN<32>.
-///
-/// For the native token marker, reads from the wrapped-native token contract.
-/// Returns [`ProofBridgeError::token_zero_address`] if the bytes32 does not
-/// resolve to a contract address.
 pub fn token_decimals_bytes32<E: ProofBridgeError>(
     env: &Env,
     token_bytes: &BytesN<32>,
@@ -150,7 +156,7 @@ pub fn transfer_to_recipient_bytes32<E: ProofBridgeError>(
     amount: u128,
 ) -> Result<(), E> {
     let contract_addr = env.current_contract_address();
-    let recipient = bytes32_to_account_address(env, recipient_bytes);
+    let recipient = bytes32_to_account_address::<E>(env, recipient_bytes)?;
     transfer_tokens(
         env,
         token_bytes,

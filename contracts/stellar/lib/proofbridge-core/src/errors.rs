@@ -19,6 +19,7 @@ pub trait ProofBridgeError: Copy {
     fn decimal_overflow() -> Self;
     fn order_decimals_mismatch() -> Self;
     fn ad_decimals_mismatch() -> Self;
+    fn invalid_account_address() -> Self;
 }
 
 /// Convert a [`crate::decimal_scaling::DecimalScalingError`] into the
