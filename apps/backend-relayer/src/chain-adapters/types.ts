@@ -120,6 +120,8 @@ export type T_OrderParams = {
   adCreator: Bytes32Hex;
   adRecipient: Bytes32Hex;
   salt: string;
+  orderDecimals: number;
+  adDecimals: number;
 };
 
 // Ad-chain subset passed to AdManager.lockForOrder / unlock. The local
@@ -137,6 +139,8 @@ export type T_AdManagerOrderParams = {
   adCreator: Bytes32Hex;
   adRecipient: Bytes32Hex;
   salt: string;
+  orderDecimals: number;
+  adDecimals: number;
 };
 
 // Order-chain subset passed to OrderPortal.createOrder / unlock. The local
@@ -153,6 +157,8 @@ export type T_OrderPortalParams = {
   adCreator: Bytes32Hex;
   adRecipient: Bytes32Hex;
   salt: string;
+  orderDecimals: number;
+  adDecimals: number;
 };
 
 export type T_LockForOrderRequest = {

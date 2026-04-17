@@ -244,6 +244,8 @@ function toAdManagerParams(p: T_OrderParams): T_AdManagerOrderParams {
     adCreator: p.adCreator,
     adRecipient: p.adRecipient,
     salt: p.salt,
+    orderDecimals: p.orderDecimals,
+    adDecimals: p.adDecimals,
   };
 }
 
@@ -260,5 +262,7 @@ function toOrderPortalParams(p: T_OrderParams): T_OrderPortalParams {
     adCreator: p.adCreator,
     adRecipient: p.adRecipient,
     salt: p.salt,
+    orderDecimals: p.orderDecimals,
+    adDecimals: p.adDecimals,
   };
 }

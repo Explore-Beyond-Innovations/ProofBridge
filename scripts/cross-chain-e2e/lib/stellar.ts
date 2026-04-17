@@ -7,6 +7,20 @@ import { execSync } from "child_process";
 const NETWORK = process.env.STELLAR_NETWORK ?? "local";
 const SOURCE = process.env.STELLAR_SOURCE_ACCOUNT ?? "alice";
 
+/**
+ * Shell-quote a single arg for POSIX sh. Flags (`--foo`) pass through;
+ * values get wrapped in single quotes with internal quotes escaped so that
+ * strings containing spaces (`Wrapped ETH`) survive the `execSync` shell.
+ */
+function shQuote(arg: string): string {
+  if (arg.startsWith("--")) return arg;
+  return `'${arg.replace(/'/g, `'\\''`)}'`;
+}
+
+function joinArgs(args: string[]): string {
+  return args.map(shQuote).join(" ");
+}
+
 function exec(cmd: string): string {
   const result = execSync(cmd, {
     encoding: "utf8",
@@ -29,7 +43,7 @@ export function deployContract(
   constructorArgs: string[] = [],
 ): string {
   const ctorStr =
-    constructorArgs.length > 0 ? `-- ${constructorArgs.join(" ")}` : "";
+    constructorArgs.length > 0 ? `-- ${joinArgs(constructorArgs)}` : "";
   const output = stellar(
     `contract deploy --wasm "${wasmPath}" --source "${SOURCE}" --network "${NETWORK}" ${ctorStr}`,
   );
@@ -51,7 +65,7 @@ export function invokeContract(
 ): string {
   const sendFlag = options.send === false ? "--send no" : "--send yes";
   const source = options.source ?? SOURCE;
-  const argsStr = args.length > 0 ? args.join(" ") : "";
+  const argsStr = args.length > 0 ? joinArgs(args) : "";
   return stellar(
     `contract invoke --id "${contractId}" --source-account "${source}" --network "${NETWORK}" ${sendFlag} -- ${fn} ${argsStr}`,
   );

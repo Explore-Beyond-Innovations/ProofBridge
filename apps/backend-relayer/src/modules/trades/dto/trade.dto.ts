@@ -365,6 +365,20 @@ export class AdManagerOrderParamsDto {
   })
   @IsString()
   salt!: string;
+
+  @ApiProperty({
+    example: 6,
+    description: 'Order-chain token decimals',
+  })
+  @IsInt()
+  orderDecimals!: number;
+
+  @ApiProperty({
+    example: 18,
+    description: 'Ad-chain token decimals',
+  })
+  @IsInt()
+  adDecimals!: number;
 }
 
 export class LockForOrderResponseDto {
@@ -505,6 +519,20 @@ export class OrderPortalParamsDto {
   })
   @IsString()
   salt!: string;
+
+  @ApiProperty({
+    example: 6,
+    description: 'Order-chain token decimals',
+  })
+  @IsInt()
+  orderDecimals!: number;
+
+  @ApiProperty({
+    example: 18,
+    description: 'Ad-chain token decimals',
+  })
+  @IsInt()
+  adDecimals!: number;
 }
 
 export class CreateOrderRequestContractDetailsDto {
@@ -631,6 +659,8 @@ export class UnlockOrderResponseDto {
       adCreator: '0x1234567890abcdef',
       adRecipient: '0x1234567890abcdef',
       salt: '123456',
+      orderDecimals: 6,
+      adDecimals: 18,
     },
   })
   orderParams!: OrderPortalParamsDto | AdManagerOrderParamsDto;

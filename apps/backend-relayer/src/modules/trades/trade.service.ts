@@ -298,6 +298,7 @@ export class TradesService {
                 orderToken: {
                   select: {
                     address: true,
+                    decimals: true,
                     chain: {
                       select: {
                         orderPortalAddress: true,
@@ -311,6 +312,7 @@ export class TradesService {
                 adToken: {
                   select: {
                     address: true,
+                    decimals: true,
                     chain: {
                       select: {
                         adManagerAddress: true,
@@ -351,15 +353,11 @@ export class TradesService {
         );
       }
 
-      // Bridger signs + pays on the order chain. Resolve that wallet first so
-      // we can both use it for on-chain params and reject self-trades below.
       const bridgerAddress = await this.users.getWalletForChain(
         reqUser.sub,
         ad.route.orderToken.chain.kind,
       );
 
-      // Reject self-trading — if the caller has a linked wallet on the
-      // ad chain that matches `ad.creatorAddress`, they're the ad's creator.
       const callerLinked = await this.users.getLinkedAddresses(reqUser.sub);
       if (callerLinked.has(ad.creatorAddress)) {
         throw new BadRequestException(
@@ -367,8 +365,6 @@ export class TradesService {
         );
       }
 
-      // bridgerDstAddress lives on the ad chain (where the bridger receives
-      // the locked tokens), so validate against that chain's kind.
       let normalizedBridgerDst: string;
       try {
         normalizedBridgerDst = normalizeChainAddress(
@@ -379,11 +375,26 @@ export class TradesService {
         throw new BadRequestException('Invalid bridgerDstAddress');
       }
 
-      const amount = new Prisma.Decimal(dto.amount);
-      if (ad.minAmount && amount.lt(ad.minAmount)) {
+      const orderAmount = new Prisma.Decimal(dto.amount);
+      const orderDecimals = ad.route.orderToken.decimals;
+      const adDecimals = ad.route.adToken.decimals;
+      const scale = new Prisma.Decimal(10).pow(
+        Math.abs(adDecimals - orderDecimals),
+      );
+      const adAmount =
+        adDecimals >= orderDecimals
+          ? orderAmount.mul(scale)
+          : orderAmount.div(scale);
+      if (!adAmount.isInteger()) {
+        throw new BadRequestException(
+          'Amount not representable in ad-token decimals',
+        );
+      }
+
+      if (ad.minAmount && adAmount.lt(ad.minAmount)) {
         throw new BadRequestException('Amount below minAmount');
       }
-      if (ad.maxAmount && amount.gt(ad.maxAmount)) {
+      if (ad.maxAmount && adAmount.gt(ad.maxAmount)) {
         throw new BadRequestException('Amount above maxAmount');
       }
 
@@ -394,7 +405,7 @@ export class TradesService {
       });
       const locked = lockSum._sum.amount ?? new Prisma.Decimal(0);
       const available = ad.poolAmount.sub(locked);
-      if (amount.gt(available))
+      if (adAmount.gt(available))
         throw new BadRequestException('Insufficient liquidity');
 
       const secret = this.proofService.generateSecret();
@@ -409,7 +420,7 @@ export class TradesService {
           orderParams: {
             orderChainToken: toBytes32(ad.route.orderToken.address),
             adChainToken: toBytes32(ad.route.adToken.address),
-            amount: amount.toFixed(0),
+            amount: orderAmount.toFixed(0),
             bridger: toBytes32(bridgerAddress),
             orderChainId: ad.route.orderToken.chain.chainId.toString(),
             orderPortal: toBytes32(
@@ -422,6 +433,8 @@ export class TradesService {
             adCreator: toBytes32(ad.creatorAddress),
             adRecipient: toBytes32(ad.creatorDstAddress),
             salt: tradeId,
+            orderDecimals,
+            adDecimals,
           },
         });
 
@@ -432,7 +445,7 @@ export class TradesService {
             id: tradeId,
             adId: ad.id,
             routeId: ad.route.id,
-            amount: amount.toFixed(0),
+            amount: orderAmount.toFixed(0),
             adCreatorAddress: normalizeChainAddress(ad.creatorAddress),
             adCreatorDstAddress: normalizeChainAddress(ad.creatorDstAddress),
             bridgerAddress: normalizeChainAddress(bridgerAddress),
@@ -443,7 +456,8 @@ export class TradesService {
         });
 
         await tx.adLock.create({
-          data: { adId: ad.id, tradeId: trade.id, amount: amount },
+          // AdLock accounts against ad.poolAmount, which is in adToken units.
+          data: { adId: ad.id, tradeId: trade.id, amount: adAmount },
         });
 
         // create trade update log to make status active
@@ -572,17 +586,10 @@ export class TradesService {
         throw new ForbiddenException('Unauthorized');
       }
 
-      // Derive which chain this caller will unlock on. adCreator unlocks on
-      // the order chain (they're claiming bridger-provided funds there);
-      // bridger unlocks on the ad chain. The frontend uses this to pick the
-      // right signing flow (EIP-712 vs SEP-43 Stellar signMessage).
       const unlockChainKind = isAdCreator
         ? trade.route.orderToken.chain.kind
         : trade.route.adToken.chain.kind;
 
-      // All address-like fields are declared bytes32 in the cross-chain
-      // Order typed-data (EVM addresses left-padded; Stellar accounts already
-      // 32 bytes), so return the padded wire form here.
       return {
         orderChainToken: toBytes32(trade.route.orderToken.address),
         adChainToken: toBytes32(trade.route.adToken.address),
@@ -642,6 +649,7 @@ export class TradesService {
               adToken: {
                 select: {
                   address: true,
+                  decimals: true,
                   chain: {
                     select: {
                       chainId: true,
@@ -655,6 +663,7 @@ export class TradesService {
               orderToken: {
                 select: {
                   address: true,
+                  decimals: true,
                   chain: {
                     select: {
                       chainId: true,
@@ -698,8 +707,20 @@ export class TradesService {
         throw new BadRequestException('Trade is already locked');
       }
 
-      if (trade.adLock && !trade.adLock.amount.eq(trade.amount)) {
-        throw new BadRequestException('AdLock amount mismatch');
+      const orderDecimals = trade.route.orderToken.decimals;
+      const adDecimals = trade.route.adToken.decimals;
+
+      if (trade.adLock) {
+        const scale = new Prisma.Decimal(10).pow(
+          Math.abs(adDecimals - orderDecimals),
+        );
+        const expectedAdAmount =
+          adDecimals >= orderDecimals
+            ? trade.amount.mul(scale)
+            : trade.amount.div(scale);
+        if (!trade.adLock.amount.eq(expectedAdAmount)) {
+          throw new BadRequestException('AdLock amount mismatch');
+        }
       }
 
       const reqContractDetails = await this.chainAdapters
@@ -724,6 +745,8 @@ export class TradesService {
             adCreator: toBytes32(trade.adCreatorAddress),
             adRecipient: toBytes32(trade.adCreatorDstAddress),
             salt: trade.id,
+            orderDecimals,
+            adDecimals,
           },
         });
 
@@ -799,6 +822,7 @@ export class TradesService {
               adToken: {
                 select: {
                   address: true,
+                  decimals: true,
                   chain: {
                     select: {
                       adManagerAddress: true,
@@ -812,6 +836,7 @@ export class TradesService {
               orderToken: {
                 select: {
                   address: true,
+                  decimals: true,
                   chain: {
                     select: {
                       orderPortalAddress: true,
@@ -852,9 +877,6 @@ export class TradesService {
         ? trade.route.orderToken.chain
         : trade.route.adToken.chain;
 
-      // The on-chain contract recovers the unlocker's *destination* address on
-      // the unlock chain from the signature. Caller's walletAddress is their
-      // origin-chain wallet, which is the wrong format when unlocking cross-chain.
       const unlockSigner = normalizeChainAddress(
         isAdCreator ? trade.adCreatorDstAddress : trade.bridgerDstAddress,
         unlockChain.kind,
@@ -963,14 +985,14 @@ export class TradesService {
             adCreator: toBytes32(trade.adCreatorAddress),
             adRecipient: toBytes32(trade.adCreatorDstAddress),
             salt: trade.id,
+            orderDecimals: trade.route.orderToken.decimals,
+            adDecimals: trade.route.adToken.decimals,
           },
           nullifierHash: nullifierHash,
           targetRoot: localRoot,
           proof,
         });
 
-      // Log one of the caller's linked wallets so `confirmUnlockChainAction`
-      // can locate this entry via the caller's linked-address set.
       const callerUnlockWallet = await this.users.getWalletForChain(
         reqUser.sub,
         unlockChain.kind,

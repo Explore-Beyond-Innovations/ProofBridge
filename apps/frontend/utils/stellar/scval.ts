@@ -9,6 +9,10 @@ export function bytes(buf: Buffer): xdr.ScVal {
   return nativeToScVal(buf, { type: "bytes" })
 }
 
+export function u32(n: number): xdr.ScVal {
+  return nativeToScVal(n, { type: "u32" })
+}
+
 export function u64(n: number | bigint): xdr.ScVal {
   return nativeToScVal(BigInt(n), { type: "u64" })
 }
@@ -49,6 +53,8 @@ export interface StellarOrderParams {
   adCreator: string
   adRecipient: string
   salt: string
+  orderDecimals: number
+  adDecimals: number
 }
 
 // Soroban struct is an ScMap with entries sorted alphabetically by key.
@@ -56,12 +62,14 @@ export function orderParamsScVal(p: StellarOrderParams): xdr.ScVal {
   const entries: Array<[string, xdr.ScVal]> = [
     ["ad_chain_token", bytesN(p.adChainToken)],
     ["ad_creator", bytesN(p.adCreator)],
+    ["ad_decimals", u32(p.adDecimals)],
     ["ad_id", strVal(p.adId)],
     ["ad_recipient", bytesN(p.adRecipient)],
     ["amount", u128(p.amount)],
     ["bridger", bytesN(p.bridger)],
     ["order_chain_id", u128(p.orderChainId)],
     ["order_chain_token", bytesN(p.orderChainToken)],
+    ["order_decimals", u32(p.orderDecimals)],
     ["order_recipient", bytesN(p.orderRecipient)],
     ["salt", u128(p.salt)],
     ["src_order_portal", bytesN(p.srcOrderPortal)],
@@ -86,6 +94,8 @@ export interface StellarOrderPortalParams {
   adCreator: string
   adRecipient: string
   salt: string
+  orderDecimals: number
+  adDecimals: number
 }
 
 export function orderPortalParamsScVal(
@@ -95,12 +105,14 @@ export function orderPortalParamsScVal(
     ["ad_chain_id", u128(p.adChainId)],
     ["ad_chain_token", bytesN(p.adChainToken)],
     ["ad_creator", bytesN(p.adCreator)],
+    ["ad_decimals", u32(p.adDecimals)],
     ["ad_id", strVal(p.adId)],
     ["ad_manager", bytesN(p.adManager)],
     ["ad_recipient", bytesN(p.adRecipient)],
     ["amount", u128(p.amount)],
     ["bridger", bytesN(p.bridger)],
     ["order_chain_token", bytesN(p.orderChainToken)],
+    ["order_decimals", u32(p.orderDecimals)],
     ["order_recipient", bytesN(p.orderRecipient)],
     ["salt", u128(p.salt)],
   ]

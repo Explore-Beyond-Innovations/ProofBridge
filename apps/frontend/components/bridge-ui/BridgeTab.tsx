@@ -17,7 +17,6 @@ import { useGetAllTokens } from "@/hooks/useTokens"
 import { useGetAllAds } from "@/hooks/useAds"
 import { GiChainLightning } from "react-icons/gi"
 import SkeletonTradeAd from "./SkeletonTradeAd"
-import { sepolia } from "viem/chains"
 import { chain_icons } from "@/lib/chain-icons"
 import { isVisibleChain, STELLAR_TESTNET_CHAIN_ID } from "@/lib/chains"
 import { IoDocumentText } from "react-icons/io5"
@@ -26,12 +25,8 @@ import { Logo } from "../shared/Logo"
 export const BridgeTab = () => {
   const { data: chains, isLoading: loadingChains } = useGetAllChains({})
 
-  const [selectedBaseChainId, setSelectedBaseChainId] = useState<string>(
-    STELLAR_TESTNET_CHAIN_ID
-  )
-  const [selectedDstChainId, setSelectedDstChainId] = useState<string>(
-    `${sepolia.id}`
-  )
+  const [selectedBaseChainId, setSelectedBaseChainId] = useState<string>("")
+  const [selectedDstChainId, setSelectedDstChainId] = useState<string>("")
   const [selectedTokenId, setSelectedTokenId] = useState<string>("")
 
   const { data: tokens, isLoading: loadingTokens } = useGetAllTokens({
@@ -45,11 +40,32 @@ export const BridgeTab = () => {
     adChainId: selectedDstChainId,
     orderTokenId: selectedTokenId,
   })
-  // useEffect(() => {
-  //   if (chains?.data.length) {
-  //     setSelectedBaseChainId(chains.rows[0].chainId)
-  //   }
-  // }, [chains])
+
+  // Defaults come from the chains the backend actually seeded — hardcoding
+  // sepolia/stellar breaks docker-local where those ids may not exist.
+  useEffect(() => {
+    const visible = chains?.data?.filter((c) => isVisibleChain(c.chainId)) ?? []
+    if (!visible.length) return
+    setSelectedBaseChainId((prev) =>
+      prev && visible.some((c) => c.chainId === prev)
+        ? prev
+        : (visible.find((c) => c.chainId === STELLAR_TESTNET_CHAIN_ID) ??
+            visible[0]).chainId,
+    )
+  }, [chains])
+
+  useEffect(() => {
+    const visible = chains?.data?.filter((c) => isVisibleChain(c.chainId)) ?? []
+    if (!visible.length || !selectedBaseChainId) return
+    setSelectedDstChainId((prev) =>
+      prev &&
+      prev !== selectedBaseChainId &&
+      visible.some((c) => c.chainId === prev)
+        ? prev
+        : (visible.find((c) => c.chainId !== selectedBaseChainId) ??
+            visible[0]).chainId,
+    )
+  }, [chains, selectedBaseChainId])
 
   useEffect(() => {
     if (tokens?.data.length) {
@@ -153,28 +169,42 @@ export const BridgeTab = () => {
 
       <div className="flex md:flex-row flex-col md:items-center md:justify-between gap-3">
         <div className="">
-          <p>Select token</p>
-          <div className="flex items-center gap-3 md:gap-3 text-xs p-2 px-3 bg-grey-1000/50 rounded-sm">
+          <p className="text-sm text-grey-300 mb-2">Select token</p>
+          <div className="flex items-center gap-2 flex-wrap">
             {loadingTokens ? (
-              <Skeleton.Button active={true} />
-            ) : (
               <>
-                {tokens?.data?.map((token, index) => {
-                  const isActive = selectedTokenId === token.id
-                  return (
-                    <p
-                      key={index}
-                      className={`${isActive
-                        ? "text-black bg-primary px-3 py-2 rounded-sm"
-                        : ""
-                        } cursor-pointer`}
-                      onClick={() => setSelectedTokenId(token.id)}
+                <Skeleton.Button active={true} />
+                <Skeleton.Button active={true} />
+              </>
+            ) : tokens?.data?.length ? (
+              tokens.data.map((token) => {
+                const isActive = selectedTokenId === token.id
+                return (
+                  <button
+                    key={token.id}
+                    type="button"
+                    onClick={() => setSelectedTokenId(token.id)}
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs transition-colors ${
+                      isActive
+                        ? "bg-primary text-black border-primary"
+                        : "bg-grey-1000/50 text-grey-100 border-grey-700 hover:border-primary/60 hover:text-primary"
+                    }`}
+                  >
+                    <span className="font-semibold">{token.symbol}</span>
+                    <span
+                      className={`text-[11px] ${
+                        isActive ? "text-black/70" : "text-grey-400"
+                      }`}
                     >
                       {token.name}
-                    </p>
-                  )
-                })}
-              </>
+                    </span>
+                  </button>
+                )
+              })
+            ) : (
+              <p className="text-xs text-grey-400">
+                No tokens available on this chain.
+              </p>
             )}
           </div>
         </div>
@@ -238,8 +268,8 @@ export const BridgeTab = () => {
               type="primary"
               className="mt-4"
               onClick={() => {
-                setSelectedBaseChainId(STELLAR_TESTNET_CHAIN_ID)
-                setSelectedDstChainId(`${sepolia.id}`)
+                setSelectedBaseChainId("")
+                setSelectedDstChainId("")
               }}
             >
               Reset Filters

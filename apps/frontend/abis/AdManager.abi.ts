@@ -783,6 +783,16 @@ export const AD_MANAGER_ABI = [
             "name": "salt",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "orderDecimals",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "adDecimals",
+            "type": "uint8",
+            "internalType": "uint8"
           }
         ]
       }
@@ -1177,6 +1187,16 @@ export const AD_MANAGER_ABI = [
             "name": "salt",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "orderDecimals",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "adDecimals",
+            "type": "uint8",
+            "internalType": "uint8"
           }
         ]
       },
@@ -1723,6 +1743,22 @@ export const AD_MANAGER_ABI = [
   },
   {
     "type": "error",
+    "name": "AdManager__AdDecimalsMismatch",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "provided",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "AdManager__AdNotFound",
     "inputs": []
   },
@@ -1961,6 +1997,38 @@ export const AD_MANAGER_ABI = [
     "type": "error",
     "name": "Admanager__RequestHashedProcessed",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "DecimalScaling__DecimalsOutOfRange",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "DecimalScaling__NonExactDownscale",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "fromDec",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "toDec",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
   },
   {
     "type": "error",

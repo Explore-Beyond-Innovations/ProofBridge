@@ -40,6 +40,8 @@ export interface IAdManagerOrderParams {
   adCreator: Address
   adRecipient: Address
   salt: string
+  orderDecimals: number
+  adDecimals: number
 }
 
 export interface IOrderPortalOrderParams {
@@ -54,6 +56,8 @@ export interface IOrderPortalOrderParams {
   adCreator: Address
   adRecipient: Address
   salt: string
+  orderDecimals: number
+  adDecimals: number
 }
 
 export interface ILockFundsReponse {
@@ -168,6 +172,8 @@ export interface ITradeParams {
   adChainId: string
   adManager: Address
   orderHash: string
+  orderDecimals: number
+  adDecimals: number
   // Chain kind of the chain this caller unlocks on. Drives signing flow —
   // EVM → EIP-712; STELLAR → SEP-43 signMessage.
   unlockChainKind: ChainKind

@@ -23,6 +23,8 @@ export const ORDER_TYPES_BYTES32 = {
     { name: "adCreator", type: "bytes32" },
     { name: "adRecipient", type: "bytes32" },
     { name: "salt", type: "uint256" },
+    { name: "orderDecimals", type: "uint8" },
+    { name: "adDecimals", type: "uint8" },
   ],
 } as const
 
@@ -43,6 +45,8 @@ export const ORDER_TYPES_ADDRESS = {
     { name: "adCreator", type: "address" },
     { name: "adRecipient", type: "address" },
     { name: "salt", type: "uint256" },
+    { name: "orderDecimals", type: "uint8" },
+    { name: "adDecimals", type: "uint8" },
   ],
 } as const
 
@@ -60,6 +64,8 @@ export interface OrderTypedMessage {
   adCreator: `0x${string}`
   adRecipient: `0x${string}`
   salt: bigint
+  orderDecimals: number
+  adDecimals: number
 }
 
 export function uuidToBigInt(uuid: string): bigint {
@@ -84,6 +90,8 @@ export function buildOrderMessage(params: {
   adCreator: string
   adRecipient: string
   salt: string | bigint
+  orderDecimals: number
+  adDecimals: number
 }): OrderTypedMessage {
   const toBig = (v: string | bigint) =>
     typeof v === "bigint" ? v : BigInt(v)
@@ -106,6 +114,8 @@ export function buildOrderMessage(params: {
     adCreator: params.adCreator as `0x${string}`,
     adRecipient: params.adRecipient as `0x${string}`,
     salt: toBigSalt(params.salt),
+    orderDecimals: params.orderDecimals,
+    adDecimals: params.adDecimals,
   }
 }
 

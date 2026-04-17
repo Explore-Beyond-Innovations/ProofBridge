@@ -32,7 +32,7 @@ const NAME_HASH = keccak(Buffer.from('Proofbridge'));
 const VERSION_HASH = keccak(Buffer.from('1'));
 const ORDER_TYPEHASH = keccak(
   Buffer.from(
-    'Order(bytes32 orderChainToken,bytes32 adChainToken,uint256 amount,bytes32 bridger,uint256 orderChainId,bytes32 orderPortal,bytes32 orderRecipient,uint256 adChainId,bytes32 adManager,string adId,bytes32 adCreator,bytes32 adRecipient,uint256 salt)',
+    'Order(bytes32 orderChainToken,bytes32 adChainToken,uint256 amount,bytes32 bridger,uint256 orderChainId,bytes32 orderPortal,bytes32 orderRecipient,uint256 adChainId,bytes32 adManager,string adId,bytes32 adCreator,bytes32 adRecipient,uint256 salt,uint8 orderDecimals,uint8 adDecimals)',
   ),
 );
 
@@ -60,6 +60,8 @@ function structHashOrder(p: T_OrderParams): Buffer {
       // and the Stellar contracts encode it as a uint256 derived from the
       // raw 128-bit UUID. Use uuidToBigInt to match.
       u256BE(uuidToBigInt(p.salt)),
+      u256BE(BigInt(p.orderDecimals)),
+      u256BE(BigInt(p.adDecimals)),
     ]),
   );
 }

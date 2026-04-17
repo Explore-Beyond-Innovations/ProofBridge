@@ -1,10 +1,9 @@
 "use client"
 import React, { useEffect, useState } from "react"
 import { Avatar, Button, Modal, Skeleton } from "antd"
-import { ArrowRight, Clock, Info, ThumbsUp, Verified } from "lucide-react"
+import { ArrowRight, Info, Verified } from "lucide-react"
 import Link from "next/link"
-import Image from "next/image"
-import { AdStatusT, IAd } from "@/types/ads"
+import { IAd } from "@/types/ads"
 import { formatUnits, parseUnits } from "viem"
 import { parseToBigInt } from "@/lib/parse-to-bigint"
 import moment from "moment"
@@ -12,7 +11,6 @@ import { useGetAllChains } from "@/hooks/useChains"
 import { truncateString } from "@/utils/truncate-string"
 import { formatChainAddress } from "@/utils/format-address"
 import { Status } from "../shared/Status"
-import { chain_icons } from "@/lib/chain-icons"
 import { useAccount, useBalance } from "wagmi"
 import { useCreateTrade } from "@/hooks/useTrades"
 import { useChainModal, useConnectModal } from "@rainbow-me/rainbowkit"
@@ -193,20 +191,6 @@ export const TradeAd = ({ ...props }: IAd) => {
           <div className="bg-grey-800 w-full h-full md:rounded-l-[12px] p-4 md:p-6 md:py-7 space-y-7">
             <div className="space-y-3">
               <MerchantInfo {...props} variant="variant_2" />
-              <div className="flex items-center gap-6 flex-wrap">
-                <div className="flex items-center gap-1 text-xs text-primary">
-                  <Verified className="" size={12} />
-                  <p className="">Email</p>
-                </div>
-                <div className="flex items-center gap-1 text-xs text-primary">
-                  <ThumbsUp className="" size={12} />
-                  <p className="">Positive feedbacks</p>
-                </div>
-                <div className="flex items-center gap-1 text-xs text-primary">
-                  <Verified className="" size={12} />
-                  <p className="">Verified</p>
-                </div>
-              </div>
             </div>
 
             <div>
@@ -277,7 +261,7 @@ export const TradeAd = ({ ...props }: IAd) => {
           <div className="bg-grey-800/60 w-full h-full md:rounded-r-[12px] p-4 md:p-6 md:py-7 space-y-3">
             <div className="flex items-center gap-4">
               <p>{orderChainName} balance</p>
-              <p className="font-semibold text-primary font-pixter tracking-wide">
+              <span className="font-semibold text-primary font-pixter tracking-wide">
                 {(isStellarOrder
                   ? stellarBalance.isLoading
                   : balance.isLoading || nativeBalance.isLoading) ? (
@@ -290,24 +274,18 @@ export const TradeAd = ({ ...props }: IAd) => {
                       : balance?.data?.symbol || nativeBalance?.data?.symbol}
                   </>
                 )}
-              </p>
+              </span>
             </div>
 
             <div className="mb-16 space-y-4">
               <div className="h-[80px] w-full bg-grey-900/40 rounded-md p-4 flex flex-col justify-between">
                 <p className="text-xs text-grey-300">Amount to Bridge?</p>
                 <div className="grid [grid-template-columns:20px_1fr_20%] gap-1 items-center">
-                  {chain_icons[props.adToken.chainId] ? (
-                    <Image
-                      src={chain_icons[props.adToken.chainId]}
-                      alt=""
-                      height={20}
-                      width={20}
-                      className="rounded-full"
-                    />
-                  ) : (
-                    <span className="h-5 w-5 rounded-full bg-grey-700" />
-                  )}
+                  <span className="h-5 w-5 rounded-full bg-grey-800 flex items-center justify-center text-[10px] font-semibold text-amber-300">
+                    {props.adToken.symbol?.[0] ??
+                      props.adToken.name?.[0] ??
+                      "T"}
+                  </span>
                   <input
                     className="w-full !border-0 outline-0 text-lg font-semibold tracking-wider disabled:cursor-not-allowed"
                     type="number"

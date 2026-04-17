@@ -219,6 +219,16 @@ export const ORDER_PORTAL_ABI = [
             "name": "salt",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "orderDecimals",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "adDecimals",
+            "type": "uint8",
+            "internalType": "uint8"
           }
         ]
       }
@@ -883,6 +893,16 @@ export const ORDER_PORTAL_ABI = [
             "name": "salt",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "orderDecimals",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "adDecimals",
+            "type": "uint8",
+            "internalType": "uint8"
           }
         ]
       },
@@ -1241,6 +1261,17 @@ export const ORDER_PORTAL_ABI = [
   },
   {
     "type": "error",
+    "name": "DecimalScaling__DecimalsOutOfRange",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ECDSAInvalidSignature",
     "inputs": []
   },
@@ -1357,6 +1388,22 @@ export const ORDER_PORTAL_ABI = [
         "name": "nullifierHash",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "OrderPortal__OrderDecimalsMismatch",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "provided",
+        "type": "uint8",
+        "internalType": "uint8"
       }
     ]
   },
