@@ -57,6 +57,8 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
 
       # ── builds ──────────────────────────────────────────────────────
       - name: Build Stellar WASMs
