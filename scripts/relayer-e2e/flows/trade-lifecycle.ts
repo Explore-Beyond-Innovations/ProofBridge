@@ -4,10 +4,12 @@
 // Ad on Stellar, order on EVM. Ad creator unlocks on EVM (ECDSA). Bridger
 // unlocks on Stellar (ed25519 over the order hash).
 
+import { createHash } from "crypto";
 import { Keypair } from "@stellar/stellar-sdk";
 import { getAddress, parseEther } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { TypedDataEncoder } from "ethers";
+import { buildStellarUnlockMessage } from "../../../apps/backend-relayer/src/providers/stellar/utils/unlock-message.js";
 import {
   apiCreateAd,
   apiConfirm,
@@ -286,11 +288,17 @@ export async function runTradeLifecycle(): Promise<void> {
       ...bridgerOrderParams,
       salt: BigInt(bridgerOrderParams.salt),
     });
-    const bridgerSigPreimage = Buffer.concat([
-      Buffer.from("Stellar Signed Message:\n", "utf8"),
-      Buffer.from(bridgerOrderHash, "utf8"),
-    ]);
-    const bridgerSigBytes = bridgerStellar.sign(bridgerSigPreimage);
+    const bridgerMessage = buildStellarUnlockMessage({
+      ...bridgerOrderParams,
+      orderHash: bridgerOrderHash,
+    });
+    const bridgerDigest = createHash("sha256")
+      .update(Buffer.concat([
+        Buffer.from("Stellar Signed Message:\n", "utf8"),
+        Buffer.from(bridgerMessage, "utf8"),
+      ]))
+      .digest();
+    const bridgerSigBytes = bridgerStellar.sign(bridgerDigest);
     const bridgerSig = `0x${bridgerSigBytes.toString("hex")}`;
 
     const unlockOnAd = expectStatus(

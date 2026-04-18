@@ -193,6 +193,7 @@ export class EvmChainAdapter extends ChainAdapter {
   verifyOrderSignature(
     address: ChainAddress,
     orderHash: `0x${string}`,
+    _orderParams: T_OrderParams,
     signature: string,
   ): boolean {
     this.assertLocalAddress(address, 'address');

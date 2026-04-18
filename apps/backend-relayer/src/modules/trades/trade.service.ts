@@ -153,10 +153,22 @@ export class TradesService {
             { bridgerAddress: { in: normalized } },
           ];
         } else {
-          if (q.adCreatorAddress)
-            where.adCreatorAddress = normalizeChainAddress(q.adCreatorAddress);
-          if (q.bridgerAddress)
-            where.bridgerAddress = normalizeChainAddress(q.bridgerAddress);
+          if (q.adCreatorAddress) {
+            const list = Array.isArray(q.adCreatorAddress)
+              ? q.adCreatorAddress
+              : [q.adCreatorAddress];
+            const normalized = list.map((a) => normalizeChainAddress(a));
+            where.adCreatorAddress =
+              normalized.length === 1 ? normalized[0] : { in: normalized };
+          }
+          if (q.bridgerAddress) {
+            const list = Array.isArray(q.bridgerAddress)
+              ? q.bridgerAddress
+              : [q.bridgerAddress];
+            const normalized = list.map((a) => normalizeChainAddress(a));
+            where.bridgerAddress =
+              normalized.length === 1 ? normalized[0] : { in: normalized };
+          }
         }
       } catch {
         throw new BadRequestException('Invalid address filter');
@@ -886,11 +898,30 @@ export class TradesService {
         unlockChain.kind,
       );
 
+      const orderParams = {
+        orderChainToken: toBytes32(trade.route.orderToken.address),
+        adChainToken: toBytes32(trade.route.adToken.address),
+        amount: trade.amount.toFixed(0),
+        bridger: toBytes32(trade.bridgerAddress),
+        orderChainId: trade.route.orderToken.chain.chainId.toString(),
+        orderPortal: toBytes32(trade.route.orderToken.chain.orderPortalAddress),
+        orderRecipient: toBytes32(trade.bridgerDstAddress),
+        adChainId: trade.route.adToken.chain.chainId.toString(),
+        adManager: toBytes32(trade.route.adToken.chain.adManagerAddress),
+        adId: trade.adId,
+        adCreator: toBytes32(trade.adCreatorAddress),
+        adRecipient: toBytes32(trade.adCreatorDstAddress),
+        salt: uuidToBigInt(trade.id).toString(),
+        orderDecimals: trade.route.orderToken.decimals,
+        adDecimals: trade.route.adToken.decimals,
+      };
+
       const isAuthorized = this.chainAdapters
         .forChain(unlockChain.kind)
         .verifyOrderSignature(
           unlockSigner as `0x${string}`,
           trade.orderHash as `0x${string}`,
+          orderParams,
           dto.signature,
         );
 
@@ -1017,7 +1048,6 @@ export class TradesService {
         chainKind: unlockChain.kind as string,
       };
     } catch (e) {
-      console.log(e);
       if (e instanceof Error) {
         if (e instanceof HttpException) throw e;
         const status = e.message.toLowerCase().includes('forbidden')
@@ -1211,7 +1241,6 @@ export class TradesService {
         where: {
           tradeId: tradeId,
           userAddress: { in: Array.from(callerLinked) },
-          ...(dto.signature ? { signature: dto.signature } : {}),
         },
         orderBy: { createdAt: 'desc' },
         include: { trade: true },
@@ -1321,8 +1350,6 @@ export class TradesService {
       await this.prisma.authorizationLog.delete({
         where: { id: authorizationLog.id },
       });
-
-      console.log(dto);
 
       return {
         tradeId: updatedTrade.id,

@@ -1,5 +1,5 @@
 "use client"
-import React, { useState } from "react"
+import React, { useMemo, useState } from "react"
 import { CiBadgeDollar } from "react-icons/ci"
 import { RxDoubleArrowUp } from "react-icons/rx"
 import { GiTrade } from "react-icons/gi"
@@ -8,7 +8,7 @@ import { IoReceiptOutline } from "react-icons/io5"
 import { OrdersTable } from "@/components/orders/OrdersTable"
 import { Tabs, TabsProps } from "antd"
 import { useGetAllTrades } from "@/hooks/useTrades"
-import { useAccount } from "wagmi"
+import { useCurrentUser } from "@/hooks/useCurrentUser"
 
 const OrdersPage = () => {
   const [type, setType] = useState<"incoming" | "outgoing">("incoming")
@@ -26,12 +26,31 @@ const OrdersPage = () => {
     },
   ]
 
-  const account = useAccount()
+  const { data: currentUser } = useCurrentUser()
+  const linkedAddresses =
+    currentUser?.wallets?.map((w) => w.address).filter(Boolean) ?? []
 
   const { data: trades } = useGetAllTrades({
-    adCreatorAddress: type === "incoming" ? account.address : undefined,
-    bridgerAddress: type === "outgoing" ? account.address : undefined,
+    adCreatorAddress:
+      type === "incoming" && linkedAddresses.length > 0
+        ? linkedAddresses
+        : undefined,
+    bridgerAddress:
+      type === "outgoing" && linkedAddresses.length > 0
+        ? linkedAddresses
+        : undefined,
   })
+
+  const metrics = useMemo(() => {
+    const rows = trades?.data ?? []
+    const total = rows.length
+    const completed = rows.filter((t) => t.status === "COMPLETED").length
+    const pending = rows.filter(
+      (t) => t.status === "INACTIVE" || t.status === "ACTIVE" || t.status === "LOCKED",
+    ).length
+    const avgCompletion = total ? ((completed / total) * 100).toFixed(2) : "0.00"
+    return { total, completed, pending, avgCompletion }
+  }, [trades?.data])
   return (
     <div className="max-w-[98%] mx-auto space-y-4 md:space-y-8 md:py-2 md:px-0 p-4">
       <div>
@@ -48,7 +67,7 @@ const OrdersPage = () => {
               </div>
               <div>
                 <h3 className="text-xl md:text-2xl font-semibold">
-                  {trades?.data?.length || 0}
+                  {metrics.total}
                 </h3>
                 <p className="text-sm ">Total trades</p>
               </div>
@@ -65,9 +84,7 @@ const OrdersPage = () => {
               </div>
               <div>
                 <h3 className="text-xl md:text-2xl font-semibold">
-                  {" "}
-                  {trades?.data?.filter((trade) => trade.status === "INACTIVE")
-                    ?.length || 0}
+                  {metrics.pending}
                 </h3>
                 <p className="text-sm ">Pending Orders</p>
               </div>
@@ -84,9 +101,7 @@ const OrdersPage = () => {
               </div>
               <div>
                 <h3 className="text-xl md:text-2xl font-semibold">
-                  {" "}
-                  {trades?.data?.filter((trade) => trade.status === "LOCKED")
-                    ?.length || 0}
+                  {metrics.completed}
                 </h3>
                 <p className="text-sm ">Completed orders</p>
               </div>
@@ -103,15 +118,7 @@ const OrdersPage = () => {
               </div>
               <div>
                 <h3 className="text-xl md:text-2xl font-semibold">
-                  {trades?.data?.length
-                    ? (
-                      (trades.data.filter((trade) => trade.status === "LOCKED")
-                        .length /
-                        trades.data.length) *
-                      100
-                    ).toFixed(2)
-                    : "0.00"}
-                  %
+                  {metrics.avgCompletion}%
                 </h3>
                 <p className="text-sm ">Avg. completion</p>
               </div>

@@ -55,8 +55,7 @@ export const OurApproach = () => {
               </p>
               <div className="col-span-2 md:w-[75%]">
                 <p className="mb-8 font-polysans md:text-[1.3rem] text-lg text-2">
-                  ProofBridge is the new frontier of bridging, connecting
-                  Ethereum and Stellar.
+                  ProofBridge is the new frontier of bridging, connecting ecosystems.
                 </p>
                 <div className="space-y-7 text-grey-300">
                   <p className="font-polysans text-3">

@@ -99,7 +99,7 @@ export interface IUnlockFundsRequest {
 
 export interface IConfirmUnlockFundsRequest {
   id: string
-  signature: string
+  signature?: string
   txHash: string
 }
 
@@ -115,8 +115,10 @@ export interface IConfirmTradeTxReponse {
 }
 
 export interface IGetTradesParams {
-  adCreatorAddress?: Address
-  bridgerAddress?: Address
+  // Accepts a single address or an array to match any of the caller's linked
+  // wallets — lets a user see orders tied to any of their wallets across chains.
+  adCreatorAddress?: string | string[]
+  bridgerAddress?: string | string[]
   /**
    * Matches trades where any of these addresses is either the ad creator or
    * the bridger. Use this from the dashboard so trades tied to any of the

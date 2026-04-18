@@ -29,20 +29,34 @@ export class QueryTradesDto {
   adId?: string;
 
   @ApiPropertyOptional({
-    example: '0x1234567890abcdef',
-    description: 'EVM address of the advertisement creator',
+    description:
+      'Address(es) of the advertisement creator. Pass a single address or an array — an array matches when any of the caller\'s linked wallets owns the ad.',
+    oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
   })
   @IsOptional()
-  @IsString()
-  adCreatorAddress?: string;
+  @Transform(({ value }) =>
+    Array.isArray(value)
+      ? value
+      : typeof value === 'string' && value.includes(',')
+        ? value.split(',').filter(Boolean)
+        : value,
+  )
+  adCreatorAddress?: string | string[];
 
   @ApiPropertyOptional({
-    example: '0x1234567890abcdef',
-    description: 'EVM address of the bridger',
+    description:
+      'Address(es) of the bridger. Pass a single address or an array — an array matches when any of the caller\'s linked wallets created the trade.',
+    oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
   })
   @IsOptional()
-  @IsString()
-  bridgerAddress?: string;
+  @Transform(({ value }) =>
+    Array.isArray(value)
+      ? value
+      : typeof value === 'string' && value.includes(',')
+        ? value.split(',').filter(Boolean)
+        : value,
+  )
+  bridgerAddress?: string | string[];
 
   @ApiPropertyOptional({
     description:

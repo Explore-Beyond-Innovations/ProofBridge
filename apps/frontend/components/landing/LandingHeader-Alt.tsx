@@ -27,7 +27,7 @@ export const LandingHeaderAlt = () => {
           </li>
           <li className="signal-line-link">
             <Link href={"https://x.com/Proof_bridge"} target="_blank">
-              blog
+              Blog
             </Link>
           </li>
           <li className="signal-line-link">

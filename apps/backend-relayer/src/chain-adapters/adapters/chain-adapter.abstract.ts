@@ -98,6 +98,7 @@ export abstract class ChainAdapter {
   abstract verifyOrderSignature(
     address: ChainAddress,
     orderHash: `0x${string}`,
+    orderParams: T_OrderParams,
     signature: string,
   ): boolean;
 }

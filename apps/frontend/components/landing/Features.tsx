@@ -9,25 +9,25 @@ const features = [
     title: "P2P bridge",
     desc: "Peer-to-Peer Cross-Chain Transactions. Direct interaction between users without intermediaries.",
     img: "/bridge.png",
-    explore: "P2P bridge across Ethereum & Stellar",
+    explore: "P2P bridge across ecosystems",
   },
   {
     title: "ZK-Based Security",
     desc: "Zero-Knowledge Proof Validation. Ensures correctness of computations and state transitions.",
     img: "/assets/features/shield.png",
-    explore: "P2P bridge across Ethereum & Stellar",
+    explore: "P2P bridge across ecosystems",
   },
   {
     title: "Multi-Chain support",
     desc: "Multi-Chain Compatibility. Supports Ethereum, EVM-compatible chains, and extensibility for non-EVM chains.",
     img: "/assets/features/tokens.png",
-    explore: "P2P bridge across Ethereum & Stellar",
+    explore: "P2P bridge across ecosystems",
   },
   {
     title: "Trustless Operations",
     desc: "Removes reliance on custodians, relayers, or centralized sequencers.",
     img: "/assets/features/wall.png",
-    explore: "P2P bridge across Ethereum & Stellar",
+    explore: "P2P bridge across ecosystems",
   },
 ]
 

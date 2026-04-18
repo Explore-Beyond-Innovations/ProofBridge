@@ -45,25 +45,11 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
-    if ([403].includes(error?.response?.status)) {
-      error.message =
-        (error?.response.data?.errors &&
-          error?.response.data?.errors?.length > 0 &&
-          `${error?.response.data?.errors[0]?.field_name?.replace(/_/g, " ")} -
-        ${error?.response.data?.errors[0]?.message}`) ||
-        error?.response.data.message ||
-        error?.response.message;
-      // await toast.error(error?.message);
-      const refresh_token = Cookies.get("refresh_token");
-      const res = await api.post<any, AxiosResponse<IRefreshTokenResponse>>(
-        "/v1/auth/refresh",
-        { refresh: refresh_token },
-        { withCredentials: true }, // Ensure credentials for refresh token request
-      );
+    const status = error?.response?.status;
+    const reqUrl: string = error?.config?.url ?? "";
+    const isRefreshEndpoint = reqUrl.includes("/auth/refresh");
 
-      Cookies.set("auth_token", res.data.tokens.access);
-      Cookies.set("refresh_token", res.data.tokens.refresh);
-    } else if ([401].includes(error?.response?.status)) {
+    if (status === 401) {
       error.message =
         (error?.response.data?.errors &&
           error?.response.data?.errors?.length > 0 &&
@@ -72,26 +58,32 @@ api.interceptors.response.use(
         error?.response.data.message ||
         error?.response.message;
 
-      const refresh_token = Cookies.get("refresh_token");
-
-      try {
-        // Make sure refresh token request also includes credentials
-        const res = await api.post<any, AxiosResponse<IRefreshTokenResponse>>(
-          "/v1/auth/refresh",
-          { refresh: refresh_token },
-          { withCredentials: true }, // Ensure credentials for refresh token request
-        );
-
-        Cookies.set("auth_token", res.data.tokens.access);
-        Cookies.set("refresh_token", res.data.tokens.refresh);
-      } catch (error) {
+      if (isRefreshEndpoint) {
         Cookies.remove("refresh_token");
         Cookies.remove("auth_token");
-        window.location.href = "/";
-      }
+      } else {
+        try {
+          const refresh_token = Cookies.get("refresh_token");
+          const res = await api.post<any, AxiosResponse<IRefreshTokenResponse>>(
+            "/v1/auth/refresh",
+            { refresh: refresh_token },
+            { withCredentials: true },
+          );
+          Cookies.set("auth_token", res.data.tokens.access);
+          Cookies.set("refresh_token", res.data.tokens.refresh);
 
-      console.log({ error });
-    } else if ([400].includes(error?.response?.status)) {
+          const originalConfig = error.config;
+          if (originalConfig) {
+            originalConfig.headers = originalConfig.headers ?? {};
+            originalConfig.headers.Authorization = `Bearer ${res.data.tokens.access}`;
+            return api.request(originalConfig);
+          }
+        } catch {
+          Cookies.remove("refresh_token");
+          Cookies.remove("auth_token");
+        }
+      }
+    } else if (status === 400) {
       error.message =
         (error?.response.data?.errors &&
           error?.response.data?.errors?.length > 0 &&
@@ -99,7 +91,6 @@ api.interceptors.response.use(
           ${error?.response.data?.errors[0]?.message}`) ||
         error?.response.data.message ||
         error?.response.message;
-      // await toast.error(error?.message);
     }
     return Promise.reject(error);
   },

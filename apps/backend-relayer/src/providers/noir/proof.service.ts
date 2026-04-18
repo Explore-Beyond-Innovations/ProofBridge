@@ -16,7 +16,7 @@ export class ProofService {
     const circuit = JSON.parse(JSON.stringify(circuitJson));
     this.noirService = new Noir(circuit);
     this.ultralHonkService = new UltraHonkBackend(circuit.bytecode, {
-      threads: 1,
+      threads: 4,
     });
   }
 
