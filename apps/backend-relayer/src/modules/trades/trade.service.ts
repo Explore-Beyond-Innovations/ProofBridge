@@ -27,6 +27,7 @@ import {
   uuidToBigInt,
 } from '../../providers/viem/ethers/typedData';
 import { UserService } from '../user/user.service';
+import { NotificationService } from '../notifications/notification.service';
 
 @Injectable()
 export class TradesService {
@@ -37,6 +38,7 @@ export class TradesService {
     private readonly proofService: ProofService,
     private readonly encryptionService: EncryptionService,
     private readonly users: UserService,
+    private readonly notifications: NotificationService,
   ) {}
 
   async getById(id: string) {
@@ -506,6 +508,22 @@ export class TradesService {
 
         return { tradeId: trade.id, reqContractDetails };
       });
+
+      // Notify the ad creator that a new order landed on their ad
+      await this.notifications.safeCreateForAddress(
+        ad.creatorAddress,
+        {
+          type: 'TRADE_CREATED',
+          tradeId: result.tradeId,
+          title: 'New order on your ad',
+          body: `A bridger placed an order from ${ad.route.orderToken.chain.kind === 'EVM' ? 'EVM' : 'Stellar'} to ${ad.route.adToken.chain.kind === 'EVM' ? 'EVM' : 'Stellar'}.`,
+          payload: {
+            adId: ad.id,
+            amount: orderAmount.toFixed(0),
+          },
+        },
+        ad.route.adToken.chain.kind,
+      );
 
       return {
         ...result,
@@ -1201,6 +1219,20 @@ export class TradesService {
         where: { id: tradeLogUpdate.id },
       });
 
+      // On LOCKED  tell the bridger they can now unlock on the ad chain.
+      if (status === 'LOCKED') {
+        await this.notifications.safeCreateForAddress(
+          tradeLogUpdate.trade.bridgerAddress,
+          {
+            type: 'TRADE_LOCKED',
+            tradeId: tradeLogUpdate.tradeId,
+            title: 'Your order is locked — claim now',
+            body: 'The ad creator locked funds for your order. You can unlock your tokens on the ad chain.',
+          },
+          trade.route.orderToken.chain.kind,
+        );
+      }
+
       return {
         tradeId,
         success: true,
@@ -1226,9 +1258,9 @@ export class TradesService {
 
   async confirmUnlockChainAction(
     req: Request,
-
     tradeId: string,
-    dto: ConfirmTradeActionDto,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _dto: ConfirmTradeActionDto,
   ) {
     try {
       const reqUser = req.user;
@@ -1350,6 +1382,24 @@ export class TradesService {
       await this.prisma.authorizationLog.delete({
         where: { id: authorizationLog.id },
       });
+
+      // process message for unlocks
+      if (
+        !isAdCreator &&
+        !authorizationLog.trade.bridgerClaimed &&
+        !authorizationLog.trade.adCreatorClaimed
+      ) {
+        await this.notifications.safeCreateForAddress(
+          authorizationLog.trade.adCreatorAddress,
+          {
+            type: 'BRIDGER_CLAIMED',
+            tradeId: authorizationLog.tradeId,
+            title: 'Bridger claimed — your turn',
+            body: 'The bridger unlocked their tokens. You can now unlock yours on the order chain.',
+          },
+          trade.route.adToken.chain.kind,
+        );
+      }
 
       return {
         tradeId: updatedTrade.id,

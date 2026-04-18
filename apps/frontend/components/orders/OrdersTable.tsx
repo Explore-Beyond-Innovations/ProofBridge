@@ -105,7 +105,7 @@ export const OrdersTable: React.FC<{ type?: "incoming" | "outgoing" }> = ({
       title: "Route",
       dataIndex: "route",
       sorter: (a, b) => Number(a.amount) - Number(b.amount),
-      render: (value, rowData) => {
+      render: (_value, rowData) => {
         return (
           <div className="flex items-center gap-1">
             {type === "incoming" ? (
@@ -184,7 +184,6 @@ export const OrdersTable: React.FC<{ type?: "incoming" | "outgoing" }> = ({
   const isWalletReady = (kind: ChainKind) =>
     adapterFor(kind)?.status === "authenticated"
 
-  const isBridger = ownsAddress(linkedSet, tradeInfo?.bridgerAddress)
   const isAdCreator = ownsAddress(linkedSet, tradeInfo?.adCreatorAddress)
   const adTokenChain = tradeInfo?.route?.adToken?.chain
   const orderTokenChain = tradeInfo?.route?.orderToken?.chain
