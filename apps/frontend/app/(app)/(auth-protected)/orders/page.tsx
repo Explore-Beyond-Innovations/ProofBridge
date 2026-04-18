@@ -1,5 +1,6 @@
 "use client"
-import React, { useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { CiBadgeDollar } from "react-icons/ci"
 import { RxDoubleArrowUp } from "react-icons/rx"
 import { GiTrade } from "react-icons/gi"
@@ -11,18 +12,20 @@ import { useGetAllTrades } from "@/hooks/useTrades"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 
 const OrdersPage = () => {
+  const searchParams = useSearchParams()
+  const highlight = searchParams.get("highlight")
   const [type, setType] = useState<"incoming" | "outgoing">("incoming")
   const items: TabsProps["items"] = [
     {
       key: "incoming",
       label: "Incoming Orders",
-      children: <OrdersTable type="incoming" />,
+      children: <OrdersTable type="incoming" highlight={highlight} />,
     },
 
     {
       key: "outgoing",
       label: "Outgoing Orders",
-      children: <OrdersTable type="outgoing" />,
+      children: <OrdersTable type="outgoing" highlight={highlight} />,
     },
   ]
 
@@ -40,6 +43,28 @@ const OrdersPage = () => {
         ? linkedAddresses
         : undefined,
   })
+
+  // If a notification deep-links us to a specific trade, auto-switch to the
+  // tab that actually contains it so the user doesn't land on an empty list.
+  // Fetch both sides independently so we don't miss a trade on the other tab.
+  const { data: allTradesForHighlight } = useGetAllTrades(
+    highlight && linkedAddresses.length > 0
+      ? { participantAddresses: linkedAddresses }
+      : { participantAddresses: undefined },
+  )
+  useEffect(() => {
+    if (!highlight) return
+    const rows = allTradesForHighlight?.data ?? []
+    const match = rows.find((t) => t.id === highlight)
+    if (!match) return
+    const linkedLower = new Set(
+      linkedAddresses.map((a) => a.toLowerCase()),
+    )
+    const ownsAdCreator =
+      typeof match.adCreatorAddress === "string" &&
+      linkedLower.has(match.adCreatorAddress.toLowerCase())
+    setType(ownsAdCreator ? "incoming" : "outgoing")
+  }, [highlight, allTradesForHighlight, linkedAddresses])
 
   const metrics = useMemo(() => {
     const rows = trades?.data ?? []
@@ -129,7 +154,7 @@ const OrdersPage = () => {
 
       <div>
         <Tabs
-          defaultActiveKey={"incoming"}
+          activeKey={type}
           items={items}
           type="line"
           onChange={(activeKey) =>

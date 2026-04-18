@@ -2,6 +2,7 @@ import React from "react"
 import { Logo } from "./Logo"
 import Link from "next/link"
 import { ConnectWalletButton } from "../connect-wallet/ConnectWalletButton"
+import { NotificationBell } from "../notifications/NotificationBell"
 
 export const Header = () => {
   return (
@@ -15,10 +16,10 @@ export const Header = () => {
             ProofBridge
           </p>
         </div>
-        <div className="flex items-center justify-between text-sm gap-8">
+        <div className="flex items-center justify-between text-sm gap-4 md:gap-8">
           <span className="signal-line-link hidden md:inline uppercase">
             <Link
-              href={"https://github.com/JoE11-y/ProofBridge"}
+              href={"https://docs.pfbridge.xyz/"}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -28,6 +29,7 @@ export const Header = () => {
           <span className="signal-line-link hidden md:inline uppercase">
             <Link href={"/bridge"}>Bridge</Link>
           </span>
+          <NotificationBell />
           <ConnectWalletButton />
         </div>
       </div>

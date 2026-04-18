@@ -85,7 +85,12 @@ export const MobileNav = () => {
       >
         <ul className=" text-[15vmin] space-y-7 leading-[110%] mb-7">
           <li>
-            <Link href={""} className="mobile-link inline-block">
+            <Link
+              href={"https://docs.pfbridge.xyz/"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mobile-link inline-block"
+            >
               Docs
             </Link>
           </li>
