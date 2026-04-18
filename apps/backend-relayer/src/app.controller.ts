@@ -18,7 +18,7 @@ export class AppController {
     return { message: 'Welcome to ProofBridge' };
   }
 
-  @Get('/v1/health')
+  @Get('health')
   @HttpCode(HttpStatus.OK)
   async getHealth(): Promise<HealthResponse> {
     const health = await this.appService.health();
