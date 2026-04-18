@@ -1,6 +1,6 @@
 services:
   backend-relayer:
-    image: ghcr.io/explore-beyond-innovations/proofbridge-backend-relayer:${IMAGE_TAG:-latest}
+    image: ghcr.io/explore-beyond-innovations/proofbridge-backend-relayer:latest
     restart: unless-stopped
     expose:
       - "2005"
