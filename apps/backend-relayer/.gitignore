@@ -12,6 +12,7 @@ build/
 # environment variables
 .env
 .env.test
+.env.deploy
 
 
 leveldb_data/

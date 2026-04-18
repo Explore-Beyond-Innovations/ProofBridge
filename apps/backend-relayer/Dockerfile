@@ -16,14 +16,12 @@ WORKDIR /repo
 # Copy workspace manifests first for better cache hits.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY apps/backend-relayer/package.json apps/backend-relayer/
-COPY packages/proofbridge_mmr/package.json packages/proofbridge_mmr/
 
 # Prefetch all workspace deps once.
 RUN pnpm fetch --ignore-scripts
 
 # Now pull in the sources we need to build.
 COPY apps/backend-relayer apps/backend-relayer
-COPY packages/proofbridge_mmr packages/proofbridge_mmr
 
 # Install & build the relayer (and only the relayer — avoid compiling every
 # workspace package).
@@ -58,7 +56,6 @@ COPY --from=builder /out/prisma ./prisma
 RUN chown -R node:node /app
 USER node
 
-ENV NODE_ENV=development
 ENV PORT=2005
 EXPOSE 2005
 
