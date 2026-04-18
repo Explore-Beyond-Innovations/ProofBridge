@@ -1,19 +1,22 @@
 import { useCreateAd } from "@/hooks/useAds"
 import { useGetBridgeRoutes } from "@/hooks/useBridgeRoutes"
+import { toast } from "sonner"
 import { Button, Modal, Select } from "antd"
 import { Handshake, Info, ShieldAlert, Text } from "lucide-react"
 import moment from "moment"
 import Link from "next/link"
-import React, { useState } from "react"
-import { parseUnits } from "viem"
-import { useAccount } from "wagmi"
+import React, { useMemo, useState } from "react"
+import { formatUnits, parseUnits } from "viem"
+import { useAccount, useBalance } from "wagmi"
 import { useChainModal } from "@rainbow-me/rainbowkit"
+import { useQuery } from "@tanstack/react-query"
 import { useGetAllChains } from "@/hooks/useChains"
 import { chains as supported_chains, isVisibleChain } from "@/lib/chains"
 import { GiCancel } from "react-icons/gi"
 import { CiWarning } from "react-icons/ci"
 import { useGetAllTokens } from "@/hooks/useTokens"
 import { useStellarWallet } from "@/components/providers/StellarWallet"
+import { getStellarTokenBalance } from "@/utils/stellar/balance"
 import {
   CreateAdSuccessModal,
   type CreatedAdSummary,
@@ -50,6 +53,16 @@ export const AddLiquidity = () => {
         ? Boolean(stellarAddress)
         : false
 
+  // Destination wallet must be connected too — we use its address as
+  // `creatorDstAddress` so the ad creator can later claim on the order chain.
+  // Without it, handleCreateAd throws and the user sees a dead click.
+  const destinationWalletReady =
+    orderChainKind === "EVM"
+      ? Boolean(account.address)
+      : orderChainKind === "STELLAR"
+        ? Boolean(stellarAddress)
+        : false
+
   const { openChainModal } = useChainModal()
   const { mutateAsync: createAd, isPending } = useCreateAd()
   const [title, setTitle] = useState("")
@@ -72,9 +85,93 @@ export const AddLiquidity = () => {
     adTokenId: selectedTokenId,
   })
 
-  // Creator's receive address lives on the *order chain* (destination). Pick
-  // the wallet matching that chain's kind so we don't submit a 0x EVM address
-  // as a Stellar G-strkey or vice versa.
+  const selectedToken = tokens?.data?.find((t) => t.id === selectedTokenId)
+  const isEvmBase = baseChainKind === "EVM"
+  const isStellarBase = baseChainKind === "STELLAR"
+
+  const evmNativeBalance = useBalance({
+    chainId: baseEvmChain?.id,
+    address: account.address,
+    query: {
+      enabled: isEvmBase && selectedToken?.kind === "NATIVE",
+    },
+  })
+  const evmErc20Balance = useBalance({
+    chainId: baseEvmChain?.id,
+    address: account.address,
+    token:
+      selectedToken?.kind === "ERC20"
+        ? (selectedToken.address as `0x${string}`)
+        : undefined,
+    query: {
+      enabled: isEvmBase && selectedToken?.kind === "ERC20",
+    },
+  })
+  const stellarBalance = useQuery({
+    queryKey: [
+      "stellar-balance",
+      stellarAddress,
+      selectedToken?.id,
+      baseChainId,
+    ],
+    queryFn: () =>
+      getStellarTokenBalance(stellarAddress!, {
+        kind: selectedToken!.kind,
+        symbol: selectedToken!.symbol,
+        decimals: selectedToken!.decimals,
+        assetIssuer: selectedToken!.assetIssuer ?? undefined,
+        address: selectedToken!.address,
+      }),
+    enabled: isStellarBase && !!stellarAddress && !!selectedToken,
+  })
+
+  const balanceDisplay = useMemo(() => {
+    if (!selectedToken) return null
+    if (isEvmBase) {
+      if (!account.address) return { text: "Connect wallet to view balance" }
+      const src =
+        selectedToken.kind === "NATIVE"
+          ? evmNativeBalance
+          : selectedToken.kind === "ERC20"
+            ? evmErc20Balance
+            : null
+      if (!src) return null
+      if (src.isLoading) return { text: "Loading balance…" }
+      if (src.data) {
+        return {
+          text: `${formatUnits(src.data.value, src.data.decimals)} ${selectedToken.symbol}`,
+          value: src.data.value,
+        }
+      }
+      return null
+    }
+    if (isStellarBase) {
+      if (!stellarAddress)
+        return { text: "Connect Stellar wallet to view balance" }
+      if (stellarBalance.isLoading) return { text: "Loading balance…" }
+      if (stellarBalance.data) {
+        return {
+          text: `${formatUnits(stellarBalance.data.value, stellarBalance.data.decimals)} ${selectedToken.symbol}`,
+          value: stellarBalance.data.value,
+        }
+      }
+      return { text: "Balance unavailable" }
+    }
+    return null
+  }, [
+    selectedToken,
+    isEvmBase,
+    isStellarBase,
+    account.address,
+    stellarAddress,
+    evmNativeBalance.data,
+    evmNativeBalance.isLoading,
+    evmErc20Balance.data,
+    evmErc20Balance.isLoading,
+    stellarBalance.data,
+    stellarBalance.isLoading,
+  ])
+
   const creatorDstAddress =
     orderChainKind === "STELLAR" ? stellarAddress : account.address
 
@@ -118,7 +215,11 @@ export const AddLiquidity = () => {
         orderChainName: orderChain?.name ?? "",
       })
       toggleModal()
-    } catch (error) {}
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create ad",
+      )
+    }
   }
 
   return (
@@ -211,6 +312,12 @@ export const AddLiquidity = () => {
                 value={selectedTokenId}
               />
             </div>
+            {selectedToken && balanceDisplay && (
+              <p className="text-xs text-grey-300 mt-1 tracking-wider">
+                Balance:{" "}
+                <span className="text-grey-100">{balanceDisplay.text}</span>
+              </p>
+            )}
           </div>
 
           <div>
@@ -337,7 +444,23 @@ export const AddLiquidity = () => {
             <CiWarning size={18} />
             <p className="">Route not available.</p>
           </div>
-        ) : baseWalletReady ? (
+        ) : !baseWalletReady && baseChainKind === "STELLAR" ? (
+          <Button type="primary" size="large" onClick={() => connectStellar()}>
+            Connect Stellar
+          </Button>
+        ) : !baseWalletReady ? (
+          <Button type="primary" size="large" onClick={openChainModal}>
+            Connect to {baseChain?.name}
+          </Button>
+        ) : !destinationWalletReady && orderChainKind === "STELLAR" ? (
+          <Button type="primary" size="large" onClick={() => connectStellar()}>
+            Connect Stellar to receive on {orderChain?.name}
+          </Button>
+        ) : !destinationWalletReady ? (
+          <Button type="primary" size="large" onClick={openChainModal}>
+            Connect {orderChain?.name} wallet to receive
+          </Button>
+        ) : (
           <Button
             onClick={() => {
               if (!title || !description || !amount || !min || !max) {
@@ -352,14 +475,6 @@ export const AddLiquidity = () => {
             loading={isPending}
           >
             Preview Ad
-          </Button>
-        ) : baseChainKind === "STELLAR" ? (
-          <Button type="primary" size="large" onClick={() => connectStellar()}>
-            Connect Stellar
-          </Button>
-        ) : (
-          <Button type="primary" size="large" onClick={openChainModal}>
-            Connect to {baseChain?.name}
           </Button>
         )}
       </div>

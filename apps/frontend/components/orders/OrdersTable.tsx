@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useMemo, useState } from "react"
 import { Button, Modal, Table } from "antd"
 import type { TableColumnsType, TableProps } from "antd"
 import { ITrade } from "@/types/trades"
@@ -16,12 +16,12 @@ import { Status } from "../shared/Status"
 import moment from "moment"
 import { formatUnits } from "viem"
 import { ArrowRight } from "lucide-react"
-import Link from "next/link"
-import { chains } from "@/lib/chains"
-import { useChainModal, useConnectModal } from "@rainbow-me/rainbowkit"
+import { useChainModal } from "@rainbow-me/rainbowkit"
 import { parseToBigInt } from "@/lib/parse-to-bigint"
-
-type DataIndex = keyof ITrade
+import { useCurrentUser } from "@/hooks/useCurrentUser"
+import { useAdapters } from "@/components/connect-wallet/useAdapters"
+import { ConnectHubModal } from "@/components/connect-wallet/ConnectHubModal"
+import type { ChainKind } from "@/types/chains"
 
 const onChange: TableProps<ITrade>["onChange"] = (
   pagination,
@@ -32,13 +32,31 @@ const onChange: TableProps<ITrade>["onChange"] = (
   console.log("params", pagination, filters, sorter, extra)
 }
 
+const ownsAddress = (linked: Set<string>, addr: string | null | undefined) =>
+  Boolean(addr) && linked.has(addr!.toLowerCase())
+
 export const OrdersTable: React.FC<{ type?: "incoming" | "outgoing" }> = ({
   type = "incoming",
 }) => {
   const account = useAccount()
+  const { data: currentUser } = useCurrentUser()
+  const linkedAddresses = useMemo(
+    () => currentUser?.wallets?.map((w) => w.address).filter(Boolean) ?? [],
+    [currentUser],
+  )
+  const linkedSet = useMemo(
+    () => new Set(linkedAddresses.map((a) => a.toLowerCase())),
+    [linkedAddresses],
+  )
   const { data, isLoading, refetch, isRefetching } = useGetAllTrades({
-    bridgerAddress: type === "outgoing" ? account.address : undefined,
-    adCreatorAddress: type === "incoming" ? account.address : undefined,
+    adCreatorAddress:
+      type === "incoming" && linkedAddresses.length > 0
+        ? linkedAddresses
+        : undefined,
+    bridgerAddress:
+      type === "outgoing" && linkedAddresses.length > 0
+        ? linkedAddresses
+        : undefined,
   })
   const [tradeInfo, setTradeInfo] = useState<ITrade>()
   const [openReleaseModal, setOpenReleaseModal] = useState(false)
@@ -145,6 +163,7 @@ export const OrdersTable: React.FC<{ type?: "incoming" | "outgoing" }> = ({
           <Action
             value={value}
             rowData={rowData}
+            linkedSet={linkedSet}
             setTradeInfo={setTradeInfo}
             setOpenReleaseModal={setOpenReleaseModal}
             refetch={refetch}
@@ -157,15 +176,41 @@ export const OrdersTable: React.FC<{ type?: "incoming" | "outgoing" }> = ({
   const chainModal = useChainModal()
   const { mutateAsync: unlockFunds, isPending: unlockingFunds } =
     useUnLockFunds()
-  const isBridger = account.address === tradeInfo?.bridgerAddress
-  const isAdCreator = account.address === tradeInfo?.adCreatorAddress
+  const { mutateAsync: lockFunds, isPending: lockingFunds } = useLockFunds()
+  const adapters = useAdapters()
+  const [hubOpen, setHubOpen] = useState(false)
+  const adapterFor = (kind: ChainKind) =>
+    adapters.find((a) => a.chainKind === kind)
+  const isWalletReady = (kind: ChainKind) =>
+    adapterFor(kind)?.status === "authenticated"
+
+  const isBridger = ownsAddress(linkedSet, tradeInfo?.bridgerAddress)
+  const isAdCreator = ownsAddress(linkedSet, tradeInfo?.adCreatorAddress)
   const adTokenChain = tradeInfo?.route?.adToken?.chain
   const orderTokenChain = tradeInfo?.route?.orderToken?.chain
-  const isAdChain = adTokenChain?.chainId === String(account.chainId)
-  const isOrderChain = orderTokenChain?.chainId === String(account.chainId)
-  const bridgerIsNotConnected = isBridger && !isAdChain
-  const adCreatorIsNotConnected = isAdCreator && !isOrderChain
-  const { mutateAsync: lockFunds, isPending: lockingFunds } = useLockFunds()
+
+  // The chain the current action happens on depends on role + status. Ad
+  // creator: lock on ad chain, unlock on order chain. Bridger: unlock on ad
+  // chain. Ad creator can never trigger a bridger-only unlock and vice versa.
+  const targetChain =
+    type === "incoming" && tradeInfo?.status === "ACTIVE"
+      ? adTokenChain
+      : type === "incoming" && tradeInfo?.status === "LOCKED"
+        ? orderTokenChain
+        : type === "outgoing" && tradeInfo?.status === "LOCKED"
+          ? adTokenChain
+          : undefined
+  const targetChainKind = targetChain?.kind as ChainKind | undefined
+  const targetChainId = targetChain?.chainId
+  const needsWalletConnect = Boolean(
+    targetChainKind && !isWalletReady(targetChainKind),
+  )
+  // EVM-only check — Stellar has a single network, so the "on the right chain"
+  // concept only applies to EVM targets.
+  const needsChainSwitch =
+    !needsWalletConnect &&
+    targetChainKind === "EVM" &&
+    targetChainId !== String(account.chainId)
 
   return (
     <>
@@ -176,6 +221,14 @@ export const OrdersTable: React.FC<{ type?: "incoming" | "outgoing" }> = ({
         onChange={onChange}
         showSorterTooltip={{ target: "sorter-icon" }}
         rowClassName={"bg-grey-900/60 hover:!bg-primary/20"}
+        rowKey="id"
+      />
+
+      <ConnectHubModal
+        open={hubOpen}
+        onClose={() => setHubOpen(false)}
+        adapters={adapters}
+        zIndex={1100}
       />
 
       <Modal
@@ -193,44 +246,31 @@ export const OrdersTable: React.FC<{ type?: "incoming" | "outgoing" }> = ({
           </p>
         }
         okText={
-          type === "incoming" && tradeInfo?.status === "ACTIVE" ? (
-            <>{!isAdChain ? `Connect to ${adTokenChain?.name}` : "Lock"}</>
-          ) : (
-            <>
-              {bridgerIsNotConnected
-                ? `Connect to ${adTokenChain?.name}`
-                : adCreatorIsNotConnected
-                  ? `Connect to ${orderTokenChain?.name}`
-                  : "Claim"}
-            </>
-          )
+          needsWalletConnect
+            ? `Connect ${targetChain?.name ?? "wallet"}`
+            : needsChainSwitch
+              ? `Switch to ${targetChain?.name}`
+              : type === "incoming" && tradeInfo?.status === "ACTIVE"
+                ? "Lock"
+                : "Claim"
         }
         onOk={async () => {
-          if (type === "incoming" && tradeInfo?.status === "ACTIVE") {
-            if (!isAdChain) {
-              chainModal.openChainModal && chainModal.openChainModal()
-            } else {
-              await lockFunds(tradeInfo?.id!)
-              setOpenReleaseModal(false)
-              refetch()
-            }
-          } else if (type === "incoming" && tradeInfo?.status === "LOCKED") {
-            if (!isOrderChain) {
-              chainModal.openChainModal && chainModal.openChainModal()
-            } else {
-              await unlockFunds(tradeInfo?.id!)
-              setOpenReleaseModal(false)
-              refetch()
-            }
-          } else if (type === "outgoing" && tradeInfo?.status === "LOCKED") {
-            if (!isAdChain) {
-              chainModal.openChainModal && chainModal.openChainModal()
-            } else {
-              await unlockFunds(tradeInfo?.id!)
-              setOpenReleaseModal(false)
-              refetch()
-            }
+          if (needsWalletConnect) {
+            setHubOpen(true)
+            return
           }
+          if (needsChainSwitch) {
+            chainModal.openChainModal?.()
+            return
+          }
+          if (!tradeInfo) return
+          if (type === "incoming" && tradeInfo.status === "ACTIVE") {
+            await lockFunds(tradeInfo.id)
+          } else if (tradeInfo.status === "LOCKED") {
+            await unlockFunds(tradeInfo.id)
+          }
+          setOpenReleaseModal(false)
+          refetch()
         }}
         onCancel={() => setOpenReleaseModal(false)}
         confirmLoading={unlockingFunds || lockingFunds}
@@ -316,8 +356,7 @@ export const OrdersTable: React.FC<{ type?: "incoming" | "outgoing" }> = ({
                 </p>
               ) : (
                 <p className="text-amber-500 text-sm">
-                  Please ensure you have received the tokens before releasing
-                  the tokens on your end. This action cannot be undone.
+                  This action generates a proof for you to claim your tokens.
                 </p>
               )}
             </div>
@@ -328,35 +367,69 @@ export const OrdersTable: React.FC<{ type?: "incoming" | "outgoing" }> = ({
   )
 }
 
+const WaitingNote: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <p className="text-xs text-grey-400 italic">{children}</p>
+)
+
 const Action = ({
   rowData,
+  linkedSet,
   setTradeInfo,
   setOpenReleaseModal,
 }: {
   value: string
   rowData: ITrade
+  linkedSet: Set<string>
   setTradeInfo: (value: ITrade) => void
   setOpenReleaseModal: (value: boolean) => void
   refetch: () => void
   type?: "incoming" | "outgoing"
 }) => {
-  const { address } = useAccount()
-  const isBridger = address === rowData.bridgerAddress
-  const isCreator = address === rowData.adCreatorAddress
+  const isBridger = ownsAddress(linkedSet, rowData.bridgerAddress)
+  const isCreator = ownsAddress(linkedSet, rowData.adCreatorAddress)
 
+  // Terminal + settled for this role — nothing to do here.
+  if (rowData.status === "COMPLETED") {
+    return <WaitingNote>Order completed</WaitingNote>
+  }
   if (isBridger && rowData.bridgerClaimed) {
-    return <p>-</p>
+    return <WaitingNote>Funds claimed — waiting for ad creator</WaitingNote>
   }
   if (isCreator && rowData.adCreatorClaimed) {
-    return <p>-</p>
+    return <WaitingNote>Funds claimed — waiting for bridger</WaitingNote>
   }
-  return (
-    <>
-      {rowData.status === "LOCKED" ? (
+
+  if (rowData.status === "ACTIVE") {
+    if (isCreator) {
+      return (
         <Button
           type="primary"
           size="small"
-          className="!w-full !h-[35px]"
+          className="w-full! h-8.75!"
+          onClick={() => {
+            setOpenReleaseModal(true)
+            setTradeInfo(rowData)
+          }}
+        >
+          Lock
+        </Button>
+      )
+    }
+    if (isBridger) {
+      return <WaitingNote>Waiting for ad creator to lock order</WaitingNote>
+    }
+    return <WaitingNote>Awaiting ad creator</WaitingNote>
+  }
+
+  if (rowData.status === "LOCKED") {
+    // After lock, both sides must sign unlock. Show the actionable button for
+    // whichever party hasn't claimed yet, and a waiting note for the other.
+    if (isBridger && !rowData.bridgerClaimed) {
+      return (
+        <Button
+          type="primary"
+          size="small"
+          className="w-full! h-8.75!"
           onClick={() => {
             setOpenReleaseModal(true)
             setTradeInfo(rowData)
@@ -364,24 +437,29 @@ const Action = ({
         >
           Claim
         </Button>
-      ) : rowData.status === "ACTIVE" &&
-        address === rowData.adCreatorAddress ? (
-        <>
-          <Button
-            type="primary"
-            size="small"
-            className="!w-full !h-[35px]"
-            onClick={() => {
-              setOpenReleaseModal(true)
-              setTradeInfo(rowData)
-            }}
-          >
-            Lock
-          </Button>
-        </>
-      ) : (
-        <p className="text-center">-</p>
-      )}
-    </>
-  )
+      )
+    }
+    if (isCreator && !rowData.adCreatorClaimed) {
+      return (
+        <Button
+          type="primary"
+          size="small"
+          className="w-full! h-8.75!"
+          onClick={() => {
+            setOpenReleaseModal(true)
+            setTradeInfo(rowData)
+          }}
+        >
+          Claim
+        </Button>
+      )
+    }
+    return <WaitingNote>Waiting for counterparty</WaitingNote>
+  }
+
+  if (rowData.status === "INACTIVE") {
+    return <WaitingNote>Awaiting on-chain confirmation</WaitingNote>
+  }
+
+  return <p className="text-center">-</p>
 }

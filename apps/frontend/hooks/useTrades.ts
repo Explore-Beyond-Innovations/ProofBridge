@@ -35,6 +35,7 @@ import { establishTrustline, hasTrustline } from "@/utils/stellar/trustline";
 import type { TrustlineCtx } from "@/utils/stellar/trustline";
 import type { IToken } from "@/types/tokens";
 import { hex32ToAddress20 } from "@/utils/evm/address";
+import { buildStellarUnlockMessage } from "@/utils/stellar/unlock-message";
 
 async function ensureSacTrustline(
   token: IToken,
@@ -349,9 +350,13 @@ export const useUnLockFunds = () => {
       // bridger unlocks on the ad chain. Backend tells us which.
       let signature: string;
       if (params.unlockChainKind === "STELLAR") {
-        // SEP-43 signMessage — off-chain authorization only; the signed bytes
-        // are domain-separated + ed25519-verified server-side.
-        signature = await signStellarMessage(params.orderHash);
+        // Stellar wallets (Freighter etc.) sign the raw UTF-8 bytes of the
+        // message via ed25519. There's no EIP-712 equivalent UI, so we send
+        // a pretty-printed JSON of the order fields — the wallet shows it to
+        // the user verbatim, and the backend rebuilds the same string to
+        // verify. Keep in sync with
+        // apps/backend-relayer/src/providers/stellar/utils/unlock-message.ts.
+        signature = await signStellarMessage(buildStellarUnlockMessage(params));
       } else {
         // Cross-chain address fields are bytes32 on-chain so the typeHash
         // stays chain-agnostic. Values arrive already 32-byte hex-padded.
@@ -451,7 +456,6 @@ export const useUnLockFunds = () => {
             );
         await confirmUnlockFunds({
           txHash,
-          signature: response.signature,
           id,
         });
         return response;
@@ -515,7 +519,6 @@ export const useUnLockFunds = () => {
       if (receipt.status === "success") {
         await confirmUnlockFunds({
           txHash: receipt.transactionHash,
-          signature: response.signature,
           id,
         });
       }

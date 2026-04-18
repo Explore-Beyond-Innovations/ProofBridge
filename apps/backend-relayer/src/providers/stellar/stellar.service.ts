@@ -50,6 +50,7 @@ import {
   lockForOrderRequestHash,
   randomAuthToken,
   signEd25519,
+  stellarSignedMessageDigest,
   unlockOrderRequestHash,
   verifyEd25519,
   withdrawFromAdRequestHash,
@@ -60,6 +61,7 @@ import {
   hex32ToContractId,
 } from './utils/address';
 import { computeOrderHash } from './utils/eip712';
+import { buildStellarUnlockMessage } from './utils/unlock-message';
 
 const MILLISECOND = 1000;
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
@@ -580,20 +582,24 @@ export class StellarService {
     return computeOrderHash(orderParams);
   }
 
-  // Verify a Stellar-wallet signature over `orderHash`. Off-chain only — this
-  // authorizes the unlock request on the relayer and never goes on-chain.
+  // Verify a Stellar-wallet signature over the unlock authorization message.
+  // Off-chain only — this authorizes the unlock request on the relayer and
+  // never goes on-chain.
   //
-  // Wallets don't sign raw bytes; stellar-wallets-kit's `signMessage` applies
-  // SEP-43-style domain separation and sha256 before ed25519. We reconstruct
-  // the same preimage here. Frontend sends the orderHash hex string (with
-  // `0x` prefix) as the message; signature arrives base64-encoded (kit
-  // normalizes) — we also accept `0x`-hex for direct-bytes callers.
+  // Freighter's `signMessage` wraps the raw message with a domain separator
+  // and sha256-hashes before ed25519 signing:
+  //   sha256("Stellar Signed Message:\n" + message) → 32-byte digest → ed25519.
+  // We rebuild the same pretty-printed JSON the frontend showed the user,
+  // apply the same prefix+sha256, and verify the sig. Signature arrives
+  // base64-encoded from the kit; we also accept `0x`-hex for direct-bytes
+  // callers.
   //
   // "address" is the G-strkey or its 32-byte hex; the 32-byte payload is the
   // ed25519 public key.
   verifyOrderSignature(
     address: `0x${string}`,
     orderHash: `0x${string}`,
+    orderParams: T_OrderParams,
     signature: string,
   ): boolean {
     try {
@@ -603,16 +609,9 @@ export class StellarService {
         : Buffer.from(signature, 'base64');
       if (sigBytes.length !== 64) return false;
 
-      const messageStr = orderHash.startsWith('0x')
-        ? orderHash
-        : `0x${orderHash}`;
-      const preimage = Buffer.concat([
-        Buffer.from('Stellar Signed Message:\n', 'utf8'),
-        Buffer.from(messageStr, 'utf8'),
-      ]);
-      // Ed25519 hashes the message internally (sha512); domain separation is
-      // just prepended bytes, not a pre-hash.
-      return verifyEd25519(preimage, sigBytes, publicKey);
+      const message = buildStellarUnlockMessage({ ...orderParams, orderHash });
+      const digest = stellarSignedMessageDigest(message);
+      return verifyEd25519(digest, sigBytes, publicKey);
     } catch {
       return false;
     }

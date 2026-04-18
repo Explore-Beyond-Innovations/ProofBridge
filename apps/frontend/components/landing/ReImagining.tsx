@@ -43,7 +43,7 @@ export const ReImagine = () => {
                 </span>
               </p>
               <p className="relative z-[2] bg-grey-800 md:max-w-[300px] max-w-[300px] md:text-lg leading-[22px] p-5 pt-0 md:p-0">
-                P2P cross-chain bridge connecting Ethereum and Stellar.
+                P2P cross-chain bridge connecting multiple ecosystems.
               </p>
             </div>
             <div className="h-full absolute top-0 right-0 opacity-10 hidden">

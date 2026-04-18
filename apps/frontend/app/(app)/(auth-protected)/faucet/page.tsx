@@ -8,11 +8,13 @@ import { GiWaterDrop } from "react-icons/gi"
 import useFaucet from "@/hooks/useFaucet"
 import { IToken } from "@/types/tokens"
 import { useConnectModal } from "@rainbow-me/rainbowkit"
-import { useAccount, useSwitchChain, useWalletClient } from "wagmi"
+import { useAccount, useSwitchChain, useWalletClient, useConfig } from "wagmi"
+import { getWalletClient } from "wagmi/actions"
 import { IChain } from "@/types/chains"
 import { useStellarWallet } from "@/components/providers/StellarWallet"
 import { hex32ToContractId } from "@/utils/stellar/address"
 import { WalletMinimal } from "lucide-react"
+import { addToken as freighterAddToken } from "@stellar/freighter-api"
 
 const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
   chainId,
@@ -20,14 +22,19 @@ const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
 }) => {
   const { data: tokens, isLoading } = useGetAllTokens({ chainId })
   const [claiming, setClaiming] = useState<Record<string, boolean>>({})
+  const [adding, setAdding] = useState<Record<string, boolean>>({})
   const { mutateAsync } = useFaucet()
 
   const { openConnectModal } = useConnectModal()
   const { address: evmAddress } = useAccount()
   const { data: walletClient } = useWalletClient()
   const { switchChainAsync } = useSwitchChain()
-  const { address: stellarAddress, connect: connectStellar } =
-    useStellarWallet()
+  const wagmiConfig = useConfig()
+  const {
+    address: stellarAddress,
+    connect: connectStellar,
+    networkPassphrase: stellarNetworkPassphrase,
+  } = useStellarWallet()
   const { message } = App.useApp()
 
   const isEvmChain = (token: IToken) => token.chain.kind === "EVM"
@@ -40,7 +47,7 @@ const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
       return `Add ${token.symbol} to wallet`
     }
     if (isStellarChain(token) && (token.kind === "SAC" || token.kind === "SEP41")) {
-      return `Copy ${token.symbol} contract`
+      return `Add ${token.symbol} to Freighter`
     }
     return null
   }
@@ -59,17 +66,27 @@ const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
   }
 
   const handleAddToWallet = async (token: IToken) => {
+    const key = token.id || `${token.symbol}-${token.address}`
+    setAdding((s) => ({ ...s, [key]: true }))
     try {
       if (isEvmChain(token) && token.kind === "ERC20") {
-        if (!walletClient) {
+        if (!evmAddress) {
           message.error("Connect an EVM wallet first")
           return
         }
         const targetChainId = Number(token.chain.chainId)
-        if (walletClient.chain.id !== targetChainId) {
+
+        if (walletClient?.chain.id !== targetChainId) {
           await switchChainAsync({ chainId: targetChainId })
         }
-        await walletClient.watchAsset({
+        const wc = await getWalletClient(wagmiConfig, {
+          chainId: targetChainId,
+        })
+        if (!wc) {
+          message.error("Connect an EVM wallet first")
+          return
+        }
+        await wc.watchAsset({
           type: "ERC20",
           options: {
             address: token.address,
@@ -89,15 +106,38 @@ const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
           return
         }
         const contractId = hex32ToContractId(token.address)
-        await navigator.clipboard.writeText(contractId)
-        message.success(
-          `Copied ${token.symbol} contract — paste it in Freighter's Add Asset search`,
-        )
+        const res = await Promise.race([
+          freighterAddToken({
+            contractId,
+            networkPassphrase: stellarNetworkPassphrase,
+          }),
+          new Promise<{ contractId: string; error: { message: string } }>(
+            (resolve) =>
+              setTimeout(
+                () =>
+                  resolve({
+                    contractId: "",
+                    error: { message: "Freighter did not respond in time" },
+                  }),
+                30_000,
+              ),
+          ),
+        ])
+        if (res.error) {
+          await navigator.clipboard.writeText(contractId)
+          message.success(
+            `Copied ${token.symbol} contract — paste it in your wallet's Add Asset search`,
+          )
+        } else {
+          message.success(`${token.symbol} added to Freighter`)
+        }
       }
     } catch (err) {
       message.error(
         err instanceof Error ? err.message : "Failed to add token to wallet",
       )
+    } finally {
+      setAdding((s) => ({ ...s, [key]: false }))
     }
   }
 
@@ -164,6 +204,7 @@ const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
                         shape="circle"
                         icon={<WalletMinimal size={14} />}
                         onClick={() => handleAddToWallet(token)}
+                        loading={!!adding[key]}
                       />
                     </Tooltip>
                   )}

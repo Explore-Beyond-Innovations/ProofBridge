@@ -184,12 +184,14 @@ export class StellarChainAdapter extends ChainAdapter {
   verifyOrderSignature(
     address: ChainAddress,
     orderHash: `0x${string}`,
+    orderParams: T_OrderParams,
     signature: string,
   ): boolean {
     this.assertLocalAddress(address, 'address');
     return this.stellar.verifyOrderSignature(
       address as `0x${string}`,
       orderHash,
+      orderParams,
       signature,
     );
   }

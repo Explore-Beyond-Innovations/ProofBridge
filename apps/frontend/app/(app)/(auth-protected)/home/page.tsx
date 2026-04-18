@@ -198,6 +198,14 @@ const HomePage = () => {
     participantAddresses: hasLinkedAddresses ? linkedAddresses : undefined,
   })
 
+  const tradeMetrics = React.useMemo(() => {
+    const rows = trades?.data ?? []
+    const total = rows.length
+    const completed = rows.filter((t) => t.status === "COMPLETED").length
+    const avgCompletion = total ? ((completed / total) * 100).toFixed(2) : "0.00"
+    return { total, completed, avgCompletion }
+  }, [trades?.data])
+
   return (
     <div className="max-w-[98%] mx-auto space-y-4 md:space-y-8 md:py-2 md:px-0 p-4">
       <div>
@@ -230,7 +238,7 @@ const HomePage = () => {
               </div>
               <div>
                 <h3 className="text-xl md:text-2xl font-semibold">
-                  {trades?.data?.length || 0}
+                  {tradeMetrics.total.toLocaleString()}
                 </h3>
                 <p className="text-sm">Total trades</p>
               </div>
@@ -247,9 +255,7 @@ const HomePage = () => {
               </div>
               <div>
                 <h3 className="text-xl md:text-2xl font-semibold">
-                  {" "}
-                  {trades?.data?.filter((trade) => trade.status === "LOCKED")
-                    ?.length || 0}
+                  {tradeMetrics.completed.toLocaleString()}
                 </h3>
                 <p className="text-sm">Completed orders</p>
               </div>
@@ -266,15 +272,7 @@ const HomePage = () => {
               </div>
               <div>
                 <h3 className="text-xl md:text-2xl font-semibold">
-                  {(
-                    (Number(
-                      trades?.data?.filter((trade) => trade.status === "LOCKED")
-                        ?.length
-                    ) /
-                      Number(trades?.data?.length)) *
-                      100 || 0
-                  ).toFixed(2)}
-                  %
+                  {tradeMetrics.avgCompletion}%
                 </h3>
                 <p className="text-sm">Avg. completion</p>
               </div>

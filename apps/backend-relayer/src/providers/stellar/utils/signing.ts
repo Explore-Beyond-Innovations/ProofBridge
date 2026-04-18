@@ -7,7 +7,7 @@
 
 import { keccak256 } from 'viem';
 import { ed25519 } from '@noble/curves/ed25519.js';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 
 const U64_BE_LEN = 8;
 const U128_BE_LEN = 16;
@@ -248,4 +248,15 @@ export function verifyEd25519(
   publicKey: Buffer,
 ): boolean {
   return ed25519.verify(signature, message, publicKey);
+}
+
+// Freighter's `signMessage` wraps the raw message string with a domain
+// separator and sha256-hashes before ed25519 signing:
+//   sha256("Stellar Signed Message:\n" + message) → 32-byte digest → ed25519.
+// This builds that exact 32-byte preimage so the relayer can verify
+// signatures produced by Freighter's API.
+export function stellarSignedMessageDigest(message: string): Buffer {
+  const prefix = Buffer.from('Stellar Signed Message:\n', 'utf8');
+  const body = Buffer.from(message, 'utf8');
+  return createHash('sha256').update(Buffer.concat([prefix, body])).digest();
 }

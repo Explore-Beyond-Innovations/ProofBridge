@@ -13,7 +13,7 @@ import { formatChainAddress } from "@/utils/format-address"
 import { Status } from "../shared/Status"
 import { useAccount, useBalance } from "wagmi"
 import { useCreateTrade } from "@/hooks/useTrades"
-import { useChainModal, useConnectModal } from "@rainbow-me/rainbowkit"
+import { useChainModal } from "@rainbow-me/rainbowkit"
 import { useStellarWallet } from "@/components/providers/StellarWallet"
 import { useQuery } from "@tanstack/react-query"
 import { getStellarTokenBalance } from "@/utils/stellar/balance"
@@ -21,13 +21,19 @@ import {
   NonExactDownscaleError,
   scale as scaleDecimals,
 } from "@/utils/decimal-scaling"
+import {
+  CreateOrderSuccessModal,
+  type CreatedOrderSummary,
+} from "./CreateOrderSuccessModal"
+import { useAdapters } from "@/components/connect-wallet/useAdapters"
+import { ConnectHubModal } from "@/components/connect-wallet/ConnectHubModal"
 
 export const TradeAd = ({ ...props }: IAd) => {
   const [openModal, setOpenModal] = useState(false)
   const toggleModal = () => setOpenModal(!openModal)
-  // Pool liquidity is funded and accounted in ad-token base units — format it
-  // with the ad-token's decimals, not the order-token's. Same for min/max caps,
-  // which are stored alongside the pool amount.
+  const [successSummary, setSuccessSummary] =
+    useState<CreatedOrderSummary | null>(null)
+
   const available_tokens = formatUnits(
     parseToBigInt(props.availableAmount),
     props.adToken.decimals
@@ -50,9 +56,16 @@ export const TradeAd = ({ ...props }: IAd) => {
   const account = useAccount()
   const { mutateAsync, isPending } = useCreateTrade()
   const { openChainModal } = useChainModal()
-  const { openConnectModal } = useConnectModal()
-  const { address: stellarAddress, connect: connectStellar } =
-    useStellarWallet()
+  const { address: stellarAddress } = useStellarWallet()
+  const adapters = useAdapters()
+  const [hubOpen, setHubOpen] = useState(false)
+  // The action buttons below trigger the hub whenever a wallet for a given
+  // chain kind is missing or unauthenticated — so both EVM and Stellar users
+  // go through the same connect/sign-in/link flow.
+  const adapterFor = (kind: "EVM" | "STELLAR") =>
+    adapters.find((a) => a.chainKind === kind)
+  const isReady = (kind: "EVM" | "STELLAR") =>
+    adapterFor(kind)?.status === "authenticated"
 
   // Order chain = chain the bridger pays on. Drives which wallet's balance to
   // read and which connect-flow to surface.
@@ -81,6 +94,7 @@ export const TradeAd = ({ ...props }: IAd) => {
         symbol: props.orderToken.symbol,
         decimals: props.orderToken.decimals,
         assetIssuer: props.orderToken.assetIssuer,
+        address: props.orderToken.address,
       }),
     enabled: isStellarOrder && !!stellarAddress,
   })
@@ -114,10 +128,6 @@ export const TradeAd = ({ ...props }: IAd) => {
     }
   }, [balance.data, nativeBalance.data, stellarBalance.data, isStellarOrder])
 
-  // The input is denominated in the ad-token (the asset the bridger receives
-  // and what the ad is posted in). The wire / on-chain `amount` is denominated
-  // in the order-token. Scale here using the same DecimalScaling rules the
-  // contracts enforce so a user-side error surfaces before signing.
   type ScaledResult =
     | { ok: true; adAmount: bigint; orderAmount: bigint }
     | { ok: false; error: string }
@@ -154,9 +164,9 @@ export const TradeAd = ({ ...props }: IAd) => {
       : ""
   const insufficientBalance = Boolean(
     scaled &&
-      scaled.ok &&
-      orderBalanceRaw !== undefined &&
-      scaled.orderAmount > orderBalanceRaw,
+    scaled.ok &&
+    orderBalanceRaw !== undefined &&
+    scaled.orderAmount > orderBalanceRaw,
   )
   const amountError = scaled && !scaled.ok ? scaled.error : null
 
@@ -178,35 +188,37 @@ export const TradeAd = ({ ...props }: IAd) => {
       },
       orderTokenId: props.orderTokenId,
     })
+    setSuccessSummary({
+      payAmount: formatUnits(scaled.orderAmount, props.orderToken.decimals),
+      payTokenSymbol: props.orderToken.symbol,
+      receiveAmount: String(Number(amount) - txFee),
+      receiveTokenSymbol: props.adToken.symbol,
+      orderChainName,
+      adChainName,
+      recipient: bridgerDstAddress,
+    })
     toggleModal()
   }
 
-  // Resolve which action the primary button should perform. Priority: pay-side
-  // wallet first (can't bridge without it), then destination-wallet, then the
-  // bridge action itself. Keeps button state readable at a glance.
   const orderChainName = resolveChainName(props.orderToken.chainId)
   const adChainName = resolveChainName(props.adToken.chainId)
+  const orderChainKind = props.orderToken.chainKind
+  const adChainKind = props.adToken.chainKind
   const connectionAction: {
     label: string
     onClick?: () => void
     isBridge: boolean
   } = (() => {
-    if (isStellarOrder && !stellarAddress) {
+    // Pay side — wallet must be connected + authenticated for the order chain
+    // kind. Both EVM and Stellar go through the same hub.
+    if (!isReady(orderChainKind)) {
       return {
-        label: "Connect Stellar wallet",
-        onClick: () => {
-          void connectStellar()
-        },
+        label: `Connect ${orderChainName} wallet`,
+        onClick: () => setHubOpen(true),
         isBridge: false,
       }
     }
-    if (!isStellarOrder && !account.address) {
-      return {
-        label: `Connect wallet for ${orderChainName}`,
-        onClick: openConnectModal,
-        isBridge: false,
-      }
-    }
+    // Chain-switch only applies to EVM — Stellar has a single network.
     if (!isStellarOrder && String(account.chainId) !== props.orderToken.chainId) {
       return {
         label: `Switch to ${orderChainName}`,
@@ -214,25 +226,30 @@ export const TradeAd = ({ ...props }: IAd) => {
         isBridge: false,
       }
     }
-    if (!bridgerDstAddress) {
-      return props.adToken.chainKind === "STELLAR"
-        ? {
-            label: "Connect Stellar wallet (destination)",
-            onClick: () => {
-              void connectStellar()
-            },
-            isBridge: false,
-          }
-        : {
-            label: `Connect wallet for ${adChainName}`,
-            onClick: openConnectModal,
-            isBridge: false,
-          }
+    // Destination side — the bridger receives on the ad chain, so we need
+    // that wallet too (hub handles EVM + Stellar).
+    if (!isReady(adChainKind) || !bridgerDstAddress) {
+      return {
+        label: `Connect ${adChainName} wallet`,
+        onClick: () => setHubOpen(true),
+        isBridge: false,
+      }
     }
     return { label: "Bridge", onClick: handleCreateTrade, isBridge: true }
   })()
   return (
     <div>
+      <CreateOrderSuccessModal
+        open={successSummary !== null}
+        summary={successSummary}
+        onClose={() => setSuccessSummary(null)}
+      />
+      <ConnectHubModal
+        open={hubOpen}
+        onClose={() => setHubOpen(false)}
+        adapters={adapters}
+        zIndex={1100}
+      />
       <Modal
         forceRender
         open={openModal}

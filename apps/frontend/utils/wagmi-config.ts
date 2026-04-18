@@ -1,5 +1,5 @@
 import { createConfig } from "wagmi"
-import { foundry, hederaTestnet, sepolia, type Chain } from "viem/chains"
+import { foundry, sepolia, type Chain } from "viem/chains"
 import { http } from "viem"
 
 const localEnabled =
@@ -9,14 +9,13 @@ const localEnabled =
 const anvilRpc = "http://localhost:9545"
 
 const chainList: readonly [Chain, ...Chain[]] = localEnabled
-  ? [foundry, sepolia, hederaTestnet]
-  : [sepolia, hederaTestnet]
+  ? [foundry, sepolia]
+  : [sepolia]
 
 export const config = createConfig({
   chains: chainList,
   transports: {
     [foundry.id]: http(anvilRpc),
     [sepolia.id]: http(),
-    [hederaTestnet.id]: http(),
   },
 })

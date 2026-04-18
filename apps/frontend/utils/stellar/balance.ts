@@ -1,7 +1,19 @@
-import { Horizon } from "@stellar/stellar-sdk"
-import { parseUnits } from "viem"
-import { defaultHorizonUrl } from "./trustline"
+import {
+  Address,
+  Contract,
+  TransactionBuilder,
+  rpc,
+  scValToNative,
+} from "@stellar/stellar-sdk"
+import { hex32ToContractId } from "./address"
+import { urls } from "@/utils/urls"
 import type { TokenKind } from "@/types/tokens"
+
+const DEFAULT_TESTNET_RPC = "https://soroban-testnet.stellar.org"
+
+export function defaultSorobanRpcUrl(): string {
+  return process.env.NEXT_PUBLIC_STELLAR_RPC_URL || DEFAULT_TESTNET_RPC
+}
 
 export interface StellarBalanceResult {
   value: bigint
@@ -14,62 +26,69 @@ interface BalanceToken {
   symbol: string
   decimals: number
   assetIssuer?: string | null
+  /**
+   * 0x + 64 hex of the token's Soroban contract id. Every Stellar token in
+   * the data model carries one — the wrapped-native SAC for NATIVE (XLM),
+   * the classic-asset SAC for SAC, and the SEP-41 contract itself for
+   * SEP41. All three expose the same `balance(addr) → i128` SEP-41-style
+   * method, so balance lookups use a single read-only Soroban simulation.
+   */
+  address?: string | null
 }
 
 /**
- * Reads a bridger's balance on Stellar for NATIVE (XLM) and SAC tokens via
- * Horizon. SEP41 Soroban tokens aren't supported here — Horizon doesn't index
- * contract data and a Soroban RPC query is required. Returns null for
- * unsupported kinds so callers can fall back gracefully.
+ * Reads a bridger's balance on Stellar by read-only-simulating
+ * `balance(addr)` against the token's Soroban contract (no signing, the
+ * envelope is never submitted). Unified across NATIVE / SAC / SEP-41
+ * because all three present the SEP-41 interface on their contract.
+ * Returns `null` only when the token record has no contract `address`;
+ * any simulation failure (unfunded account, RPC unreachable, etc.) is
+ * normalized to a zero balance so the UI degrades gracefully.
  */
 export async function getStellarTokenBalance(
   publicKey: string,
   token: BalanceToken,
-  horizonUrl: string = defaultHorizonUrl(),
+  rpcUrl: string = defaultSorobanRpcUrl(),
 ): Promise<StellarBalanceResult | null> {
-  const server = new Horizon.Server(horizonUrl)
-  const zero: StellarBalanceResult = {
-    value: BigInt(0),
-    decimals: token.decimals,
-    symbol: token.symbol,
-  }
+  if (!token.address) return null
   try {
-    const account = await server.loadAccount(publicKey)
-    if (token.kind === "NATIVE") {
-      const row = account.balances.find((b) => b.asset_type === "native")
-      if (!row) return zero
-      return {
-        value: parseUnits(row.balance, token.decimals),
-        decimals: token.decimals,
-        symbol: token.symbol,
-      }
+    const value = await readContractBalance(publicKey, token.address, rpcUrl)
+    return { value, decimals: token.decimals, symbol: token.symbol }
+  } catch {
+    return {
+      value: BigInt(0),
+      decimals: token.decimals,
+      symbol: token.symbol,
     }
-    if (token.kind === "SAC") {
-      if (!token.assetIssuer) return null
-      const row = account.balances.find(
-        (b) =>
-          (b.asset_type === "credit_alphanum4" ||
-            b.asset_type === "credit_alphanum12") &&
-          (b as { asset_code?: string }).asset_code === token.symbol &&
-          (b as { asset_issuer?: string }).asset_issuer === token.assetIssuer,
-      )
-      if (!row) return zero
-      return {
-        value: parseUnits(row.balance, token.decimals),
-        decimals: token.decimals,
-        symbol: token.symbol,
-      }
-    }
-    return null
-  } catch (e: unknown) {
-    if (
-      typeof e === "object" &&
-      e !== null &&
-      "response" in e &&
-      (e as { response?: { status?: number } }).response?.status === 404
-    ) {
-      return zero
-    }
-    throw e
   }
+}
+
+async function readContractBalance(
+  publicKey: string,
+  contractHex: string,
+  rpcUrl: string,
+): Promise<bigint> {
+  const server = new rpc.Server(rpcUrl, {
+    allowHttp: rpcUrl.startsWith("http://"),
+  })
+  const contract = new Contract(hex32ToContractId(contractHex))
+  const source = await server.getAccount(publicKey)
+  const tx = new TransactionBuilder(source, {
+    fee: "1000",
+    networkPassphrase: urls.STELLAR_NETWORK_PASSPHRASE,
+  })
+    .addOperation(
+      contract.call("balance", Address.fromString(publicKey).toScVal()),
+    )
+    .setTimeout(30)
+    .build()
+
+  const sim = await server.simulateTransaction(tx)
+  if (rpc.Api.isSimulationError(sim)) {
+    throw new Error(sim.error)
+  }
+  const success = sim as rpc.Api.SimulateTransactionSuccessResponse
+  if (!success.result) throw new Error("simulation returned no result")
+  const native = scValToNative(success.result.retval) as bigint | number
+  return BigInt(native)
 }

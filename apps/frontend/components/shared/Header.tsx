@@ -15,17 +15,18 @@ export const Header = () => {
             ProofBridge
           </p>
         </div>
-        <div className="flex items-center justify-between text-sm gap-5">
-          <Link
-            href={"https://github.com/JoE11-y/ProofBridge"}
-            className="hidden md:inline"
-            target="_blank"
-          >
-            Docs
-          </Link>
-          <Link href={"/bridge"} className="hidden md:inline">
-            Bridge
-          </Link>
+        <div className="flex items-center justify-between text-sm gap-8 uppercase">
+          <span className="signal-line-link hidden md:inline">
+            <Link
+              href={"https://github.com/JoE11-y/ProofBridge"}
+              target="_blank"
+            >
+              Docs
+            </Link>
+          </span>
+          <span className="signal-line-link hidden md:inline">
+            <Link href={"/bridge"}>Bridge</Link>
+          </span>
           <ConnectWalletButton />
         </div>
       </div>

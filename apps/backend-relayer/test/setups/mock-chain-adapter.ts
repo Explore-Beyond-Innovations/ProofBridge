@@ -225,6 +225,7 @@ export class MockChainAdapter extends ChainAdapter {
   verifyOrderSignature(
     _address: `0x${string}`,
     _orderHash: `0x${string}`,
+    _orderParams: T_OrderParams,
     _signature: `0x${string}`,
   ): boolean {
     return true;
