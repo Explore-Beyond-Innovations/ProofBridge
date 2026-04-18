@@ -57,6 +57,27 @@ export class NotificationService {
     }
   }
 
+  // Non-throwing "resolve address → notify" helper for lifecycle callers.
+  // The lookup + create are wrapped together so a thrown `userIdForAddress`
+  // (Prisma outage, normalization failure, etc.) never bubbles up into the
+  // trade endpoint and returns 500 after the trade state has been committed.
+  async safeCreateForAddress(
+    address: string,
+    input: Omit<CreateNotificationInput, 'userId'>,
+  ): Promise<void> {
+    try {
+      const userId = await this.userIdForAddress(address);
+      if (!userId) return;
+      await this.create({ ...input, userId });
+    } catch (err) {
+      this.logger.warn(
+        `Failed to create ${input.type} notification for address ${address}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+
   async list(userId: string, query: ListNotificationQuery = {}) {
     const take = Math.min(Math.max(query.limit ?? 20, 1), 100);
     const rows = await this.prisma.notification.findMany({
@@ -64,7 +85,10 @@ export class NotificationService {
         userId,
         ...(query.unreadOnly ? { read: false } : {}),
       },
-      orderBy: { createdAt: 'desc' },
+      // `id` tiebreaker keeps cursor pagination deterministic when multiple
+      // rows share a `createdAt` timestamp — without it, pages can duplicate
+      // or skip rows during bursts.
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: take + 1,
       ...(query.cursor
         ? { cursor: { id: query.cursor }, skip: 1 }
@@ -84,8 +108,11 @@ export class NotificationService {
   }
 
   async markRead(userId: string, id: string): Promise<Notification | null> {
+    // Idempotent for owned rows — re-marking an already-read notification
+    // should return the row, not 404. Ownership check still gates non-owners
+    // to `null` (→ 404) via the `count === 0` path.
     const row = await this.prisma.notification.updateMany({
-      where: { id, userId, read: false },
+      where: { id, userId },
       data: { read: true },
     });
     if (row.count === 0) return null;
