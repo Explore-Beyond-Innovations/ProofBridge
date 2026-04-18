@@ -14,8 +14,9 @@ export const LandingHeaderAlt = () => {
         <ul className="md:flex items-center gap-14 hidden">
           <li className="signal-line-link">
             <Link
-              href={"https://github.com/JoE11-y/ProofBridge"}
+              href={"https://docs.pfbridge.xyz/"}
               target="_blank"
+              rel="noopener noreferrer"
             >
               Docs
             </Link>

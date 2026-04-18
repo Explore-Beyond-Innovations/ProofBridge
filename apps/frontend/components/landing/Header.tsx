@@ -28,8 +28,9 @@ export const LandingHeader = () => {
         <ul className="md:flex hidden gap-4">
           <li>
             <Link
-              href={"https://github.com/JoE11-y/ProofBridge"}
+              href={"https://docs.pfbridge.xyz/"}
               target="_blank"
+              rel="noopener noreferrer"
             >
               Docs
             </Link>

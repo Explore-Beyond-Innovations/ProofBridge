@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useState } from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
 import { Button, Modal, Table } from "antd"
 import type { TableColumnsType, TableProps } from "antd"
 import { ITrade } from "@/types/trades"
@@ -35,9 +35,10 @@ const onChange: TableProps<ITrade>["onChange"] = (
 const ownsAddress = (linked: Set<string>, addr: string | null | undefined) =>
   Boolean(addr) && linked.has(addr!.toLowerCase())
 
-export const OrdersTable: React.FC<{ type?: "incoming" | "outgoing" }> = ({
-  type = "incoming",
-}) => {
+export const OrdersTable: React.FC<{
+  type?: "incoming" | "outgoing"
+  highlight?: string | null
+}> = ({ type = "incoming", highlight }) => {
   const account = useAccount()
   const { data: currentUser } = useCurrentUser()
   const linkedAddresses = useMemo(
@@ -211,17 +212,52 @@ export const OrdersTable: React.FC<{ type?: "incoming" | "outgoing" }> = ({
     targetChainKind === "EVM" &&
     targetChainId !== String(account.chainId)
 
+  // Flash-and-scroll the highlighted row when a notification deep-links
+  // here. We key off `data?.data` so the effect fires after the rows are
+  // actually in the DOM, not just when the param arrives.
+  const tableWrapRef = useRef<HTMLDivElement | null>(null)
+  const [flashId, setFlashId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!highlight || !data?.data) return
+    const exists = data.data.some((t) => t.id === highlight)
+    if (!exists) return
+    setFlashId(highlight)
+    // Wait a frame so AntD has painted the row, then scroll + flash.
+    const raf = requestAnimationFrame(() => {
+      const row = tableWrapRef.current?.querySelector(
+        `[data-row-key="${CSS.escape(highlight)}"]`,
+      )
+      if (row && "scrollIntoView" in row) {
+        ;(row as HTMLElement).scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        })
+      }
+    })
+    const clear = window.setTimeout(() => setFlashId(null), 2500)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.clearTimeout(clear)
+    }
+  }, [highlight, data?.data])
+
   return (
     <>
-      <Table<ITrade>
-        columns={columns}
-        dataSource={data?.data!}
-        loading={isLoading || isRefetching}
-        onChange={onChange}
-        showSorterTooltip={{ target: "sorter-icon" }}
-        rowClassName={"bg-grey-900/60 hover:!bg-primary/20"}
-        rowKey="id"
-      />
+      <div ref={tableWrapRef}>
+        <Table<ITrade>
+          columns={columns}
+          dataSource={data?.data!}
+          loading={isLoading || isRefetching}
+          onChange={onChange}
+          showSorterTooltip={{ target: "sorter-icon" }}
+          rowClassName={(record) =>
+            `bg-grey-900/60 hover:!bg-primary/20${
+              record.id === flashId ? " row-flash" : ""
+            }`
+          }
+          rowKey="id"
+        />
+      </div>
 
       <ConnectHubModal
         open={hubOpen}

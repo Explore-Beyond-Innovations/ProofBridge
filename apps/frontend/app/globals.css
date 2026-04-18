@@ -210,3 +210,19 @@ input::placeholder {
     @apply bg-background text-foreground;
   }
 }
+
+/* Row highlight for /orders?highlight=<tradeId> — applied transiently by
+   OrdersTable when a notification deep-links to a specific trade. */
+@keyframes row-flash {
+  0%,
+  100% {
+    background-color: transparent;
+  }
+  20%,
+  80% {
+    background-color: rgba(250, 204, 21, 0.18);
+  }
+}
+.row-flash > td {
+  animation: row-flash 2.5s ease-in-out;
+}
