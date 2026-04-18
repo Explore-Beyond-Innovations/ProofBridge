@@ -583,17 +583,7 @@ export class StellarService {
   }
 
   // Verify a Stellar-wallet signature over the unlock authorization message.
-  // Off-chain only — this authorizes the unlock request on the relayer and
-  // never goes on-chain.
-  //
-  // Freighter's `signMessage` wraps the raw message with a domain separator
-  // and sha256-hashes before ed25519 signing:
-  //   sha256("Stellar Signed Message:\n" + message) → 32-byte digest → ed25519.
-  // We rebuild the same pretty-printed JSON the frontend showed the user,
-  // apply the same prefix+sha256, and verify the sig. Signature arrives
-  // base64-encoded from the kit; we also accept `0x`-hex for direct-bytes
-  // callers.
-  //
+  // Off-chain only
   // "address" is the G-strkey or its 32-byte hex; the 32-byte payload is the
   // ed25519 public key.
   verifyOrderSignature(

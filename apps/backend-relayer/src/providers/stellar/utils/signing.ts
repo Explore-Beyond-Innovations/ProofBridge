@@ -258,5 +258,7 @@ export function verifyEd25519(
 export function stellarSignedMessageDigest(message: string): Buffer {
   const prefix = Buffer.from('Stellar Signed Message:\n', 'utf8');
   const body = Buffer.from(message, 'utf8');
-  return createHash('sha256').update(Buffer.concat([prefix, body])).digest();
+  return createHash('sha256')
+    .update(Buffer.concat([prefix, body]))
+    .digest();
 }
