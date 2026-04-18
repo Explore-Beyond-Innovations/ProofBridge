@@ -1048,7 +1048,6 @@ export class TradesService {
         chainKind: unlockChain.kind as string,
       };
     } catch (e) {
-      console.log(e);
       if (e instanceof Error) {
         if (e instanceof HttpException) throw e;
         const status = e.message.toLowerCase().includes('forbidden')
@@ -1351,8 +1350,6 @@ export class TradesService {
       await this.prisma.authorizationLog.delete({
         where: { id: authorizationLog.id },
       });
-
-      console.log(dto);
 
       return {
         tradeId: updatedTrade.id,

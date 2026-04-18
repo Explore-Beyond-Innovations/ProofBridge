@@ -71,8 +71,16 @@ api.interceptors.response.use(
           );
           Cookies.set("auth_token", res.data.tokens.access);
           Cookies.set("refresh_token", res.data.tokens.refresh);
+
+          const originalConfig = error.config;
+          if (originalConfig) {
+            originalConfig.headers = originalConfig.headers ?? {};
+            originalConfig.headers.Authorization = `Bearer ${res.data.tokens.access}`;
+            return api.request(originalConfig);
+          }
         } catch {
-          // swallow — cookies were already handled by the refresh branch above
+          Cookies.remove("refresh_token");
+          Cookies.remove("auth_token");
         }
       }
     } else if (status === 400) {

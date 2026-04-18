@@ -168,6 +168,12 @@ export const TradeAd = ({ ...props }: IAd) => {
     orderBalanceRaw !== undefined &&
     scaled.orderAmount > orderBalanceRaw,
   )
+  // Disable the Bridge action while the balance query is still in flight —
+  // `insufficientBalance` alone returns `false` when `orderBalanceRaw` is
+  // undefined, which would let users click through and revert on-chain.
+  const balanceLoading = isStellarOrder
+    ? stellarBalance.isLoading
+    : balance.isLoading || nativeBalance.isLoading
   const amountError = scaled && !scaled.ok ? scaled.error : null
 
   // Bridger's receive address lives on the *ad chain* (the destination).
@@ -428,7 +434,7 @@ export const TradeAd = ({ ...props }: IAd) => {
                   props.status !== "ACTIVE" ||
                   isPending ||
                   (connectionAction.isBridge &&
-                    (!scaled || !scaled.ok || insufficientBalance))
+                    (!scaled || !scaled.ok || balanceLoading || insufficientBalance))
                 }
                 onClick={connectionAction.onClick}
                 loading={connectionAction.isBridge && isPending}

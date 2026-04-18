@@ -106,28 +106,38 @@ const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
           return
         }
         const contractId = hex32ToContractId(token.address)
+        let timeoutId: ReturnType<typeof setTimeout> | undefined
         const res = await Promise.race([
           freighterAddToken({
             contractId,
             networkPassphrase: stellarNetworkPassphrase,
           }),
           new Promise<{ contractId: string; error: { message: string } }>(
-            (resolve) =>
-              setTimeout(
+            (resolve) => {
+              timeoutId = setTimeout(
                 () =>
                   resolve({
                     contractId: "",
                     error: { message: "Freighter did not respond in time" },
                   }),
                 30_000,
-              ),
+              )
+            },
           ),
-        ])
+        ]).finally(() => {
+          if (timeoutId) clearTimeout(timeoutId)
+        })
         if (res.error) {
-          await navigator.clipboard.writeText(contractId)
-          message.success(
-            `Copied ${token.symbol} contract — paste it in your wallet's Add Asset search`,
-          )
+          try {
+            await navigator.clipboard.writeText(contractId)
+            message.success(
+              `Copied ${token.symbol} contract — paste it in your wallet's Add Asset search`,
+            )
+          } catch {
+            message.warning(
+              `Couldn't add to Freighter or copy automatically. Contract: ${contractId}`,
+            )
+          }
         } else {
           message.success(`${token.symbol} added to Freighter`)
         }
