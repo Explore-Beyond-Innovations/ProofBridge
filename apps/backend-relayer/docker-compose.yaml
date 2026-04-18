@@ -1,0 +1,14 @@
+services:
+  backend-relayer:
+    image: ghcr.io/explore-beyond-innovations/proofbridge-backend-relayer:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    expose:
+      - "2005"
+    env_file:
+      - .env
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- --spider http://localhost:2005/v1/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

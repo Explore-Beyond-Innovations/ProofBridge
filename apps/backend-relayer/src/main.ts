@@ -14,9 +14,9 @@ async function bootstrap() {
   const devOrigins = [
     'http://localhost:3000',
     `http://localhost:${PORT}`,
-    'https://proof-bridge.vercel.app',
+    env.appUri,
   ];
-  const prodOrigins = [env.appUri, 'https://proofbridge.onrender.com'];
+  const prodOrigins = [env.appUri];
   app.enableCors({
     origin: env.isProd ? prodOrigins : devOrigins,
     credentials: true,
@@ -40,7 +40,6 @@ async function bootstrap() {
     .setTitle('Proof Relayer API')
     .setVersion('0.1.0')
     .addServer(`http://localhost:${PORT}`, 'Local')
-    .addServer('https://proofbridge.onrender.com', 'Production')
     .addBearerAuth()
     .addCookieAuth()
     .build();
