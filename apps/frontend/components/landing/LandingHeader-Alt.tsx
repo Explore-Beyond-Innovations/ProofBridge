@@ -22,17 +22,17 @@ export const LandingHeaderAlt = () => {
             </Link>
           </li>
           <li className="signal-line-link">
-            <Link href={"https://x.com/Proof_bridge"} target="_blank">
+            <Link href={""} target="_blank">
               Community
             </Link>
           </li>
           <li className="signal-line-link">
-            <Link href={"https://x.com/Proof_bridge"} target="_blank">
+            <Link href={""} target="_blank">
               Blog
             </Link>
           </li>
           <li className="signal-line-link">
-            <Link href={"https://x.com/Proof_bridge"} target="_blank">
+            <Link href={""} target="_blank">
               Contact
             </Link>
           </li>

@@ -164,6 +164,19 @@ input::placeholder {
   transform: scaleX(1);
 }
 
+@media (hover: none) {
+  .signal-line-link > a::after {
+    transform: scaleX(1);
+  }
+}
+
+/* The 0.12em letter-spacing is elegant at small sizes (desktop nav is
+   text-sm), but at the mobile menu's text-[15vmin] it pushes words like
+   "COMMUNITY" past the viewport edge. Reset inside the mobile menu only. */
+#mobile-menu .signal-line-link > a {
+  letter-spacing: normal;
+}
+
 #mobile-menu {
   clip-path: circle(0% at 100% 0%);
 }

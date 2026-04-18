@@ -1,6 +1,7 @@
 "use client"
 import { ArrowUpRight } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import React from "react"
 import { SpecialButton } from "../ui/SpecialButton"
 
@@ -32,6 +33,7 @@ const features = [
 ]
 
 export const Features = () => {
+  const router = useRouter()
   return (
     <div className="relative overflow-hidden landing-features z-[5] md:bg-transparent bg-grey-1000">
       <div className="border-y-[1px] border-gray-400/20 grid md:grid-cols-3 grid-cols-1 mb-0">
@@ -40,12 +42,12 @@ export const Features = () => {
           <p className="md:text-5xl text-lg md:my-5 my-2 font-perfectly-nineties">
             Inside ProofBridge
           </p>
-          <Link
-            href={"/bridge"}
-            className="text-primary uppercase text-lg md:text-[18px] hero-click-to-explore hero-caption relative"
-          >
-            <SpecialButton>Launch App</SpecialButton>
-          </Link>
+          {/* SpecialButton renders as <button>, so we can't nest it inside a
+              <Link> (which renders as <a>) — invalid HTML + navigation
+              silently breaks. Route imperatively on click instead. */}
+          <SpecialButton onClick={() => router.push("/home")}>
+            Launch App
+          </SpecialButton>
         </div>
         <div className="col-span-2">
           <div className="">

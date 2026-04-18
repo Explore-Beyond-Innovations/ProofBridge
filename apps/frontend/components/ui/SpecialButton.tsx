@@ -9,9 +9,9 @@ interface Props
   icon?: ReactNode
 }
 
-export const SpecialButton = ({ children, icon, ...props }: Props) => {
+export const SpecialButton = ({ children, icon, type, ...props }: Props) => {
   return (
-    <button className="relative cursor-pointer" {...props}>
+    <button type={type ?? "button"} className="relative cursor-pointer" {...props}>
       <div className="absolute top-0 md:left-0 left-3 md:h-[45px] h-[35px] md:w-[45px] w-[35px] rounded-full bg-primary text-black text-sm cursor-pointer items-center justify-center flex">
         {icon}
       </div>

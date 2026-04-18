@@ -84,7 +84,7 @@ export const MobileNav = () => {
         id="mobile-menu"
       >
         <ul className=" text-[15vmin] space-y-7 leading-[110%] mb-7">
-          <li>
+          <li className="signal-line-link">
             <Link
               href={"https://docs.pfbridge.xyz/"}
               target="_blank"
@@ -94,19 +94,34 @@ export const MobileNav = () => {
               Docs
             </Link>
           </li>
-          <li>
-            <Link href={""} className="mobile-link inline-block">
-              community
+          <li className="signal-line-link">
+            <Link
+              href={""}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mobile-link inline-block"
+            >
+              Community
             </Link>
           </li>
-          <li>
-            <Link href={""} className="mobile-link inline-block">
-              blog
+          <li className="signal-line-link">
+            <Link
+              href={""}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mobile-link inline-block"
+            >
+              Blog
             </Link>
           </li>
-          <li>
-            <Link href={""} className="mobile-link inline-block">
-              contact
+          <li className="signal-line-link">
+            <Link
+              href={""}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mobile-link inline-block"
+            >
+              Contact
             </Link>
           </li>
         </ul>
@@ -115,9 +130,8 @@ export const MobileNav = () => {
           <li>
             <Link href={"/home"} className="mobile-link inline-block w-full">
               <Button
-                className=" !text-black !h-[45px] w-full !rounded-full !border-0 !text-[16px] !items-center !leading-0"
+                className="!bg-white !text-black !h-[45px] w-full !rounded-full !border-0 !text-[16px] !items-center !leading-0"
                 iconPosition="end"
-                type="primary"
                 icon={<ArrowRight size={18} />}
               >
                 Launch app
