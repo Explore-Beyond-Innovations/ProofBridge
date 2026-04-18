@@ -43,7 +43,7 @@ RUN pnpm --filter backend-relayer deploy --prod --legacy /out \
 FROM node:20-slim AS runtime
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends openssl ca-certificates tini \
+ && apt-get install -y --no-install-recommends openssl ca-certificates tini wget \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
