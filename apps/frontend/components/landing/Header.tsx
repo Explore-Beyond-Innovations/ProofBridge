@@ -36,17 +36,17 @@ export const LandingHeader = () => {
             </Link>
           </li>
           <li>
-            <Link href={"https://x.com/Proof_bridge"} target="_blank">
+            <Link href={""} target="_blank">
               Community
             </Link>
           </li>
           <li>
-            <Link href={"https://x.com/Proof_bridge"} target="_blank">
+            <Link href={""} target="_blank">
               Blog
             </Link>
           </li>
           <li>
-            <Link href={"https://x.com/Proof_bridge"} target="_blank">
+            <Link href={""} target="_blank">
               X/Twitter
             </Link>
           </li>

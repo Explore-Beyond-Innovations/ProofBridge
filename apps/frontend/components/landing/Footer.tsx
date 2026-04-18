@@ -20,7 +20,7 @@ export const Footer = () => {
           <FaGithub size={24} />
         </Link>
 
-        <Link href={"https://x.com/Proof_bridge"} target="_blank">
+        <Link href={""} target="_blank">
           <FaXTwitter size={24} />
         </Link>
       </div>

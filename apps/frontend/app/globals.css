@@ -164,6 +164,16 @@ input::placeholder {
   transform: scaleX(1);
 }
 
+@media (hover: none) {
+  .signal-line-link > a::after {
+    transform: scaleX(1);
+  }
+}
+
+#mobile-menu .signal-line-link > a {
+  letter-spacing: normal;
+}
+
 #mobile-menu {
   clip-path: circle(0% at 100% 0%);
 }
