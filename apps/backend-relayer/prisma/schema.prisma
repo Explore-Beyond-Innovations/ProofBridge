@@ -28,6 +28,8 @@ model User {
 
   wallets UserWallet[]
 
+  notifications Notification[]
+
   lastFaucetRequestAt DateTime?
 
   createdAt DateTime @default(now())
@@ -340,4 +342,27 @@ model Secret {
   authTag          String
   secretHash       String   @unique
   createdAt        DateTime @default(now())
+}
+
+enum NotificationType {
+  TRADE_CREATED
+  TRADE_LOCKED
+  BRIDGER_CLAIMED
+}
+
+model Notification {
+  id      String           @id @default(uuid())
+  userId  String
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type    NotificationType
+  tradeId String?
+  title   String
+  body    String
+  payload Json?
+  read    Boolean          @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, read, createdAt])
+  @@index([tradeId])
 }

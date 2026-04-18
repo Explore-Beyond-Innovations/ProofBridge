@@ -13,6 +13,7 @@ import { MMRModule } from './modules/mmr/mmr.module';
 import { ViemModule } from './providers/viem/viem.module';
 import { UserModule } from './modules/user/user.module';
 import { FaucetModule } from './modules/faucet/faucet.module';
+import { NotificationModule } from './modules/notifications/notification.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { FaucetModule } from './modules/faucet/faucet.module';
     ViemModule,
     UserModule,
     FaucetModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

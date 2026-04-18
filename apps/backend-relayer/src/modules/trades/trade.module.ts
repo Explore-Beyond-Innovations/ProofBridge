@@ -8,9 +8,16 @@ import { MMRService } from '../mmr/mmr.service';
 import { ProofModule } from '../../providers/noir/proof.module';
 import { EncryptionService } from '@libs/encryption.service';
 import { UserModule } from '../user/user.module';
+import { NotificationModule } from '../notifications/notification.module';
 
 @Module({
-  imports: [JwtModule.register({}), ChainAdapterModule, ProofModule, UserModule],
+  imports: [
+    JwtModule.register({}),
+    ChainAdapterModule,
+    ProofModule,
+    UserModule,
+    NotificationModule,
+  ],
   controllers: [TradesController],
   providers: [
     TradesService,

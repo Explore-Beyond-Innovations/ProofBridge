@@ -27,6 +27,7 @@ import {
   uuidToBigInt,
 } from '../../providers/viem/ethers/typedData';
 import { UserService } from '../user/user.service';
+import { NotificationService } from '../notifications/notification.service';
 
 @Injectable()
 export class TradesService {
@@ -37,6 +38,7 @@ export class TradesService {
     private readonly proofService: ProofService,
     private readonly encryptionService: EncryptionService,
     private readonly users: UserService,
+    private readonly notifications: NotificationService,
   ) {}
 
   async getById(id: string) {
@@ -506,6 +508,26 @@ export class TradesService {
 
         return { tradeId: trade.id, reqContractDetails };
       });
+
+      // Notify the ad creator that a new order landed on their ad. Runs
+      // outside the transaction — notification failures must never roll back
+      // the trade.
+      const adCreatorUserId = await this.notifications.userIdForAddress(
+        ad.creatorAddress,
+      );
+      if (adCreatorUserId) {
+        await this.notifications.safeCreate({
+          userId: adCreatorUserId,
+          type: 'TRADE_CREATED',
+          tradeId: result.tradeId,
+          title: 'New order on your ad',
+          body: `A bridger placed an order from ${ad.route.orderToken.chain.kind === 'EVM' ? 'EVM' : 'Stellar'} to ${ad.route.adToken.chain.kind === 'EVM' ? 'EVM' : 'Stellar'}.`,
+          payload: {
+            adId: ad.id,
+            amount: orderAmount.toFixed(0),
+          },
+        });
+      }
 
       return {
         ...result,
@@ -1201,6 +1223,23 @@ export class TradesService {
         where: { id: tradeLogUpdate.id },
       });
 
+      // On LOCKED transition the ad creator has locked their funds — tell the
+      // bridger they can now unlock on the ad chain.
+      if (status === 'LOCKED') {
+        const bridgerUserId = await this.notifications.userIdForAddress(
+          tradeLogUpdate.trade.bridgerAddress,
+        );
+        if (bridgerUserId) {
+          await this.notifications.safeCreate({
+            userId: bridgerUserId,
+            type: 'TRADE_LOCKED',
+            tradeId: tradeLogUpdate.tradeId,
+            title: 'Your order is locked — claim now',
+            body: 'The ad creator locked funds for your order. You can unlock your tokens on the ad chain.',
+          });
+        }
+      }
+
       return {
         tradeId,
         success: true,
@@ -1350,6 +1389,23 @@ export class TradesService {
       await this.prisma.authorizationLog.delete({
         where: { id: authorizationLog.id },
       });
+
+      // When the bridger has just claimed, nudge the ad creator to unlock
+      // their own side on the order chain.
+      if (!isAdCreator) {
+        const adCreatorUserId = await this.notifications.userIdForAddress(
+          authorizationLog.trade.adCreatorAddress,
+        );
+        if (adCreatorUserId) {
+          await this.notifications.safeCreate({
+            userId: adCreatorUserId,
+            type: 'BRIDGER_CLAIMED',
+            tradeId: authorizationLog.tradeId,
+            title: 'Bridger claimed — your turn',
+            body: 'The bridger unlocked their tokens. You can now unlock yours on the order chain.',
+          });
+        }
+      }
 
       return {
         tradeId: updatedTrade.id,
