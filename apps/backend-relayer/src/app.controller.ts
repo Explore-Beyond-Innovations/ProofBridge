@@ -12,6 +12,12 @@ import { HealthResponse } from './types';
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
+  @Get()
+  @HttpCode(HttpStatus.OK)
+  getRoot(): { message: string } {
+    return { message: 'Welcome to ProofBridge' };
+  }
+
   @Get('health')
   @HttpCode(HttpStatus.OK)
   async getHealth(): Promise<HealthResponse> {
