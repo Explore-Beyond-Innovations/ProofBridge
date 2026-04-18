@@ -509,21 +509,21 @@ export class TradesService {
         return { tradeId: trade.id, reqContractDetails };
       });
 
-      // Notify the ad creator that a new order landed on their ad. Runs
-      // outside the transaction — the address-based helper wraps lookup +
-      // create in one try/catch so neither a Prisma lookup throw nor a
-      // persistence/push failure can roll back (or 500) the trade endpoint
-      // after the trade state has been committed.
-      await this.notifications.safeCreateForAddress(ad.creatorAddress, {
-        type: 'TRADE_CREATED',
-        tradeId: result.tradeId,
-        title: 'New order on your ad',
-        body: `A bridger placed an order from ${ad.route.orderToken.chain.kind === 'EVM' ? 'EVM' : 'Stellar'} to ${ad.route.adToken.chain.kind === 'EVM' ? 'EVM' : 'Stellar'}.`,
-        payload: {
-          adId: ad.id,
-          amount: orderAmount.toFixed(0),
+      // Notify the ad creator that a new order landed on their ad
+      await this.notifications.safeCreateForAddress(
+        ad.creatorAddress,
+        {
+          type: 'TRADE_CREATED',
+          tradeId: result.tradeId,
+          title: 'New order on your ad',
+          body: `A bridger placed an order from ${ad.route.orderToken.chain.kind === 'EVM' ? 'EVM' : 'Stellar'} to ${ad.route.adToken.chain.kind === 'EVM' ? 'EVM' : 'Stellar'}.`,
+          payload: {
+            adId: ad.id,
+            amount: orderAmount.toFixed(0),
+          },
         },
-      });
+        ad.route.adToken.chain.kind,
+      );
 
       return {
         ...result,
@@ -1219,8 +1219,7 @@ export class TradesService {
         where: { id: tradeLogUpdate.id },
       });
 
-      // On LOCKED transition the ad creator has locked their funds — tell the
-      // bridger they can now unlock on the ad chain.
+      // On LOCKED  tell the bridger they can now unlock on the ad chain.
       if (status === 'LOCKED') {
         await this.notifications.safeCreateForAddress(
           tradeLogUpdate.trade.bridgerAddress,
@@ -1230,6 +1229,7 @@ export class TradesService {
             title: 'Your order is locked — claim now',
             body: 'The ad creator locked funds for your order. You can unlock your tokens on the ad chain.',
           },
+          trade.route.orderToken.chain.kind,
         );
       }
 
@@ -1258,9 +1258,9 @@ export class TradesService {
 
   async confirmUnlockChainAction(
     req: Request,
-
     tradeId: string,
-    dto: ConfirmTradeActionDto,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _dto: ConfirmTradeActionDto,
   ) {
     try {
       const reqUser = req.user;
@@ -1383,10 +1383,7 @@ export class TradesService {
         where: { id: authorizationLog.id },
       });
 
-      // When the bridger has just claimed, nudge the ad creator to unlock
-      // their own side on the order chain. Skip if either party had already
-      // claimed — in that case the trade is completing, not starting the
-      // ad-creator's "your turn" window.
+      // process message for unlocks
       if (
         !isAdCreator &&
         !authorizationLog.trade.bridgerClaimed &&
@@ -1400,6 +1397,7 @@ export class TradesService {
             title: 'Bridger claimed — your turn',
             body: 'The bridger unlocked their tokens. You can now unlock yours on the order chain.',
           },
+          trade.route.adToken.chain.kind,
         );
       }
 

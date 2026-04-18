@@ -222,5 +222,30 @@ describe('NotificationService', () => {
 
       expect(result).toBe('user-1');
     });
+
+    it('scopes the lookup by chainKind when provided', async () => {
+      prisma.userWallet.findFirst.mockResolvedValue({ userId: 'user-1' });
+
+      await service.userIdForAddress(
+        '0x1234567890123456789012345678901234567890',
+        'EVM',
+      );
+
+      const call = prisma.userWallet.findFirst.mock.calls[0][0];
+      expect(call.where).toEqual(
+        expect.objectContaining({ chainKind: 'EVM' }),
+      );
+    });
+
+    it('omits chainKind from the lookup when not provided', async () => {
+      prisma.userWallet.findFirst.mockResolvedValue({ userId: 'user-1' });
+
+      await service.userIdForAddress(
+        '0x1234567890123456789012345678901234567890',
+      );
+
+      const call = prisma.userWallet.findFirst.mock.calls[0][0];
+      expect(call.where).not.toHaveProperty('chainKind');
+    });
   });
 });

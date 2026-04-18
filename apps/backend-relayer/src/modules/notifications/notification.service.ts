@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@prisma/prisma.service';
-import { Notification, NotificationType, Prisma } from '@prisma/client';
+import {
+  ChainKind,
+  Notification,
+  NotificationType,
+  Prisma,
+} from '@prisma/client';
 import { normalizeChainAddress } from '../../providers/viem/ethers/typedData';
 import { NotificationGateway } from './notification.gateway';
 
@@ -58,15 +63,13 @@ export class NotificationService {
   }
 
   // Non-throwing "resolve address → notify" helper for lifecycle callers.
-  // The lookup + create are wrapped together so a thrown `userIdForAddress`
-  // (Prisma outage, normalization failure, etc.) never bubbles up into the
-  // trade endpoint and returns 500 after the trade state has been committed.
   async safeCreateForAddress(
     address: string,
     input: Omit<CreateNotificationInput, 'userId'>,
+    chainKind?: ChainKind,
   ): Promise<void> {
     try {
-      const userId = await this.userIdForAddress(address);
+      const userId = await this.userIdForAddress(address, chainKind);
       if (!userId) return;
       await this.create({ ...input, userId });
     } catch (err) {
@@ -85,36 +88,29 @@ export class NotificationService {
         userId,
         ...(query.unreadOnly ? { read: false } : {}),
       },
-      // `id` tiebreaker keeps cursor pagination deterministic when multiple
-      // rows share a `createdAt` timestamp — without it, pages can duplicate
-      // or skip rows during bursts.
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: take + 1,
-      ...(query.cursor
-        ? { cursor: { id: query.cursor }, skip: 1 }
-        : {}),
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     });
 
     const hasMore = rows.length > take;
     const items = hasMore ? rows.slice(0, take) : rows;
-    const nextCursor = hasMore ? items[items.length - 1]?.id ?? null : null;
+    const nextCursor = hasMore ? (items[items.length - 1]?.id ?? null) : null;
     return { items, nextCursor };
   }
 
   async unreadCount(userId: string): Promise<number> {
-    return this.prisma.notification.count({
+    return await this.prisma.notification.count({
       where: { userId, read: false },
     });
   }
 
   async markRead(userId: string, id: string): Promise<Notification | null> {
-    // Idempotent for owned rows — re-marking an already-read notification
-    // should return the row, not 404. Ownership check still gates non-owners
-    // to `null` (→ 404) via the `count === 0` path.
     const row = await this.prisma.notification.updateMany({
       where: { id, userId },
       data: { read: true },
     });
+
     if (row.count === 0) return null;
     return this.prisma.notification.findUnique({ where: { id } });
   }
@@ -128,17 +124,22 @@ export class NotificationService {
   }
 
   // Resolve a wallet address back to the owning user. Returns null if no user
-  // has linked this wallet yet — e.g. a counterparty who hasn't signed up.
-  async userIdForAddress(address: string): Promise<string | null> {
+  async userIdForAddress(
+    address: string,
+    chainKind?: ChainKind,
+  ): Promise<string | null> {
     const normalized = (() => {
       try {
-        return normalizeChainAddress(address);
+        return normalizeChainAddress(address, chainKind);
       } catch {
         return address;
       }
     })();
     const wallet = await this.prisma.userWallet.findFirst({
-      where: { address: normalized },
+      where: {
+        address: normalized,
+        ...(chainKind ? { chainKind } : {}),
+      },
       select: { userId: true },
     });
     return wallet?.userId ?? null;
