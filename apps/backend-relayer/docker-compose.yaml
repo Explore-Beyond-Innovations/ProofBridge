@@ -1,6 +1,7 @@
 services:
   backend-relayer:
     image: ghcr.io/explore-beyond-innovations/proofbridge-backend-relayer:latest
+    pull_policy: always
     restart: unless-stopped
     expose:
       - "2005"
