@@ -78,10 +78,13 @@ export const BridgeTab = () => {
   useEffect(() => {
     const list = tokens?.data
     if (!list?.length) return
-    const preferred = list.find((t) =>
-      PROOFBRIDGE_TOKEN_SYMBOLS.includes(t.symbol?.toUpperCase() ?? ""),
-    )
-    setSelectedTokenId((preferred ?? list[0]).id)
+    setSelectedTokenId((prev) => {
+      if (prev && list.some((t) => t.id === prev)) return prev
+      const preferred = list.find((t) =>
+        PROOFBRIDGE_TOKEN_SYMBOLS.includes(t.symbol?.toUpperCase() ?? ""),
+      )
+      return (preferred ?? list[0]).id
+    })
   }, [tokens])
   return (
     <div className="w-full bg-grey-900 p-4 md:p-6 rounded-md space-y-4 md:space-y-6 tracking-wider">

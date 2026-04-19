@@ -13,6 +13,3 @@ contracts/*/deployments/*.json
 packages/deployment-manifest/dist/
 seed.config.testnet.yaml
 docs/
-pitch_deck_notes.md
-pitch_deck_rework.md
-proofbridge_pitch.pdf
