@@ -67,9 +67,10 @@ export class ViemService {
 
     if (id === sepolia.id) {
       chain = sepolia;
-      if (env.evmRpcApiKey != '') {
-        rpc_url = `https://go.getblock.io/${env.evmRpcApiKey}`;
-      }
+      rpc_url = 'https://sepolia.drpc.org';
+      // if (env.evmRpcApiKey != '') {
+      //   rpc_url = `https://go.getblock.io/${env.evmRpcApiKey}`;
+      // }
     } else if (id === hederaTestnet.id) {
       chain = hederaTestnet;
       if (env.rpcUrlHedera) {
@@ -101,15 +102,17 @@ export class ViemService {
       );
     }
 
+    const transport = rpc_url ? http(rpc_url) : http();
+
     const wallet = createWalletClient({
       chain,
-      transport: http(),
+      transport,
       account: privateKeyToAccount(adminKey),
     });
 
     const client = createPublicClient({
       chain,
-      transport: rpc_url ? http(rpc_url) : http(),
+      transport,
     });
 
     return {
