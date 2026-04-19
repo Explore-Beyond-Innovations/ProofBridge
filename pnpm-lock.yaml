@@ -29,6 +29,34 @@ importers:
         specifier: ^24.3.1
         version: 24.12.2
 
+  apps/auto-merchant-bot:
+    dependencies:
+      '@stellar/stellar-sdk':
+        specifier: ^15.0.1
+        version: 15.0.1
+      axios:
+        specifier: '>=1.15.0'
+        version: 1.15.0
+      ethers:
+        specifier: ^6.15.0
+        version: 6.16.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      siwe:
+        specifier: ^3.0.0
+        version: 3.0.0(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.7
+        version: 22.19.17
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   apps/backend-relayer:
     dependencies:
       '@aztec/bb.js':
