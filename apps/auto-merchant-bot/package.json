@@ -1,0 +1,29 @@
+{
+  "name": "@proofbridge/auto-merchant-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless service that signs in as the testnet admin wallets and auto-locks incoming bridge orders against its own ads — so bridgers on Sepolia ↔ Stellar testnet never hit a dead end from a missing human merchant.",
+  "main": "src/index.ts",
+  "bin": {
+    "auto-merchant-bot": "bin/cli.ts"
+  },
+  "scripts": {
+    "cli": "tsx bin/cli.ts",
+    "start": "tsx --env-file-if-exists=.env bin/cli.ts",
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^15.0.1",
+    "axios": "^1.7.9",
+    "ethers": "^6.15.0",
+    "siwe": "^3.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.3"
+  }
+}
