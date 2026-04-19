@@ -16,16 +16,19 @@ WORKDIR /repo
 # Copy workspace manifests first for better cache hits.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY apps/backend-relayer/package.json apps/backend-relayer/
+COPY packages/deployment-manifest/package.json packages/deployment-manifest/
 
 # Prefetch all workspace deps once.
 RUN pnpm fetch --ignore-scripts
 
-# Now pull in the sources we need to build.
+# Pull in sources. @proofbridge/deployment-manifest is a CJS workspace dep
+# imported by the seed module; its dist/ must exist before nest build
+# typechecks seed.service.ts.
 COPY apps/backend-relayer apps/backend-relayer
+COPY packages/deployment-manifest packages/deployment-manifest
 
-# Install & build the relayer (and only the relayer — avoid compiling every
-# workspace package).
 RUN pnpm install --frozen-lockfile --offline \
+ && pnpm --filter @proofbridge/deployment-manifest run build \
  && pnpm --filter backend-relayer exec prisma generate \
  && pnpm --filter backend-relayer build
 

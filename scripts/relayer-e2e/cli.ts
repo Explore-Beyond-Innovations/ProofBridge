@@ -1,32 +1,14 @@
-// CLI entrypoint for the relayer e2e lifecycle.
+// Relayer E2E CLI — HTTP-level harness. Deploy + seed live elsewhere
+// (scripts/deploy/deploy-contracts.sh, `apps/backend-relayer seed:dev`).
 //
-// Usage:
-//   tsx cli.ts deploy [--out <path>]
-//   tsx cli.ts seed   [--in  <path>]
-//   tsx cli.ts fund   [--in  <path>]
+//   tsx cli.ts fund  --evm-manifest <path> [--stellar-manifest <path>]
 //   tsx cli.ts flows
-//   tsx cli.ts all    [--out <path>]
 //
-// `deploy` brings up the on-chain state and writes a JSON snapshot.
-// `seed`   feeds that snapshot into Postgres via Prisma.
-// `fund`   tops up every known address with native + tradeable tokens:
-//            - DEV_EVM_ADDRESS / DEV_STELLAR_ADDRESS (docker-local dev wallets;
-//              Stellar side gets a friendbot call since it may be fresh)
-//            - STELLAR_AD_CREATOR_SECRET / STELLAR_ORDER_CREATOR_SECRET
-//              (flow identities; already friendbot-funded by start_chains.sh,
-//              so only SEP-41 mints are needed)
-//          Any env var left unset is skipped.
-// `flows`  drives the relayer over HTTP through the ad + trade lifecycles.
-// `all`    runs every step in-process; intended for local dev. In CI, the
-//          shell orchestrator in `e2e.sh` calls the subcommands individually
-//          so Docker can be started in between.
+// `fund` addresses come from env: DEV_{EVM,STELLAR}_ADDRESS,
+// EVM_{AD,ORDER}_CREATOR_PRIVATE_KEY, STELLAR_{AD,ORDER}_CREATOR_SECRET.
 
-import * as fs from "fs";
-import * as path from "path";
 import { Keypair } from "@stellar/stellar-sdk";
 import { privateKeyToAddress } from "viem/accounts";
-import { deploy } from "./lib/deploy.js";
-import { seedDb, type DeployedContracts } from "./lib/seed.js";
 import { fundWallets, type StellarFundTarget } from "./lib/fund.js";
 import { runAdLifecycle } from "./flows/ad-lifecycle.js";
 import { runTradeLifecycle } from "./flows/trade-lifecycle.js";
@@ -37,29 +19,20 @@ function parseFlag(argv: string[], name: string): string | undefined {
   return argv[i + 1];
 }
 
-function defaultSnapshotPath(): string {
-  return path.resolve(process.cwd(), "deployed.json");
-}
-
-function readSnapshot(p: string): DeployedContracts {
-  const raw = fs.readFileSync(p, "utf8");
-  return JSON.parse(raw) as DeployedContracts;
-}
-
-async function cmdDeploy(argv: string[]): Promise<void> {
-  const out = parseFlag(argv, "--out") ?? defaultSnapshotPath();
-  await deploy(out);
-}
-
-async function cmdSeed(argv: string[]): Promise<void> {
-  const inPath = parseFlag(argv, "--in") ?? defaultSnapshotPath();
-  const snapshot = readSnapshot(inPath);
-  await seedDb(snapshot);
+function requireEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`${name} must be set`);
+  return v;
 }
 
 async function cmdFund(argv: string[]): Promise<void> {
-  const inPath = parseFlag(argv, "--in") ?? defaultSnapshotPath();
-  const snapshot = readSnapshot(inPath);
+  const evmManifest = parseFlag(argv, "--evm-manifest");
+  const stellarManifest = parseFlag(argv, "--stellar-manifest");
+  if (!evmManifest) {
+    throw new Error(
+      "cli fund: --evm-manifest <path> is required (--stellar-manifest is optional)",
+    );
+  }
 
   const target = (
     address: string | undefined,
@@ -93,18 +66,14 @@ async function cmdFund(argv: string[]): Promise<void> {
     return;
   }
 
-  await fundWallets(snapshot, {
+  await fundWallets({
     evmAddresses,
     stellarAddresses,
     evmRpcUrl: requireEnv("EVM_RPC_URL"),
     stellarRpcUrl: requireEnv("STELLAR_RPC_URL"),
+    evmManifestPath: evmManifest,
+    stellarManifestPath: stellarManifest,
   });
-}
-
-function requireEnv(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`${name} must be set`);
-  return v;
 }
 
 async function cmdFlows(): Promise<void> {
@@ -112,35 +81,23 @@ async function cmdFlows(): Promise<void> {
   await runTradeLifecycle();
 }
 
-async function cmdAll(argv: string[]): Promise<void> {
-  const out = parseFlag(argv, "--out") ?? defaultSnapshotPath();
-  await deploy(out);
-  await cmdSeed(["--in", out]);
-  await cmdFund(["--in", out]);
-  await cmdFlows();
-}
-
 async function main(): Promise<void> {
   const [, , cmd, ...rest] = process.argv;
   switch (cmd) {
-    case "deploy":
-      await cmdDeploy(rest);
-      return;
-    case "seed":
-      await cmdSeed(rest);
-      return;
     case "fund":
       await cmdFund(rest);
       return;
     case "flows":
       await cmdFlows();
       return;
-    case "all":
-      await cmdAll(rest);
-      return;
     default:
       console.error(
-        `Unknown command '${cmd ?? ""}'. Usage: tsx cli.ts {deploy|seed|fund|flows|all} [--out/--in <path>]`,
+        `Unknown command '${cmd ?? ""}'.\n` +
+          "Usage: tsx cli.ts {fund|flows} [flags]\n\n" +
+          "  fund   --evm-manifest <path> [--stellar-manifest <path>]\n" +
+          "  flows\n\n" +
+          "For deploy + seed see scripts/deploy/deploy-contracts.sh and\n" +
+          "apps/backend-relayer `pnpm seed:dev --config <seed.config.yaml>`.",
       );
       process.exit(2);
   }

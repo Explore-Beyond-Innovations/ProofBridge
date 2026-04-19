@@ -31,15 +31,7 @@ NETWORK_PASSPHRASE="${STELLAR_NETWORK_PASSPHRASE:-Standalone Network ; February 
 ANVIL_PORT="${ANVIL_PORT:-9545}"
 EVM_RPC_URL="http://127.0.0.1:$ANVIL_PORT"
 
-# ── user roles (4 actors drive the flow) ─────────────────────────────
-# 1. Stellar admin     — configures the Stellar AdManager contract.
-# 2. EVM admin         — configures the EVM OrderPortal contract.
-# 3. Ad creator        — Stellar identity creates the ad + locks XLM in;
-#                        supplies an EVM address to receive tokens on unlock.
-# 4. Order creator     — EVM identity creates the order; supplies a Stellar
-#    (aka bridger)       identity (its key must be in the CLI keystore since
-#                        unlock calls order_recipient.require_auth()).
-
+# 4 actors: stellarAdmin, evmAdmin, adCreator (Stellar prim), orderCreator/bridger (EVM prim; Stellar key must be in CLI keystore for require_auth).
 STELLAR_ADMIN_ACCOUNT="${STELLAR_ADMIN_ACCOUNT:-admin}"
 STELLAR_AD_CREATOR_ACCOUNT="${STELLAR_AD_CREATOR_ACCOUNT:-alice}"
 STELLAR_ORDER_CREATOR_ACCOUNT="${STELLAR_ORDER_CREATOR_ACCOUNT:-bridger}"
@@ -157,9 +149,10 @@ forge build --silent
 cd "$ROOT_DIR"
 
 # ── expose addresses, keys, and secrets ──────────────────────────────
-
+# chmod 600: ephemeral localnet creds, but avoid mid-run sniffing on shared hosts.
 ENV_FILE="$ROOT_DIR/.chains.env"
 : > "$ENV_FILE"
+chmod 600 "$ENV_FILE"
 
 emit() {
   local key="$1"
@@ -169,8 +162,7 @@ emit() {
   local escaped="${val//\'/\'\\\'\'}"
   echo "export ${key}='${escaped}'" >> "$ENV_FILE"
   if [[ -n "${GITHUB_ENV:-}" ]]; then
-    # $GITHUB_ENV uses plain KEY=VALUE (no export, no quoting).
-    # Multiline-safe form isn't needed here since none of these contain newlines.
+    # $GITHUB_ENV values aren't auto-masked; only pass ephemeral localnet creds through here.
     echo "${key}=${val}" >> "$GITHUB_ENV"
   fi
 }
