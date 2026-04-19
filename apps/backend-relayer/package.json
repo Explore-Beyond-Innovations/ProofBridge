@@ -19,7 +19,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/e2e/jest-e2e.json",
     "prisma:migrate": "prisma migrate deploy",
-    "seed:dev": "tsx src/cli/seed.ts"
+    "seed:dev": "ts-node -r tsconfig-paths/register src/cli/seed.ts"
   },
   "dependencies": {
     "@aztec/bb.js": "^0.87.0",
@@ -93,7 +93,6 @@
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "tsx": "^4.21.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
   },
