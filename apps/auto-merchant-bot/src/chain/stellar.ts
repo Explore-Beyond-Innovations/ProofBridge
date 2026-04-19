@@ -64,7 +64,14 @@ export async function stellarLockForOrder(
     const got = await server.getTransaction(sent.hash)
     if (got.status === rpc.Api.GetTransactionStatus.SUCCESS) return sent.hash
     if (got.status === rpc.Api.GetTransactionStatus.FAILED) {
-      throw new Error(`stellar tx FAILED hash=${sent.hash}`)
+      // resultXdr is already a base64 string — do not re-encode.
+      const resultXdr =
+        "resultXdr" in got && typeof got.resultXdr === "string"
+          ? got.resultXdr
+          : "<missing>"
+      throw new Error(
+        `stellar tx FAILED hash=${sent.hash} resultXdr=${resultXdr}`,
+      )
     }
     await new Promise((r) => setTimeout(r, interval))
   }

@@ -66,16 +66,16 @@ jobs:
           env.DOKPLOY_AUTO_MERCHANT_BOT_APPLICATION_ID != ''
         run: |
           echo "Triggering Dokploy redeploy for applicationId=${DOKPLOY_AUTO_MERCHANT_BOT_APPLICATION_ID}"
-          response=$(curl -fsS -w "\n%{http_code}" -X POST \
+          status=$(curl -sS -o /tmp/dokploy_resp -w "%{http_code}" -X POST \
             "${DOKPLOY_URL%/}/api/application.deploy" \
             -H "accept: application/json" \
             -H "x-api-key: ${DOKPLOY_API_KEY}" \
             -H "Content-Type: application/json" \
-            -d "{\"applicationId\":\"${DOKPLOY_AUTO_MERCHANT_BOT_APPLICATION_ID}\"}")
-          body=$(echo "${response}" | sed '$d')
-          status=$(echo "${response}" | tail -n1)
+            -d "{\"applicationId\":\"${DOKPLOY_AUTO_MERCHANT_BOT_APPLICATION_ID}\"}" \
+            || echo "000")
+          body=$(cat /tmp/dokploy_resp 2>/dev/null || true)
           echo "Dokploy response (${status}): ${body}"
-          if [ "${status}" -ge 400 ]; then
+          if [ "${status}" -lt 200 ] || [ "${status}" -ge 400 ]; then
             echo "::error::Dokploy returned HTTP ${status}"
             exit 1
           fi

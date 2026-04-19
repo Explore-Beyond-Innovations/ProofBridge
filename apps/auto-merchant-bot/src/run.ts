@@ -29,6 +29,49 @@ function isAlreadyLinked(err: unknown): boolean {
   );
 }
 
+// Thrown when on-chain lock succeeded but /confirm didn't — the caller
+// needs this signal so the trade stays quarantined out of the actionable
+// set (see run loop).
+class PostLockConfirmError extends Error {
+  constructor(
+    readonly txHash: string,
+    readonly cause: unknown,
+  ) {
+    super(
+      `confirmTrade failed after successful on-chain lock (txHash=${txHash}): ${
+        cause instanceof Error ? cause.message : String(cause)
+      }`,
+    );
+    this.name = "PostLockConfirmError";
+  }
+}
+
+async function confirmWithRetry(
+  api: ApiClient,
+  tradeId: string,
+  body: { txHash: string; signature: string },
+  ctx: Record<string, unknown>,
+): Promise<void> {
+  const delays = [2_000, 4_000, 8_000, 16_000, 30_000];
+  let last: unknown;
+  for (let i = 0; i <= delays.length; i++) {
+    try {
+      await confirmTrade(api, tradeId, body);
+      return;
+    } catch (err) {
+      last = err;
+      if (i === delays.length) break;
+      log.warn("confirmTrade retry", {
+        ...ctx,
+        attempt: i + 1,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      await sleep(delays[i]);
+    }
+  }
+  throw new PostLockConfirmError(body.txHash, last);
+}
+
 interface ChainGate {
   busy: boolean;
 }
@@ -109,19 +152,36 @@ export async function run(): Promise<void> {
         if (gates[kind].busy) continue;
         inflight.add(trade.id);
         gates[kind].busy = true;
-        void handleTrade(trade, { api, cfg, evmWallet, stellarKeypair })
-          .catch((err) => {
+        void (async () => {
+          try {
+            await handleTrade(trade, { api, cfg, evmWallet, stellarKeypair });
+            // Success: drop from inflight; the trade is now LOCKED server-
+            // side so subsequent list queries won't return it anyway.
+            inflight.delete(trade.id);
+          } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             log.error("trade handler failed", {
               tradeId: trade.id,
               chain: kind,
               error: msg,
             });
-          })
-          .finally(() => {
+            if (err instanceof PostLockConfirmError) {
+              // On-chain lock already landed but /confirm could not stick.
+              // Keep the trade in `inflight` so the next tick skips it —
+              // otherwise we'd re-lock a trade the contract already
+              // accepted. Recovery requires operator action (restart +
+              // manual /confirm).
+              log.error("trade QUARANTINED in memory to prevent double-lock", {
+                tradeId: trade.id,
+                txHash: err.txHash,
+              });
+            } else {
+              inflight.delete(trade.id);
+            }
+          } finally {
             gates[kind].busy = false;
-            inflight.delete(trade.id);
-          });
+          }
+        })();
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -177,6 +237,11 @@ async function handleTrade(
   }
 
   log.info("confirming on-chain lock", { ...ctx, txHash });
-  await confirmTrade(deps.api, trade.id, { txHash, signature: lock.signature });
+  await confirmWithRetry(
+    deps.api,
+    trade.id,
+    { txHash, signature: lock.signature },
+    ctx,
+  );
   log.info("trade locked ✓", { ...ctx, txHash });
 }

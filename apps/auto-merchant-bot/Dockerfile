@@ -20,4 +20,5 @@ COPY --from=deps /app/apps/auto-merchant-bot/node_modules ./apps/auto-merchant-b
 COPY --from=builder /app/apps/auto-merchant-bot/dist ./apps/auto-merchant-bot/dist
 COPY apps/auto-merchant-bot/package.json ./apps/auto-merchant-bot/
 WORKDIR /app/apps/auto-merchant-bot
+USER node
 CMD ["node", "dist/bin/cli.js"]

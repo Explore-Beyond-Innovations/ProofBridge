@@ -1,5 +1,5 @@
 import { Wallet } from "ethers"
-import { Keypair, Networks, TransactionBuilder } from "@stellar/stellar-sdk"
+import { Keypair, TransactionBuilder } from "@stellar/stellar-sdk"
 import { SiweMessage } from "siwe"
 import type { ApiClient } from "./client.js"
 
@@ -100,9 +100,7 @@ export async function loginEvm(
 export async function loginStellar(
   api: ApiClient,
   keypair: Keypair,
-  passphrase: string = Networks.TESTNET,
 ): Promise<LoginResponse> {
-  void passphrase
   const { transaction } = await signStellar(api, keypair)
   const res = await api.request<LoginResponse>("POST", "v1/auth/login", {
     body: { chainKind: "STELLAR", transaction },

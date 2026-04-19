@@ -5,20 +5,13 @@ const HEX32_RE = /^0x[a-fA-F0-9]{64}$/
 
 function hex32ToBuffer(hex: string): Buffer {
   if (!HEX32_RE.test(hex)) {
-    throw new Error(`expected 0x + 64 hex, got ${hex}`)
-  }
-  return Buffer.from(hex.slice(2), "hex")
-}
-
-function hex32OnlyToBuffer(hex: string): Buffer {
-  if (!HEX32_RE.test(hex)) {
     throw new Error(`expected 0x + 64 hex (32 bytes), got ${hex}`)
   }
   return Buffer.from(hex.slice(2), "hex")
 }
 
 export function hex32ToContractId(hex: string): string {
-  return StrKey.encodeContract(hex32OnlyToBuffer(hex))
+  return StrKey.encodeContract(hex32ToBuffer(hex))
 }
 
 export function bytesN(hex: string): xdr.ScVal {
