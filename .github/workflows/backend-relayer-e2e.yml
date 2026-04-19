@@ -119,13 +119,13 @@ jobs:
             --local --with-test-tokens --fresh \
             --seed-config-out "$GITHUB_WORKSPACE/seed.config.ci.yaml"
 
-      # Resolve the manifests the deploy step wrote (glob, not workflow-env
-      # chain id — keeps us honest if a chain id ever changes).
+      # Resolve manifests against $GITHUB_WORKSPACE so downstream steps that
+      # change cwd (pnpm --filter …) still find the files.
       - name: Expose manifest paths
         run: |
           set -euo pipefail
-          EVM_MANIFEST="$(ls -t contracts/evm/deployments/*.json | head -n1)"
-          STELLAR_MANIFEST="$(ls -t contracts/stellar/deployments/*.json | head -n1)"
+          EVM_MANIFEST="$(ls -t "$GITHUB_WORKSPACE"/contracts/evm/deployments/*.json | head -n1)"
+          STELLAR_MANIFEST="$(ls -t "$GITHUB_WORKSPACE"/contracts/stellar/deployments/*.json | head -n1)"
           echo "EVM_MANIFEST=$EVM_MANIFEST" >> "$GITHUB_ENV"
           echo "STELLAR_MANIFEST=$STELLAR_MANIFEST" >> "$GITHUB_ENV"
 

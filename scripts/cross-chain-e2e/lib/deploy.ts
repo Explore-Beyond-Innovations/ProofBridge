@@ -216,6 +216,16 @@ export async function loadStellarDeployment(opts: {
   const manifestPath =
     opts.manifestPath ?? resolveManifestPath("stellar", opts.chainId);
   const manifest = await readStellarManifest(manifestPath);
+  if (manifest.chain.kind !== "STELLAR") {
+    throw new Error(
+      `[e2e] stellar manifest ${manifestPath} has kind=${manifest.chain.kind}, expected STELLAR`,
+    );
+  }
+  if (BigInt(manifest.chain.chainId) !== opts.chainId) {
+    throw new Error(
+      `[e2e] stellar manifest chain id ${manifest.chain.chainId} does not match expected ${opts.chainId}`,
+    );
+  }
   return {
     verifier: manifest.contracts.verifier.address,
     merkleManager: manifest.contracts.merkleManager.address,
