@@ -47,8 +47,10 @@ export class SeedService {
   }> {
     const { chain, contracts, tokens } = manifest;
     const chainIdBig = BigInt(chain.chainId);
-    const adManagerAddress = contracts.adManager.address;
-    const orderPortalAddress = contracts.orderPortal.address;
+    const dbAddress = (entry: { address: string; addressBytes32: string }) =>
+      chain.kind === 'EVM' ? entry.address : entry.addressBytes32;
+    const adManagerAddress = dbAddress(contracts.adManager);
+    const orderPortalAddress = dbAddress(contracts.orderPortal);
 
     const row = await this.prisma.chain.upsert({
       where: { chainId: chainIdBig },
@@ -70,7 +72,7 @@ export class SeedService {
 
     const byPairKey = new Map<string, string>();
     for (const tok of tokens) {
-      const tokenId = await this.upsertToken(row.id, tok);
+      const tokenId = await this.upsertToken(row.id, tok, chain.kind);
       byPairKey.set(tok.pairKey, tokenId);
     }
 
@@ -83,6 +85,7 @@ export class SeedService {
   private async upsertToken(
     chainUid: string,
     tok: TokenEntry,
+    chainKind: 'EVM' | 'STELLAR',
   ): Promise<string> {
     const assetIssuer = tok.kind === 'SAC' ? (tok.assetIssuer ?? null) : null;
     if (tok.kind === 'SAC' && !assetIssuer) {
@@ -90,15 +93,17 @@ export class SeedService {
         `token ${tok.symbol} is SAC but manifest.assetIssuer is missing`,
       );
     }
+    // Same shape invariant as chain contracts — DB stores 0x + 40/64 hex.
+    const address = chainKind === 'EVM' ? tok.address : tok.addressBytes32;
     const row = await this.prisma.token.upsert({
       where: {
-        chainUid_address: { chainUid, address: tok.address },
+        chainUid_address: { chainUid, address },
       },
       create: {
         chainUid,
         symbol: tok.symbol,
         name: tok.name,
-        address: tok.address,
+        address,
         decimals: tok.decimals,
         kind: tok.kind,
         assetIssuer,

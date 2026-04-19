@@ -125,6 +125,11 @@ export async function loadEvmDeployment(opts: {
 }): Promise<EvmDeployResult> {
   const manifestPath = opts.manifestPath ?? resolveManifestPath("evm", opts.chainId);
   const manifest = await readEvmManifest(manifestPath);
+  if (manifest.chain.kind !== "EVM") {
+    throw new Error(
+      `[e2e] evm manifest ${manifestPath} has kind=${manifest.chain.kind}, expected EVM`,
+    );
+  }
   const { signer, nonces, chainId } = await connectEvm(
     opts.rpcUrl,
     opts.adminPrivateKey,
@@ -167,18 +172,28 @@ export async function loadEvmDeployment(opts: {
     signer,
   );
 
-  const tokens: EvmTokenDeployment[] = manifest.tokens.map((t) => ({
-    pairKey: t.pairKey,
-    name: t.name,
-    symbol: t.symbol,
-    address: t.address,
-    kind: t.kind === "NATIVE" ? "NATIVE" : "ERC20",
-    decimals: t.decimals,
-    contract:
-      t.address.toLowerCase() === EVM_NATIVE_TOKEN_ADDRESS.toLowerCase()
-        ? null
-        : attachContract(t.address, "MockERC20", "MockERC20", signer),
-  }));
+  const tokens: EvmTokenDeployment[] = manifest.tokens.map((t) => {
+    // Reject tokens whose manifest kind isn't an EVM-native kind; silent
+    // coercion to ERC20 would feed stellar strkeys into attachContract and
+    // surface only much later as ABI decode errors.
+    if (t.kind !== "NATIVE" && t.kind !== "ERC20") {
+      throw new Error(
+        `[e2e] evm manifest token pairKey=${t.pairKey} has kind=${t.kind}; expected NATIVE or ERC20`,
+      );
+    }
+    return {
+      pairKey: t.pairKey,
+      name: t.name,
+      symbol: t.symbol,
+      address: t.address,
+      kind: t.kind,
+      decimals: t.decimals,
+      contract:
+        t.address.toLowerCase() === EVM_NATIVE_TOKEN_ADDRESS.toLowerCase()
+          ? null
+          : attachContract(t.address, "MockERC20", "MockERC20", signer),
+    };
+  });
 
   const addresses = {
     verifier: manifest.contracts.verifier.address,

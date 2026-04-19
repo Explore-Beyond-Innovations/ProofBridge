@@ -57,7 +57,15 @@ function refineAddressPair(
   ctx: z.RefinementCtx,
 ): void {
   const expected = expectedBytes32(data.address);
-  if (expected === null) return; // unknown format — pre-checked elsewhere
+  if (expected === null) {
+    // Regex passed but checksum/version failed — don't let the pair sneak through unchecked.
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["address"],
+      message: `address ${data.address} is not a valid EVM address or Stellar strkey (checksum/version failed)`,
+    });
+    return;
+  }
   if (expected.toLowerCase() !== data.addressBytes32.toLowerCase()) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,

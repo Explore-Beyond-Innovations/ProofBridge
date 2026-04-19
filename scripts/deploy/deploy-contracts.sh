@@ -157,6 +157,11 @@ for chain in "${CHAINS[@]}"; do
   fi
   MANIFEST[$chain]="$found"
   log "$chain manifest: $found"
+  # Expose to subsequent CI steps as <CHAIN>_MANIFEST so callers don't need
+  # to re-glob (which would race against stale files on repeat runs).
+  if [[ -n "${GITHUB_ENV:-}" ]]; then
+    echo "${chain^^}_MANIFEST=${found}" >> "$GITHUB_ENV"
+  fi
 done
 
 # ── link every ordered pair ──────────────────────────────────────────
@@ -176,16 +181,21 @@ else
 fi
 
 # ── optional: emit a seed config covering every deployed chain ───────
+# JSON-quote every user-supplied scalar via `node` — JSON strings are a
+# valid subset of YAML, so a password containing YAML metacharacters
+# (leading `!`, `: `, newlines, etc.) can't break the parse or silently
+# load a different value.
 if [[ -n "$SEED_CONFIG_OUT" ]]; then
+  yaml_scalar() { VAL="$1" node -e 'process.stdout.write(JSON.stringify(process.env.VAL ?? ""))'; }
   mkdir -p "$(dirname "$SEED_CONFIG_OUT")"
   {
     echo "admin:"
-    echo "  email: $ADMIN_EMAIL"
-    echo "  password: $ADMIN_PASSWORD"
+    printf '  email: %s\n'    "$(yaml_scalar "$ADMIN_EMAIL")"
+    printf '  password: %s\n' "$(yaml_scalar "$ADMIN_PASSWORD")"
     echo
     echo "chains:"
     for chain in "${CHAINS[@]}"; do
-      echo "  - manifest: ${MANIFEST[$chain]}"
+      printf '  - manifest: %s\n' "$(yaml_scalar "${MANIFEST[$chain]}")"
     done
   } > "$SEED_CONFIG_OUT"
   chmod 600 "$SEED_CONFIG_OUT"
