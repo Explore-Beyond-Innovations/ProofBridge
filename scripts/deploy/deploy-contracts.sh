@@ -107,15 +107,20 @@ else
   eval "$(bash "$SCRIPT_DIR/fetch-contracts-bundle.sh" "${FETCH_ARGS[@]}")"
 fi
 
-# ── source per-chain env files if provided ───────────────────────────
-if [[ -n "$EVM_ENV_FILE" && -f "$EVM_ENV_FILE" ]]; then
-  log "sourcing EVM env from $EVM_ENV_FILE"
-  set -a; source "$EVM_ENV_FILE"; set +a
-fi
-if [[ -n "$STELLAR_ENV_FILE" && -f "$STELLAR_ENV_FILE" ]]; then
-  log "sourcing Stellar env from $STELLAR_ENV_FILE"
-  set -a; source "$STELLAR_ENV_FILE"; set +a
-fi
+declare -A CHAIN_ENV_FILE
+CHAIN_ENV_FILE[evm]="$EVM_ENV_FILE"
+CHAIN_ENV_FILE[stellar]="$STELLAR_ENV_FILE"
+
+run_in_chain() {
+  local chain="$1" cmd="$2"
+  local env_file="${CHAIN_ENV_FILE[$chain]:-}"
+  (
+    if [[ -n "$env_file" && -f "$env_file" ]]; then
+      set -a; source "$env_file"; set +a
+    fi
+    cd "$ROOT_DIR/contracts/$chain/deploy" && eval "$cmd"
+  )
+}
 
 if [[ -z "${GIT_COMMIT:-}" ]] && git -C "$ROOT_DIR" rev-parse --short HEAD >/dev/null 2>&1; then
   export GIT_COMMIT="$(git -C "$ROOT_DIR" rev-parse --short HEAD)"
@@ -136,13 +141,13 @@ fi
 # ── deploy each chain ────────────────────────────────────────────────
 for chain in "${CHAINS[@]}"; do
   log "deploying $chain core"
-  ( cd "$ROOT_DIR/contracts/$chain/deploy" && pnpm --silent cli deploy )
+  run_in_chain "$chain" "pnpm --silent cli deploy"
 done
 
 if [[ $WITH_TEST_TOKENS -eq 1 ]]; then
   for chain in "${CHAINS[@]}"; do
     log "deploying $chain test tokens"
-    ( cd "$ROOT_DIR/contracts/$chain/deploy" && pnpm --silent cli deploy-test-tokens )
+    run_in_chain "$chain" "pnpm --silent cli deploy-test-tokens"
   done
 fi
 
@@ -174,17 +179,12 @@ else
     for peer_chain in "${CHAINS[@]}"; do
       [[ "$local_chain" == "$peer_chain" ]] && continue
       log "linking $local_chain → $peer_chain"
-      ( cd "$ROOT_DIR/contracts/$local_chain/deploy" && \
-        pnpm --silent cli link --peer "${MANIFEST[$peer_chain]}" )
+      run_in_chain "$local_chain" "pnpm --silent cli link --peer ${MANIFEST[$peer_chain]@Q}"
     done
   done
 fi
 
 # ── optional: emit a seed config covering every deployed chain ───────
-# JSON-quote every user-supplied scalar via `node` — JSON strings are a
-# valid subset of YAML, so a password containing YAML metacharacters
-# (leading `!`, `: `, newlines, etc.) can't break the parse or silently
-# load a different value.
 if [[ -n "$SEED_CONFIG_OUT" ]]; then
   yaml_scalar() { VAL="$1" node -e 'process.stdout.write(JSON.stringify(process.env.VAL ?? ""))'; }
   mkdir -p "$(dirname "$SEED_CONFIG_OUT")"

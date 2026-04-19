@@ -18,7 +18,13 @@ import { useGetAllAds } from "@/hooks/useAds"
 import { GiChainLightning } from "react-icons/gi"
 import SkeletonTradeAd from "./SkeletonTradeAd"
 import { chain_icons } from "@/lib/chain-icons"
-import { isVisibleChain, STELLAR_TESTNET_CHAIN_ID } from "@/lib/chains"
+import {
+  isVisibleChain,
+  SEPOLIA_CHAIN_ID,
+  STELLAR_TESTNET_CHAIN_ID,
+} from "@/lib/chains"
+
+const PROOFBRIDGE_TOKEN_SYMBOLS = ["PB", "PBT", "PROOFBRIDGE"]
 import { IoDocumentText } from "react-icons/io5"
 import { Logo } from "../shared/Logo"
 
@@ -41,16 +47,15 @@ export const BridgeTab = () => {
     orderTokenId: selectedTokenId,
   })
 
-  // Defaults come from the chains the backend actually seeded — hardcoding
-  // sepolia/stellar breaks docker-local where those ids may not exist.
   useEffect(() => {
     const visible = chains?.data?.filter((c) => isVisibleChain(c.chainId)) ?? []
     if (!visible.length) return
     setSelectedBaseChainId((prev) =>
       prev && visible.some((c) => c.chainId === prev)
         ? prev
-        : (visible.find((c) => c.chainId === STELLAR_TESTNET_CHAIN_ID) ??
-            visible[0]).chainId,
+        : (visible.find((c) => c.chainId === SEPOLIA_CHAIN_ID) ??
+          visible.find((c) => c.chainId === STELLAR_TESTNET_CHAIN_ID) ??
+          visible[0]).chainId,
     )
   }, [chains])
 
@@ -71,9 +76,12 @@ export const BridgeTab = () => {
   }, [chains, selectedBaseChainId])
 
   useEffect(() => {
-    if (tokens?.data.length) {
-      setSelectedTokenId(tokens.data[0].id)
-    }
+    const list = tokens?.data
+    if (!list?.length) return
+    const preferred = list.find((t) =>
+      PROOFBRIDGE_TOKEN_SYMBOLS.includes(t.symbol?.toUpperCase() ?? ""),
+    )
+    setSelectedTokenId((preferred ?? list[0]).id)
   }, [tokens])
   return (
     <div className="w-full bg-grey-900 p-4 md:p-6 rounded-md space-y-4 md:space-y-6 tracking-wider">
@@ -187,17 +195,15 @@ export const BridgeTab = () => {
                     key={token.id}
                     type="button"
                     onClick={() => setSelectedTokenId(token.id)}
-                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs transition-colors ${
-                      isActive
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs transition-colors ${isActive
                         ? "bg-primary text-black border-primary"
                         : "bg-grey-1000/50 text-grey-100 border-grey-700 hover:border-primary/60 hover:text-primary"
-                    }`}
+                      }`}
                   >
                     <span className="font-semibold">{token.symbol}</span>
                     <span
-                      className={`text-[11px] ${
-                        isActive ? "text-black/70" : "text-grey-400"
-                      }`}
+                      className={`text-[11px] ${isActive ? "text-black/70" : "text-grey-400"
+                        }`}
                     >
                       {token.name}
                     </span>
