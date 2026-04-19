@@ -107,6 +107,8 @@ jobs:
         run: bash scripts/start_chains.sh
 
       # ── 2. deploy contracts + write seed config (ephemeral) ──────────
+      # Absolute path: the seed step below runs pnpm --filter which
+      # rewrites cwd to apps/backend-relayer, so a relative path breaks.
       - name: Deploy contracts
         env:
           ADMIN_EMAIL: ${{ vars.ADMIN_EMAIL || 'admin@x.com' }}
@@ -115,7 +117,7 @@ jobs:
           bash scripts/deploy/deploy-contracts.sh \
             --chains evm,stellar \
             --local --with-test-tokens --fresh \
-            --seed-config-out seed.config.ci.yaml
+            --seed-config-out "$GITHUB_WORKSPACE/seed.config.ci.yaml"
 
       # Resolve the manifests the deploy step wrote (glob, not workflow-env
       # chain id — keeps us honest if a chain id ever changes).
@@ -138,8 +140,9 @@ jobs:
         run: |
           set -euo pipefail
           DATABASE_URL="$HOST_DATABASE_URL" \
-            pnpm --filter backend-relayer run seed:dev --config seed.config.ci.yaml
-          rm -f seed.config.ci.yaml
+            pnpm --filter backend-relayer run seed:dev \
+              --config "$GITHUB_WORKSPACE/seed.config.ci.yaml"
+          rm -f "$GITHUB_WORKSPACE/seed.config.ci.yaml"
 
       # ── 5. fund wallets (reads manifests directly) ───────────────────
       - name: Fund wallets
