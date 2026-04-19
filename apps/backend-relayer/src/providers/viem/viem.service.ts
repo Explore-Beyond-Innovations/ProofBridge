@@ -68,7 +68,7 @@ export class ViemService {
     if (id === sepolia.id) {
       chain = sepolia;
       if (env.evmRpcApiKey != '') {
-        rpc_url = `https://eth-sepolia.g.alchemy.com/v2/${env.evmRpcApiKey}`;
+        rpc_url = `https://go.getblock.io/${env.evmRpcApiKey}`;
       }
     } else if (id === hederaTestnet.id) {
       chain = hederaTestnet;
