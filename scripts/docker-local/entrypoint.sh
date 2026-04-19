@@ -1,19 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# One-shot deploy + migrate + seed for the docker-local stack.
+# Docker-local preamble; delegates deploy+link to deploy-contracts.sh --no-fetch
+# and DB seed to `apps/backend-relayer pnpm seed:dev`.
 #
-# Expects these env vars from docker-compose:
-#   EVM_RPC_URL, STELLAR_RPC_URL, STELLAR_NETWORK_PASSPHRASE,
-#   STELLAR_NETWORK, STELLAR_SOURCE_ACCOUNT, EVM_ADMIN_PRIVATE_KEY,
-#   DATABASE_URL, ROOT_DIR.
-#
-# On success, writes:
-#   /shared/deployed.json        — contract addresses for the seed step
-#   /shared/stellar-admin.secret — secret key consumed by the relayer
+# Env in (from docker-compose): EVM_RPC_URL, STELLAR_RPC_URL,
+#   STELLAR_NETWORK_PASSPHRASE, STELLAR_NETWORK, STELLAR_SOURCE_ACCOUNT,
+#   EVM_ADMIN_PRIVATE_KEY, DATABASE_URL, ROOT_DIR.
+# Out: /shared/stellar-admin.secret
 
 SHARED_DIR="${SHARED_DIR:-/shared}"
-SNAPSHOT_PATH="$SHARED_DIR/deployed.json"
 ADMIN_SECRET_PATH="$SHARED_DIR/stellar-admin.secret"
 mkdir -p "$SHARED_DIR"
 
@@ -34,9 +30,7 @@ done
 log "stellar RPC healthy."
 
 log "waiting for anvil at $EVM_RPC_URL…"
-# Slim deployer image has no `cast` — talk to anvil via raw JSON-RPC.
-# Compose already gates us on `anvil: service_healthy`, so this is a
-# sanity check more than a real wait loop.
+# Raw JSON-RPC probe (no `cast` in this slim image); mostly a sanity check since compose already gated on service_healthy.
 for i in $(seq 1 30); do
   if curl -sf -X POST -H 'Content-Type: application/json' \
        -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
@@ -68,9 +62,6 @@ stellar keys generate "$ADMIN_ACCT" --network "$STELLAR_NETWORK"
 FRIENDBOT_URL="${STELLAR_RPC_URL%/soroban/rpc}/friendbot"
 log "waiting for friendbot at $FRIENDBOT_URL…"
 for i in $(seq 1 90); do
-  # A bare GET returns 400 ("invalid request") once friendbot is actually
-  # serving. Anything in 2xx/4xx means the backend is up; 5xx / 000 mean
-  # the quickstart proxy is up but the friendbot process isn't ready yet.
   code="$(curl -s -o /dev/null -w '%{http_code}' "$FRIENDBOT_URL" || echo 000)"
   case "$code" in
     2*|4*)
@@ -89,31 +80,24 @@ ADMIN_SECRET="$(stellar keys show "$ADMIN_ACCT")"
 printf '%s' "$ADMIN_SECRET" > "$ADMIN_SECRET_PATH"
 log "wrote admin secret → $ADMIN_SECRET_PATH"
 
-# ── deploy contracts ─────────────────────────────────────────────────
-#
-# WASMs, EVM artifacts, and the deposit VK are bind-mounted in from
-# $ROOT_DIR (populated by up.sh from the Proofbridge-Contracts `latest` GitHub Release,
-# or from the repo's locally-built tree via `up.sh --local`). Sanity-check
-# their presence before running deploy so missing artifacts fail fast.
+# ── point the per-chain deploy CLIs at the bind-mounted bundle ───────
+# Artifacts were fetched+extracted by `up.sh` and bind-mounted into $ROOT_DIR.
+export EVM_OUT_DIR="$ROOT_DIR/contracts/evm/out"
+export STELLAR_WASM_DIR="$ROOT_DIR/contracts/stellar/target/wasm32v1-none/release"
+export STELLAR_DEPOSIT_VK="$ROOT_DIR/proof_circuits/deposits/target/vk"
+export DEPLOY_ENV="${DEPLOY_ENV:-local}"
 
-for wasm in verifier merkle_manager ad_manager order_portal test_token; do
-  path="$ROOT_DIR/contracts/stellar/target/wasm32v1-none/release/${wasm}.wasm"
-  [[ -f "$path" ]] || { log "missing stellar wasm: $path"; exit 1; }
-done
-for sol in OrderPortal AdManager MerkleManager Verifier wNativeToken MockERC20; do
-  [[ -d "$ROOT_DIR/contracts/evm/out/${sol}.sol" ]] \
-    || { log "missing EVM artifact: ${sol}.sol under $ROOT_DIR/contracts/evm/out"; exit 1; }
-done
-[[ -f "$ROOT_DIR/proof_circuits/deposits/target/vk" ]] \
-  || { log "missing deposit VK at $ROOT_DIR/proof_circuits/deposits/target/vk"; exit 1; }
-
-log "deploying contracts…"
-cd "$ROOT_DIR/scripts/relayer-e2e"
-ROOT_DIR="$ROOT_DIR" \
-STELLAR_SOURCE_ACCOUNT="$ADMIN_ACCT" \
-EVM_RPC_URL="$EVM_RPC_URL" \
-EVM_ADMIN_PRIVATE_KEY="$EVM_ADMIN_PRIVATE_KEY" \
-  pnpm exec tsx cli.ts deploy --out "$SNAPSHOT_PATH"
+# ── deploy + link chains + emit seed config ─────────────────────────
+# `--with-test-tokens` is safe here because docker-local is dev-only.
+# Seed config is written into the shared volume so it survives the cd below.
+SEED_CONFIG="$SHARED_DIR/seed.config.yaml"
+log "delegating deploy + link to scripts/deploy/deploy-contracts.sh…"
+bash "$ROOT_DIR/scripts/deploy/deploy-contracts.sh" \
+  --chains evm,stellar \
+  --no-fetch \
+  --with-test-tokens \
+  --fresh \
+  --seed-config-out "$SEED_CONFIG"
 
 # ── db migrations + seed ─────────────────────────────────────────────
 
@@ -122,13 +106,21 @@ cd "$ROOT_DIR/apps/backend-relayer"
 DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy
 
 log "seeding database…"
-cd "$ROOT_DIR/scripts/relayer-e2e"
-DATABASE_URL="$DATABASE_URL" pnpm exec tsx cli.ts seed --in "$SNAPSHOT_PATH"
+# `seed:dev` registers tsconfig-paths so @prisma/* / @libs/* aliases resolve without a build.
+DATABASE_URL="$DATABASE_URL" pnpm --silent seed:dev --config "$SEED_CONFIG"
+
+# Shared volume persists across restarts — shred the password file.
+rm -f "$SEED_CONFIG"
+
+# Recompute manifest paths for downstream fund step.
+EVM_MANIFEST="$(ls -t "$ROOT_DIR"/contracts/evm/deployments/*.json | head -n1)"
+STELLAR_MANIFEST="$(ls -t "$ROOT_DIR"/contracts/stellar/deployments/*.json | head -n1)"
 
 # ── optional: fund frontend dev wallets ──────────────────────────────
 
 if [[ -n "${DEV_EVM_ADDRESS:-}" || -n "${DEV_STELLAR_ADDRESS:-}" ]]; then
   log "funding dev wallets (evm=${DEV_EVM_ADDRESS:-<unset>} stellar=${DEV_STELLAR_ADDRESS:-<unset>})…"
+  cd "$ROOT_DIR/scripts/relayer-e2e"
   ROOT_DIR="$ROOT_DIR" \
   EVM_RPC_URL="$EVM_RPC_URL" \
   STELLAR_RPC_URL="$STELLAR_RPC_URL" \
@@ -137,7 +129,9 @@ if [[ -n "${DEV_EVM_ADDRESS:-}" || -n "${DEV_STELLAR_ADDRESS:-}" ]]; then
   EVM_ADMIN_PRIVATE_KEY="$EVM_ADMIN_PRIVATE_KEY" \
   DEV_EVM_ADDRESS="${DEV_EVM_ADDRESS:-}" \
   DEV_STELLAR_ADDRESS="${DEV_STELLAR_ADDRESS:-}" \
-    pnpm exec tsx cli.ts fund --in "$SNAPSHOT_PATH"
+    pnpm exec tsx cli.ts fund \
+      --evm-manifest "$EVM_MANIFEST" \
+      --stellar-manifest "$STELLAR_MANIFEST"
 fi
 
 log "done ✓"

@@ -1,11 +1,10 @@
 name: Publish Contracts Bundle
 
-# Builds Stellar WASMs, EVM artifacts, and the deposit verifier key, then
-# publishes them as a tarball on two GitHub releases:
+# Builds Stellar WASMs + EVM artifacts + deposit VK, publishes as a tarball on two releases (per-sha + rolling `latest`).
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
     paths:
       - "contracts/**"
       - "proof_circuits/**"
@@ -46,7 +45,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             contracts/stellar/target
-          key: ${{ runner.os }}-cargo-stellar-${{ hashFiles('contracts/stellar/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-stellar-${{
+            hashFiles('contracts/stellar/Cargo.lock') }}
 
       - name: Install Stellar CLI
         run: |
@@ -78,11 +78,6 @@ jobs:
 
       - name: Build deposit circuit VK
         run: scripts/build_circuits.sh proof_circuits/deposits
-
-      # ── bundle ──────────────────────────────────────────────────────
-      # Layout mirrors the on-disk paths the docker-local deployer expects
-      # (deploy.ts reads from these directories verbatim), so the frontend
-      # dev just extracts the tarball into a bind-mount root.
       - name: Assemble bundle
         id: bundle
         run: |

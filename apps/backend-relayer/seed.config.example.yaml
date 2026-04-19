@@ -1,0 +1,17 @@
+# Relayer seed config. `chains[].manifest` is a local path or https URL to a
+# deploy-contracts.sh manifest. `admin.password` is argon2-hashed by the seed
+# CLI; for non-dev envs, generate this file from a secret manager.
+
+admin:
+  email: admin@x.com
+  password: ChangeMe123!
+
+chains:
+  - manifest: ../../contracts/evm/deployments/11155111.json
+  - manifest: ../../contracts/stellar/deployments/1000001.json
+
+# Optional: restrict which tokens get routed. Omit to route every pairKey
+# that's common across all chains.
+#
+# routes:
+#   include: ["eth", "xlm", "pb"]

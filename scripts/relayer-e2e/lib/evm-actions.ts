@@ -1,31 +1,8 @@
-import * as fs from 'fs';
-import * as path from 'path';
-
-import { ethers } from 'ethers';
-import { EthChainData, AddressLike } from './eth.js';
-
-// Same pattern as scripts/cross-chain-e2e/lib/evm.ts — read Foundry output at
-// runtime from $ROOT_DIR/contracts/evm/out.
-const ROOT_DIR = process.env.ROOT_DIR!;
-const EVM_OUT = path.join(ROOT_DIR ?? '', 'contracts/evm/out');
-
-function loadArtifact(contractFileName: string, contractName: string) {
-  const artifactPath = path.join(
-    EVM_OUT,
-    `${contractFileName}.sol`,
-    `${contractName}.json`,
-  );
-  if (!fs.existsSync(artifactPath)) {
-    throw new Error(`Artifact not found: ${artifactPath}`);
-  }
-  const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
-  return { abi: artifact.abi, bytecode: artifact.bytecode.object };
-}
-
-const AD_MANAGER_ABI = loadArtifact('AdManager', 'AdManager').abi;
-const ORDER_PORTAL_ABI = loadArtifact('OrderPortal', 'OrderPortal').abi;
-const MERKLE_MANAGER_ABI = loadArtifact('MerkleManager', 'MerkleManager').abi;
-const ERC20_MOCK_ABI = loadArtifact('MockERC20', 'MockERC20').abi;
+import { AddressLike } from './eth.js';
+import {
+  getAbi,
+  EVM_NATIVE_TOKEN_ADDRESS,
+} from '@proofbridge/evm-deploy';
 import {
   T_AdManagerOrderParams,
   T_OrderPortalParams,
@@ -38,215 +15,23 @@ import {
   PublicClient,
 } from 'viem';
 
-const DEFAULT_ADMIN_ROLE = ethers.ZeroHash as `0x${string}`;
+// ABIs come from the shared deploy package so we never drift from the
+// addresses the deploy step wrote into the manifest.
+const AD_MANAGER_ABI = getAbi('AdManager', 'AdManager');
+const ORDER_PORTAL_ABI = getAbi('OrderPortal', 'OrderPortal');
+const ERC20_MOCK_ABI = getAbi('MockERC20', 'MockERC20');
 
 // Mirrors contracts/evm/src/libraries/AddressCast.sol NATIVE_TOKEN_ADDRESS.
-const EVM_NATIVE_SENTINEL =
-  '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+// Kept lowercase here for the endsWith-style comparison below.
+const EVM_NATIVE_SENTINEL_LOWER =
+  EVM_NATIVE_TOKEN_ADDRESS.toLowerCase().replace(/^0x/, '');
 
 /**
  * OrderParams encodes addresses as 32-byte values (left-padded for EVM). The
  * low 20 bytes match the sentinel when the order-chain token is native.
  */
 export function isNativeOrderToken(orderChainToken32: string): boolean {
-  return orderChainToken32.slice(-40).toLowerCase() === EVM_NATIVE_SENTINEL.slice(2);
-}
-
-export async function grantManagerRole(
-  publicClient: PublicClient,
-  account: PrivateKeyAccount,
-  chain: EthChainData,
-) {
-  const mgrAddr = account.address;
-
-  const isAdmin = await publicClient.readContract({
-    address: chain.merkleManagerAddress,
-    abi: MERKLE_MANAGER_ABI,
-    functionName: 'hasRole',
-    args: [DEFAULT_ADMIN_ROLE, mgrAddr],
-  });
-
-  if (!isAdmin) throw new Error(`Signer ${mgrAddr} is NOT DEFAULT_ADMIN_ROLE`);
-
-  const MANAGER_ROLE = ethers.id('MANAGER_ROLE');
-
-  const wallet = createWalletClient({
-    chain: publicClient.chain,
-    transport: http(),
-    account,
-  });
-
-  let hash = await wallet.writeContract({
-    chain: publicClient.chain,
-    address: chain.merkleManagerAddress,
-    abi: MERKLE_MANAGER_ABI,
-    functionName: 'grantRole',
-    args: [MANAGER_ROLE, chain.orderPortalAddress],
-  });
-  let receipt = await publicClient.waitForTransactionReceipt({ hash });
-
-  if (receipt.status !== 'success') {
-    throw new Error(`grantRole(OP) tx failed: ${receipt.transactionHash}`);
-  }
-  console.log('Orderportal granted');
-
-  hash = await wallet.writeContract({
-    chain: publicClient.chain,
-    address: chain.merkleManagerAddress,
-    abi: MERKLE_MANAGER_ABI,
-    functionName: 'grantRole',
-    args: [MANAGER_ROLE, chain.adManagerAddress],
-  });
-  receipt = await publicClient.waitForTransactionReceipt({ hash });
-
-  if (receipt.status !== 'success') {
-    throw new Error(`grantRole(AD) tx failed: ${receipt.transactionHash}`);
-  }
-
-  console.log('AdManager granted');
-}
-
-export async function setupAdManager(
-  publicClient: PublicClient,
-  account: PrivateKeyAccount,
-  adChain: EthChainData,
-  orderChain: EthChainData,
-) {
-  const mgrAddr = account.address;
-
-  const wallet = createWalletClient({
-    chain: publicClient.chain,
-    transport: http(),
-    account,
-  });
-
-  const isAdmin = await publicClient.readContract({
-    address: adChain.adManagerAddress,
-    abi: AD_MANAGER_ABI,
-    functionName: 'hasRole',
-    args: [DEFAULT_ADMIN_ROLE, mgrAddr],
-  });
-
-  if (!isAdmin) throw new Error(`Signer ${mgrAddr} is NOT DEFAULT_ADMIN_ROLE`);
-
-  let hash = await wallet.writeContract({
-    chain: publicClient.chain,
-    address: adChain.adManagerAddress,
-    abi: AD_MANAGER_ABI,
-    functionName: 'setChain',
-    args: [BigInt(orderChain.chainId), orderChain.orderPortalAddress, true],
-  });
-
-  let receipt = await publicClient.waitForTransactionReceipt({ hash });
-
-  if (receipt.status !== 'success') {
-    throw new Error(
-      `AdManager.setChain tx failed revert: ${receipt.transactionHash}`,
-    );
-  }
-
-  console.log('AdManager set');
-
-  hash = await wallet.writeContract({
-    chain: publicClient.chain,
-    address: adChain.adManagerAddress,
-    abi: AD_MANAGER_ABI,
-    functionName: 'setTokenRoute',
-    args: [
-      adChain.tokenAddress,
-      orderChain.tokenAddress,
-      BigInt(orderChain.chainId),
-    ],
-  });
-
-  receipt = await publicClient.waitForTransactionReceipt({ hash });
-
-  if (receipt.status !== 'success') {
-    throw new Error(
-      `AdManager.setChain tx failed revert: ${receipt.transactionHash}`,
-    );
-  }
-
-  console.log('AdManager route set');
-}
-
-export async function setupOrderPortal(
-  publicClient: PublicClient,
-  account: PrivateKeyAccount,
-  adChain: EthChainData,
-  orderChain: EthChainData,
-) {
-  const mgrAddr = account.address;
-
-  const wallet = createWalletClient({
-    chain: publicClient.chain,
-    transport: http(),
-    account,
-  });
-
-  const isAdmin = await publicClient.readContract({
-    address: orderChain.orderPortalAddress,
-    abi: AD_MANAGER_ABI,
-    functionName: 'hasRole',
-    args: [DEFAULT_ADMIN_ROLE, mgrAddr],
-  });
-
-  if (!isAdmin) throw new Error(`Signer ${mgrAddr} is NOT DEFAULT_ADMIN_ROLE`);
-
-  let hash = await wallet.writeContract({
-    chain: publicClient.chain,
-    address: orderChain.orderPortalAddress,
-    abi: ORDER_PORTAL_ABI,
-    functionName: 'setChain',
-    args: [BigInt(adChain.chainId), adChain.adManagerAddress, true],
-  });
-
-  let receipt = await publicClient.waitForTransactionReceipt({ hash });
-
-  if (receipt.status !== 'success') {
-    throw new Error(
-      `OrderPortal.setChain tx failed revert: ${receipt.transactionHash}`,
-    );
-  }
-
-  console.log('OrderPortal set');
-
-  hash = await wallet.writeContract({
-    chain: publicClient.chain,
-    address: orderChain.orderPortalAddress,
-    abi: ORDER_PORTAL_ABI,
-    functionName: 'setTokenRoute',
-    args: [
-      orderChain.tokenAddress,
-      BigInt(adChain.chainId),
-      adChain.tokenAddress,
-    ],
-  });
-
-  receipt = await publicClient.waitForTransactionReceipt({ hash });
-
-  if (receipt.status !== 'success') {
-    throw new Error(
-      `OrderPortal.setTokenRoute tx failed revert: ${receipt.transactionHash}`,
-    );
-  }
-
-  console.log('OrderPortal route set');
-}
-
-export async function adminSetup(
-  publicClient: PublicClient,
-  account: PrivateKeyAccount,
-  chain1: EthChainData,
-  chain2: EthChainData,
-) {
-  // On the same provider chain (chain 1)
-  // Setup roles and contracts
-  await grantManagerRole(publicClient, account, chain1);
-  // chain 1 is the ad chain, chain 2 is the order chain for setupAdManager
-  await setupAdManager(publicClient, account, chain1, chain2);
-  // chain 2 is the ad chain, chain 1 is the order chain for setupOrderPortal
-  await setupOrderPortal(publicClient, account, chain2, chain1);
+  return orderChainToken32.slice(-40).toLowerCase() === EVM_NATIVE_SENTINEL_LOWER;
 }
 
 export async function createAd(

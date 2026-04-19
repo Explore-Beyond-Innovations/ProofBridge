@@ -7,6 +7,9 @@
     "@noble/ed25519": "^2.0.0",
     "@noble/hashes": "^1.7.0",
     "@noir-lang/noir_js": "1.0.0-beta.9",
+    "@proofbridge/deployment-manifest": "workspace:*",
+    "@proofbridge/evm-deploy": "workspace:*",
+    "@proofbridge/stellar-deploy": "workspace:*",
     "@zkpassport/poseidon2": "^0.6.2",
     "ethers": "^6.15.0",
     "proofbridge-mmr": "1.0.8"

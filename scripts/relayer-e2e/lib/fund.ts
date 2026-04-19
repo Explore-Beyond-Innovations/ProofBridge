@@ -1,25 +1,17 @@
-// Funds dev wallets and flow test identities against the local docker stack.
-//
-// EVM:    sets native balance via `anvil_setBalance`, then mints each ERC20
-//         tradeable token in the snapshot. Native-sentinel tokens are skipped.
-// Stellar: optionally friendbot-funds the G-address for XLM, then mints each
-//          SEP-41 tradeable token via the stellar CLI. NATIVE XLM has no mint.
-//
-// Addresses are supplied by the caller; pass in any mix of dev wallets
-// (DEV_EVM_ADDRESS / DEV_STELLAR_ADDRESS) and flow identities derived from
-// STELLAR_{AD,ORDER}_CREATOR_SECRET. Flow identities are already friendbot-
-// funded by start_chains.sh, so pass `friendbot: false` for those.
+// Funds dev / flow identities: EVM via anvil_setBalance + ERC20 mint;
+// Stellar via friendbot + SEP-41 mint. Reads contracts/<chain>/deployments/*.json.
 
 import { execFileSync } from "child_process";
 import { ethers } from "ethers";
-import type { DeployedContracts, DeployedTokenStellar } from "./seed.js";
+import {
+  readManifest,
+  type ChainDeploymentManifest,
+  type TokenEntry,
+} from "@proofbridge/deployment-manifest";
+import { EVM_NATIVE_TOKEN_ADDRESS } from "@proofbridge/evm-deploy";
 
 const DEFAULT_NATIVE_WEI = 10n ** 20n; // 100 ETH
 const DEFAULT_TOKEN_UNITS = 1_000_000n; // 1,000,000 (pre-decimals) per token
-
-// Mirrors contracts/evm/src/{OrderPortal,AdManager}.sol NATIVE_TOKEN_ADDRESS.
-const EVM_NATIVE_SENTINEL =
-  "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE".toLowerCase();
 
 export interface StellarFundTarget {
   address: string;
@@ -32,32 +24,38 @@ export interface FundOpts {
   stellarAddresses: StellarFundTarget[];
   evmRpcUrl: string;
   stellarRpcUrl: string;
+  /** Path to the EVM deployment manifest. Required when any EVM address is supplied. */
+  evmManifestPath?: string;
+  /** Path to the Stellar deployment manifest. Required when any Stellar address is supplied. */
+  stellarManifestPath?: string;
   /** Amount of native token units (already applied with 10^18). Defaults to 100 ETH. */
   nativeWei?: bigint;
   /** Human-readable token amount; converted using each token's decimals. Defaults to 1,000,000. */
   tokenAmount?: bigint;
 }
 
-export async function fundWallets(
-  snapshot: DeployedContracts,
-  opts: FundOpts,
-): Promise<void> {
-  await fundEvm(snapshot, opts);
-  await fundStellar(snapshot, opts);
+export async function fundWallets(opts: FundOpts): Promise<void> {
+  if (opts.evmAddresses.length > 0) {
+    if (!opts.evmManifestPath) {
+      throw new Error("[fund] evmAddresses supplied but evmManifestPath is missing");
+    }
+    await fundEvm(await readManifest(opts.evmManifestPath), opts);
+  }
+  if (opts.stellarAddresses.length > 0) {
+    if (!opts.stellarManifestPath) {
+      throw new Error("[fund] stellarAddresses supplied but stellarManifestPath is missing");
+    }
+    await fundStellar(await readManifest(opts.stellarManifestPath), opts);
+  }
 }
 
 async function fundEvm(
-  snapshot: DeployedContracts,
+  manifest: ChainDeploymentManifest,
   opts: FundOpts,
 ): Promise<void> {
   const addresses = opts.evmAddresses
     .map((a) => a.trim())
     .filter((a) => a.length > 0);
-
-  if (addresses.length === 0) {
-    console.log("[fund] EVM: no addresses supplied — skipping EVM funding.");
-    return;
-  }
 
   for (const addr of addresses) {
     if (!ethers.isAddress(addr)) {
@@ -81,8 +79,8 @@ async function fundEvm(
       "0x" + nativeWei.toString(16),
     ]);
 
-    for (const tok of snapshot.eth.tokens) {
-      if (tok.address.toLowerCase() === EVM_NATIVE_SENTINEL) {
+    for (const tok of manifest.tokens) {
+      if (tok.address.toLowerCase() === EVM_NATIVE_TOKEN_ADDRESS.toLowerCase()) {
         console.log(
           `[fund] EVM: skipping mint for ${tok.symbol} — native sentinel (covered by anvil_setBalance).`,
         );
@@ -104,18 +102,13 @@ async function fundEvm(
 }
 
 async function fundStellar(
-  snapshot: DeployedContracts,
+  manifest: ChainDeploymentManifest,
   opts: FundOpts,
 ): Promise<void> {
   const targets = opts.stellarAddresses
     .map((t) => ({ ...t, address: t.address.trim() }))
     .filter((t) => t.address.length > 0);
-  if (targets.length === 0) {
-    console.log(
-      "[fund] Stellar: no addresses supplied — skipping Stellar funding.",
-    );
-    return;
-  }
+
   for (const t of targets) {
     if (!/^G[A-Z2-7]{55}$/.test(t.address)) {
       throw new Error(`[fund] Stellar: not a valid G-strkey: ${t.address}`);
@@ -147,47 +140,27 @@ async function fundStellar(
         }
       }
     }
-
-    mintStellarSep41ToAddress(snapshot, target.address, opts.tokenAmount);
+    mintStellarSep41ToAddress(manifest, target.address, opts.tokenAmount);
   }
 }
 
 function mintStellarSep41ToAddress(
-  snapshot: DeployedContracts,
+  manifest: ChainDeploymentManifest,
   addr: string,
   tokenAmount?: bigint,
 ): void {
-  if (!snapshot.stellar) {
-    console.log(
-      "[fund] Stellar: snapshot has no stellar section — skipping SEP-41 mints.",
-    );
-    return;
-  }
-
   const baseUnits = tokenAmount ?? DEFAULT_TOKEN_UNITS;
-  for (const tok of snapshot.stellar.tokens) {
-    if (tok.kind !== "SEP41") {
-      continue;
-    }
-    if (!tok.contractId) {
-      console.warn(
-        `[fund] Stellar: ${tok.symbol} missing contractId in snapshot; cannot mint.`,
-      );
-      continue;
-    }
+  for (const tok of manifest.tokens) {
+    if (tok.kind !== "SEP41") continue;
     const amount = baseUnits * 10n ** BigInt(tok.decimals);
     console.log(
-      `[fund] Stellar: minting ${baseUnits} ${tok.symbol} (${tok.contractId}) to ${addr}`,
+      `[fund] Stellar: minting ${baseUnits} ${tok.symbol} (${tok.address}) to ${addr}`,
     );
     stellarMint(tok, addr, amount);
   }
 }
 
-function stellarMint(
-  tok: DeployedTokenStellar,
-  to: string,
-  amount: bigint,
-): void {
+function stellarMint(tok: TokenEntry, to: string, amount: bigint): void {
   const network = process.env.STELLAR_NETWORK;
   const source = process.env.STELLAR_SOURCE_ACCOUNT;
   if (!network) throw new Error("[fund] STELLAR_NETWORK not set");
@@ -197,7 +170,7 @@ function stellarMint(
     "contract",
     "invoke",
     "--id",
-    tok.contractId!,
+    tok.address,
     "--source-account",
     source,
     "--network",
