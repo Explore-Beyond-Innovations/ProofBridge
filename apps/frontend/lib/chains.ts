@@ -8,6 +8,7 @@ export const chains: Record<string, Chain> = {
 
 // Stellar is non-EVM so it has no viem `Chain`. Backend seeds this id.
 export const STELLAR_TESTNET_CHAIN_ID = "1000001"
+export const SEPOLIA_CHAIN_ID = String(sepolia.id)
 
 const localChainsEnabled =
   process.env.NEXT_PUBLIC_ENABLE_LOCAL_CHAINS === "true"

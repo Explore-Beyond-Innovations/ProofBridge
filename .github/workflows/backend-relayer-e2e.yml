@@ -126,8 +126,6 @@ jobs:
             pnpm --filter backend-relayer run seed:dev \
               --config "$GITHUB_WORKSPACE/seed.config.ci.yaml"
 
-      # Credentials-bearing; wipe on every exit path so a failure mid-flow
-      # never leaves them on the runner for later steps to snapshot.
       - name: Shred seed config
         if: always()
         run: rm -f "$GITHUB_WORKSPACE/seed.config.ci.yaml"

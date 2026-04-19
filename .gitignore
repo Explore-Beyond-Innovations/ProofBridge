@@ -3,12 +3,13 @@ target
 scripts/docker-local/.artifacts/
 scripts/docker-local/.env
 scripts/deploy/.bundle/
+scripts/deploy/.env.*
+!scripts/deploy/.env.*.example
 dump/
 .chains*
 
-# Deployment manifests are ignored by default to avoid committing ephemeral
-# anvil / stellar-localnet addresses. To track a real prod deployment:
-#   git add -f contracts/<chain>/deployments/<chainId>.json
 contracts/*/deployments/*.json
 !contracts/*/deployments/.gitkeep
 packages/deployment-manifest/dist/
+seed.config.testnet.yaml
+docs/

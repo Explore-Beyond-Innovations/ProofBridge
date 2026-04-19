@@ -318,25 +318,25 @@ export const TradeAd = ({ ...props }: IAd) => {
                 </div>
               </div>
             </div>
+            {props.metadata?.description && (
+              <div className="font-perfectly-nineties text-[15px] italic leading-relaxed text-grey-50 border-l-2 border-primary/60 pl-3 max-h-[150px] overflow-y-auto">
+                {props.metadata.description}
+              </div>
+            )}
             <div className="text-[13px] tracking-wide text-grey-300">
               <p className="font-semibold mb-1">Advertiser Terms</p>
               <div className="grid [grid-template-columns:12px_1fr] gap-0">
                 <Info size={12} className="mt-1" />
-                <div className="">
-                  <p className="pl-3">
-                    Merchants may impose additional terms in the Advertiser
-                    Terms. Kindly read carefully before placing an order. In the
-                    event of any conflict, the Platform&apos;s{" "}
-                    <Link href={"#"} className="!text-primary">
-                      Terms
-                    </Link>{" "}
-                    shall prevail. Violations will not be covered by platform
-                    protection.
-                  </p>
-                  <div className="max-h-[130px] overflow-y-auto mt-2 py-2 pr-2 text-grey-50">
-                    <p>{props.metadata.description}</p>
-                  </div>
-                </div>
+                <p className="pl-3">
+                  Merchants may impose additional terms in the Advertiser
+                  Terms. Kindly read carefully before placing an order. In the
+                  event of any conflict, the Platform&apos;s{" "}
+                  <Link href={"#"} className="!text-primary">
+                    Terms
+                  </Link>{" "}
+                  shall prevail. Violations will not be covered by platform
+                  protection.
+                </p>
               </div>
             </div>
           </div>
@@ -455,6 +455,11 @@ export const TradeAd = ({ ...props }: IAd) => {
           </div>
         </div>
       </Modal>
+      {props.metadata?.title && (
+        <p className="mb-3 text-base font-semibold text-grey-50">
+          {props.metadata.title}
+        </p>
+      )}
       <div className="md:grid md:[grid-template-columns:2fr_1fr_2fr_1fr_1fr] gap-7 items-center text-sm md:py-0 py-2">
         <MerchantInfo {...props} variant="variant_2" />
 

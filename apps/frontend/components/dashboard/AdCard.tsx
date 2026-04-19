@@ -5,7 +5,6 @@ import { IAd } from "@/types/ads"
 import { truncateString } from "@/utils/truncate-string"
 import { ArrowRight, Dot, Shield } from "lucide-react"
 import Image from "next/image"
-import Link from "next/link"
 import React, { useState } from "react"
 import { hederaTestnet, sepolia } from "viem/chains"
 import { VscVerifiedFilled } from "react-icons/vsc"
@@ -46,15 +45,9 @@ export const AdCard = ({ ad }: { ad: IAd }) => {
             />
             <div>
               <div className="inline-flex items-center gap-2">
-                <Link
-                  href={`${explorer_urls[ad?.adToken?.chainId]}/address/${
-                    ad?.adToken?.address
-                  }`}
-                  className="text-sm !underline"
-                  target="_blank"
-                >
+                <span className="text-sm">
                   {ad?.metadata?.title || truncateString(ad?.id, 6, 6)}
-                </Link>
+                </span>
                 <Shield className="text-primary" size={16} />
               </div>
 
