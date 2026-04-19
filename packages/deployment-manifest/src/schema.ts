@@ -27,8 +27,11 @@ export const StrkeySchema = z
 
 // ── contracts ────────────────────────────────────────────────────────────
 
+/** Human-readable chain address: 20-byte EVM hex or 56-char Stellar strkey. */
+export const HumanAddressSchema = z.union([EvmAddressSchema, StrkeySchema]);
+
 export const ContractEntrySchema = z.object({
-  address: z.string().min(1),
+  address: HumanAddressSchema,
   addressBytes32: Bytes32Schema,
 });
 export type ContractEntry = z.infer<typeof ContractEntrySchema>;
@@ -49,12 +52,12 @@ export const TokenEntrySchema = z.object({
   pairKey: z.string().min(1),
   symbol: z.string().min(1),
   name: z.string().min(1),
-  address: z.string().min(1),
+  address: HumanAddressSchema,
   addressBytes32: Bytes32Schema,
   kind: TokenKindSchema,
   decimals: z.number().int().min(0).max(36),
   /** Stellar SAC-only: classic-asset issuer strkey. */
-  assetIssuer: z.string().nullable().optional(),
+  assetIssuer: StrkeySchema.nullable().optional(),
   /** `true` for deploy-time test tokens (MockERC20, test_token SEP-41, etc). */
   isTestToken: z.boolean().default(false),
 });

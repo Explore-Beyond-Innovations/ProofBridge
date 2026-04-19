@@ -8,7 +8,7 @@ import {
   invokeContract,
   getAddress,
   getSecret,
-  base32Decode,
+  decodeEd25519Secret,
   strkeyToHex,
   evmAddressToBytes32,
 } from "./lib/stellar.js";
@@ -116,8 +116,7 @@ async function main() {
 
   // Stellar admin — default CLI source + manager pre-auth signer.
   const stellarAdmin = getAddress();
-  const stellarAdminSecret = base32Decode(getSecret()).slice(1, 33);
-  const stellarAdminSecretKey = Buffer.from(stellarAdminSecret);
+  const stellarAdminSecretKey = decodeEd25519Secret(getSecret());
   const stellarAdminPubKey = Buffer.from(
     (await import("@noble/ed25519")).getPublicKey(stellarAdminSecretKey),
   );

@@ -105,6 +105,10 @@ download_bundle() {
 
   rm -rf "$OUT_DIR"
   mkdir -p "$OUT_DIR"
+  # Reject absolute paths or `..` components before extracting (defence in depth).
+  if tar -tzf "$tmp/bundle.tgz" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+    log "bundle contains unsafe paths; refusing to extract"; exit 1
+  fi
   tar -xzf "$tmp/bundle.tgz" -C "$OUT_DIR"
   log "extracted bundle → $OUT_DIR"
 }
@@ -125,9 +129,7 @@ if ! have_artifact; then
   log "artifact layout incomplete under $OUT_DIR"; exit 1
 fi
 
-# Emit exports for the caller.
-cat <<EOF
-export EVM_OUT_DIR='$OUT_DIR/contracts/evm/out'
-export STELLAR_WASM_DIR='$OUT_DIR/contracts/stellar/target/wasm32v1-none/release'
-export STELLAR_DEPOSIT_VK='$OUT_DIR/proof_circuits/deposits/target/vk'
-EOF
+# Emit shell-escaped exports so `eval "$(fetch-contracts-bundle.sh …)"` survives paths containing quotes/spaces.
+printf 'export EVM_OUT_DIR=%q\n'       "$OUT_DIR/contracts/evm/out"
+printf 'export STELLAR_WASM_DIR=%q\n'  "$OUT_DIR/contracts/stellar/target/wasm32v1-none/release"
+printf 'export STELLAR_DEPOSIT_VK=%q\n' "$OUT_DIR/proof_circuits/deposits/target/vk"

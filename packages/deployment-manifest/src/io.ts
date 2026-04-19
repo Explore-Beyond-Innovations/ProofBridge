@@ -47,14 +47,26 @@ export async function writeManifest(
 /** Fetch a manifest over HTTP(S) — lets the seeder pull from a GitHub Release. */
 export async function fetchManifest(
   url: string,
+  timeoutMs = 30_000,
 ): Promise<ChainDeploymentManifest> {
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(
-      `failed to fetch manifest from ${url}: ${res.status} ${res.statusText}`,
-    );
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) {
+      throw new Error(
+        `failed to fetch manifest from ${url}: ${res.status} ${res.statusText}`,
+      );
+    }
+    return parseManifest(await res.text(), url);
+  } catch (err) {
+    if ((err as { name?: string }).name === "AbortError") {
+      throw new Error(`timed out fetching manifest from ${url} after ${timeoutMs}ms`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
-  return parseManifest(await res.text(), url);
 }
 
 export { CHAIN_DEPLOYMENT_MANIFEST_VERSION };

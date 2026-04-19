@@ -5,6 +5,9 @@
   "description": "Shared schema for per-chain deployment manifests. Consumed by contracts/<chain>/deploy/ CLIs and the backend-relayer seeder.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist"

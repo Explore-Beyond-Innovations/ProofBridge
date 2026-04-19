@@ -8,7 +8,7 @@ export {
   getSecret,
   deploySAC,
   strkeyToHex,
-  base32Decode,
+  decodeEd25519Secret,
 } from "@proofbridge/stellar-deploy";
 
 export { evmAddressToBytes32 } from "@proofbridge/evm-deploy";

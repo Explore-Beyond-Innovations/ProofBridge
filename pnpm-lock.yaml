@@ -440,6 +440,9 @@ importers:
       '@proofbridge/deployment-manifest':
         specifier: workspace:*
         version: link:../../../packages/deployment-manifest
+      '@stellar/stellar-sdk':
+        specifier: ^15.0.1
+        version: 15.0.1
     devDependencies:
       '@types/node':
         specifier: ^22.10.7
