@@ -16,13 +16,13 @@ import {
 import { urls } from "@/utils/urls"
 
 const NETWORK_PASSPHRASE = urls.STELLAR_NETWORK_PASSPHRASE as Networks
+// Restricted to Freighter only while we debug link/sign regressions across
 import { FreighterModule } from "@creit.tech/stellar-wallets-kit/modules/freighter"
-import { AlbedoModule } from "@creit.tech/stellar-wallets-kit/modules/albedo"
-import { LobstrModule } from "@creit.tech/stellar-wallets-kit/modules/lobstr"
-import { xBullModule } from "@creit.tech/stellar-wallets-kit/modules/xbull"
-import { RabetModule } from "@creit.tech/stellar-wallets-kit/modules/rabet"
-import { HanaModule } from "@creit.tech/stellar-wallets-kit/modules/hana"
-
+// import { AlbedoModule } from "@creit.tech/stellar-wallets-kit/modules/albedo"
+// import { LobstrModule } from "@creit.tech/stellar-wallets-kit/modules/lobstr"
+// import { xBullModule } from "@creit.tech/stellar-wallets-kit/modules/xbull"
+// import { RabetModule } from "@creit.tech/stellar-wallets-kit/modules/rabet"
+// import { HanaModule } from "@creit.tech/stellar-wallets-kit/modules/hana"
 interface StellarWalletContextValue {
   address: string | null
   networkPassphrase: string
@@ -68,11 +68,11 @@ export const StellarWalletProvider = ({
       selectedWalletId: cachedWallet,
       modules: [
         new FreighterModule(),
-        new AlbedoModule(),
-        new LobstrModule(),
-        new xBullModule(),
-        new RabetModule(),
-        new HanaModule(),
+        // new AlbedoModule(),
+        // new LobstrModule(),
+        // new xBullModule(),
+        // new RabetModule(),
+        // new HanaModule(),
       ],
     })
 
