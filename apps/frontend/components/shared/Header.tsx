@@ -43,7 +43,7 @@ export const Header = ({ mobileMenuOpen, onToggleMobileMenu }: HeaderProps) => {
           </button>
 
           <div className="flex items-baseline gap-2">
-            <Link href={"/"}>
+            <Link href={""}>
               <Logo />
             </Link>
             <p className="text-sm from-primary to-amber-400 bg-gradient-to-r text-transparent bg-clip-text md:block hidden">
