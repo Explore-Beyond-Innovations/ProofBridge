@@ -20,6 +20,7 @@ import {
 import { config } from "@/utils/wagmi-config";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { formatTxError } from "@/utils/format-tx-error";
 import { useAccount, useWriteContract } from "wagmi";
 import { waitForTransactionReceipt } from "wagmi/actions";
 import { getSingleToken } from "@/services/tokens.service";
@@ -228,10 +229,8 @@ export const useCreateAd = () => {
     onSuccess: () => {
       toast.success("Ad creation was successful");
     },
-    onError: function (error: any) {
-      toast.error(
-        error.response?.data?.message || error.message || "Unable to create ad",
-      );
+    onError: (error: unknown) => {
+      toast.error(formatTxError(error, "Unable to create ad"));
     },
   });
 };
@@ -358,10 +357,8 @@ export const useFundAd = () => {
     onSuccess: () => {
       toast.success("Ad top up was successful");
     },
-    onError: function (error: any) {
-      toast.error(
-        error.response?.data?.message || error.message || "Unable to top up ad",
-      );
+    onError: (error: unknown) => {
+      toast.error(formatTxError(error, "Unable to top up ad"));
     },
   });
 };
@@ -431,10 +428,8 @@ export const useWithdrawFunds = () => {
     onSuccess: () => {
       toast.success("Funds withdrawal was successful");
     },
-    onError: function (error: any) {
-      toast.error(
-        error.response?.data?.message || error.message || "Unable to withdraw",
-      );
+    onError: (error: unknown) => {
+      toast.error(formatTxError(error, "Unable to withdraw"));
     },
   });
 };
@@ -502,10 +497,8 @@ export const useCloseAd = () => {
     onSuccess: () => {
       toast.success("Ad closed successfully");
     },
-    onError: function (error: any) {
-      toast.error(
-        error.response?.data?.message || error.message || "Unable to close ad",
-      );
+    onError: (error: unknown) => {
+      toast.error(formatTxError(error, "Unable to close ad"));
     },
   });
 };
@@ -519,10 +512,8 @@ export const useConfirmAdTx = () => {
     onSuccess: () => {
       toast.success("Tx confirmed successful");
     },
-    onError: function (error: any) {
-      toast.error(
-        error.response?.data?.message || error.message || "Unable to confirm ad",
-      );
+    onError: (error: unknown) => {
+      toast.error(formatTxError(error, "Unable to confirm ad"));
     },
   });
 };
