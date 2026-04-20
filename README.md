@@ -116,12 +116,10 @@ For detailed information about each component of the ProofBridge system, refer t
 Full technical specifications and developer guides are here in  [docs](https://docs.pfbridge.xyz).
 
 ## 👥 Team
-
-![alt text](team_images/team_picture.jpg)
-
 - **Joseph Edoh** - Blockchain Developer,
-- **Ugonna Dike** - Program manager,
+- **Ugonna Dike** - Ecosystem,
 - **Osaretin Frank** - Fullstack Developer.
+- **Isaac Onyemaechi** - Ai Engineer
 
 ## 📜 License
 
