@@ -1,13 +1,6 @@
 "use client"
 import React, { useEffect, useState } from "react"
-import {
-  Alert,
-  Button,
-  Divider,
-  Select,
-  Skeleton,
-  Tooltip,
-} from "antd"
+import { Alert, Button, Divider, Select, Skeleton, Tooltip } from "antd"
 import { ArrowRight, Bot, Clock, Rabbit, Verified } from "lucide-react"
 import Image from "next/image"
 import { TradeAd } from "./TradeAd"
@@ -103,13 +96,13 @@ export const BridgeTab = () => {
             <GiChainLightning />
             <p className="text-sm">From Chain</p>
           </div>
-          <div className="flex items-center gap-2 w-50">
+          <div className="md:flex items-center gap-2 w-50 hidden">
             <GiChainLightning />
             <p className="text-sm">To Chain</p>
           </div>
         </div>
         <div className="flex md:flex-row flex-col md:items-center gap-4">
-          <div className="inline-flex items-center gap-2 bg-grey-800 p-1.25 rounded-sm w-fit">
+          <div className="inline-flex md:flex-row flex-col items-center gap-2 bg-grey-800 p-1.25 rounded-sm md:w-fit w-full">
             {loadingChains ? (
               <>
                 <Skeleton.Button active={true} />
@@ -119,14 +112,17 @@ export const BridgeTab = () => {
               <>
                 <Select
                   onChange={(id) => setSelectedBaseChainId(id)}
-                  className="min-w-[200px] !h-[40px]"
+                  className="md:min-w-[200px] w-full !h-[40px]"
                   value={selectedBaseChainId}
                 >
                   {chains?.data
                     ?.filter((chain) => isVisibleChain(chain.chainId))
                     .map((chain) => {
                       return (
-                        <Select.Option key={chain.chainId} value={chain.chainId}>
+                        <Select.Option
+                          key={chain.chainId}
+                          value={chain.chainId}
+                        >
                           <div className="flex items-center gap-2">
                             {chain_icons[chain.chainId] ? (
                               <Image
@@ -147,33 +143,42 @@ export const BridgeTab = () => {
                 <div>
                   <ArrowRight size={14} />
                 </div>
-                <Select
-                  onChange={(id) => setSelectedDstChainId(id)}
-                  className="min-w-[200px] !h-[40px]"
-                  value={selectedDstChainId}
-                >
-                  {chains?.data
-                    ?.filter((chain) => isVisibleChain(chain.chainId))
-                    .map((chain) => {
-                      return (
-                        <Select.Option key={chain.chainId} value={chain.chainId}>
-                          <div className="flex items-center gap-2">
-                            {chain_icons[chain.chainId] ? (
-                              <Image
-                                src={chain_icons[chain.chainId]}
-                                alt=""
-                                width={20}
-                                height={20}
-                              />
-                            ) : (
-                              <span className="h-5 w-5 rounded-full bg-grey-700" />
-                            )}
-                            <span className="text-[13px]">{chain.name}</span>
-                          </div>
-                        </Select.Option>
-                      )
-                    })}
-                </Select>
+                <div className="w-full">
+                  <div className="flex items-center gap-2 w-50 md:hidden">
+                    <GiChainLightning />
+                    <p className="text-sm">To Chain</p>
+                  </div>
+                  <Select
+                    onChange={(id) => setSelectedDstChainId(id)}
+                    className="md:min-w-[200px] w-full !h-[40px]"
+                    value={selectedDstChainId}
+                  >
+                    {chains?.data
+                      ?.filter((chain) => isVisibleChain(chain.chainId))
+                      .map((chain) => {
+                        return (
+                          <Select.Option
+                            key={chain.chainId}
+                            value={chain.chainId}
+                          >
+                            <div className="flex items-center gap-2">
+                              {chain_icons[chain.chainId] ? (
+                                <Image
+                                  src={chain_icons[chain.chainId]}
+                                  alt=""
+                                  width={20}
+                                  height={20}
+                                />
+                              ) : (
+                                <span className="h-5 w-5 rounded-full bg-grey-700" />
+                              )}
+                              <span className="text-[13px]">{chain.name}</span>
+                            </div>
+                          </Select.Option>
+                        )
+                      })}
+                  </Select>
+                </div>
               </>
             )}
           </div>
