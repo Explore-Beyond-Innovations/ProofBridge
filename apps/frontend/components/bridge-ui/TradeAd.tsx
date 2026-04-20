@@ -2,8 +2,10 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { Avatar, Button, Modal, Skeleton } from "antd"
 import { ArrowRight, Info, Verified } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { IAd } from "@/types/ads"
+import { chain_icons } from "@/lib/chain-icons"
 import { formatUnits, parseUnits } from "viem"
 import { parseToBigInt } from "@/lib/parse-to-bigint"
 import moment from "moment"
@@ -463,8 +465,19 @@ export const TradeAd = ({ ...props }: IAd) => {
       <div className="md:grid md:[grid-template-columns:2fr_1fr_2fr_1fr_1fr] gap-7 items-center text-sm md:py-0 py-2">
         <MerchantInfo {...props} variant="variant_2" />
 
-        <div className="flex items-baseline gap-2 mt-2">
+        <div className="flex items-center gap-2 mt-2">
           <p className="md:hidden block text-xs">Destination Chain: </p>
+          {chain_icons[props.adToken.chainId] ? (
+            <Image
+              src={chain_icons[props.adToken.chainId]}
+              alt=""
+              width={20}
+              height={20}
+              className="shrink-0"
+            />
+          ) : (
+            <span className="h-5 w-5 rounded-full bg-grey-700 shrink-0" />
+          )}
           <p className="md:text-lg text-[16px]">{adChainName}</p>
         </div>
 

@@ -41,9 +41,6 @@ export const useMarkNotificationRead = () => {
     mutationKey: ["mark-notification-read"],
     mutationFn: (id: string) => markNotificationRead(id),
     onSuccess: async () => {
-      // Mark-read is silent — the UI already reflects the change optimistically
-      // via the bell dropdown. Refetch the caches so other tabs / stale reads
-      // pick up the new state.
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_LIST_KEY }),
         queryClient.invalidateQueries({

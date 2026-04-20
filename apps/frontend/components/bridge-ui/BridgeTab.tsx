@@ -25,6 +25,7 @@ import {
 } from "@/lib/chains"
 
 const PROOFBRIDGE_TOKEN_SYMBOLS = ["PB", "PBT", "PROOFBRIDGE"]
+const STELLAR_NATIVE_SYMBOLS = ["XLM"]
 import { IoDocumentText } from "react-icons/io5"
 import { Logo } from "../shared/Logo"
 
@@ -80,12 +81,20 @@ export const BridgeTab = () => {
     if (!list?.length) return
     setSelectedTokenId((prev) => {
       if (prev && list.some((t) => t.id === prev)) return prev
+      // Route-aware default: Stellar → Sepolia prefers XLM (native), all
+      // other routes prefer the PROOFBRIDGE test token. Falls back to the
+      // first token so docker-local stays unbroken.
+      const preferredSymbols =
+        selectedBaseChainId === STELLAR_TESTNET_CHAIN_ID &&
+        selectedDstChainId === SEPOLIA_CHAIN_ID
+          ? STELLAR_NATIVE_SYMBOLS
+          : PROOFBRIDGE_TOKEN_SYMBOLS
       const preferred = list.find((t) =>
-        PROOFBRIDGE_TOKEN_SYMBOLS.includes(t.symbol?.toUpperCase() ?? ""),
+        preferredSymbols.includes(t.symbol?.toUpperCase() ?? ""),
       )
       return (preferred ?? list[0]).id
     })
-  }, [tokens])
+  }, [tokens, selectedBaseChainId, selectedDstChainId])
   return (
     <div className="w-full bg-grey-900 p-4 md:p-6 rounded-md space-y-4 md:space-y-6 tracking-wider">
       <div className="">

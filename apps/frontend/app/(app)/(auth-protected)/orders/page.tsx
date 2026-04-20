@@ -18,13 +18,13 @@ const OrdersPage = () => {
   const items: TabsProps["items"] = [
     {
       key: "incoming",
-      label: "Incoming Orders",
+      label: "My Ads",
       children: <OrdersTable type="incoming" highlight={highlight} />,
     },
 
     {
       key: "outgoing",
-      label: "Outgoing Orders",
+      label: "My Bridges",
       children: <OrdersTable type="outgoing" highlight={highlight} />,
     },
   ]
