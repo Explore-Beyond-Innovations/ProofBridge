@@ -52,7 +52,7 @@ export const TradeAd = ({ ...props }: IAd) => {
   const { data: chainList } = useGetAllChains({ limit: 50 })
   const resolveChainName = (chainId?: string) =>
     chainList?.data?.find((c) => c.chainId === chainId)?.name ?? ""
-  const txFeePercent = 1
+  const txFeePercent = 0
   const [amount, setAmount] = useState("")
   const txFee = Number(amount) * (txFeePercent / 100)
   const account = useAccount()
@@ -61,16 +61,11 @@ export const TradeAd = ({ ...props }: IAd) => {
   const { address: stellarAddress } = useStellarWallet()
   const adapters = useAdapters()
   const [hubOpen, setHubOpen] = useState(false)
-  // The action buttons below trigger the hub whenever a wallet for a given
-  // chain kind is missing or unauthenticated — so both EVM and Stellar users
-  // go through the same connect/sign-in/link flow.
   const adapterFor = (kind: "EVM" | "STELLAR") =>
     adapters.find((a) => a.chainKind === kind)
   const isReady = (kind: "EVM" | "STELLAR") =>
     adapterFor(kind)?.status === "authenticated"
 
-  // Order chain = chain the bridger pays on. Drives which wallet's balance to
-  // read and which connect-flow to surface.
   const isStellarOrder = props.orderToken.chainKind === "STELLAR"
   const nativeBalance = useBalance({
     chainId: Number(props.orderToken.chainId),
@@ -101,8 +96,6 @@ export const TradeAd = ({ ...props }: IAd) => {
     enabled: isStellarOrder && !!stellarAddress,
   })
 
-  // Raw order-chain balance in order-token base units — needed to compare
-  // against the scaled order-chain amount without floating-point rounding.
   const orderBalanceRaw: bigint | undefined = isStellarOrder
     ? stellarBalance.data?.value
     : props.orderToken.kind === "ERC20"
@@ -170,17 +163,12 @@ export const TradeAd = ({ ...props }: IAd) => {
     orderBalanceRaw !== undefined &&
     scaled.orderAmount > orderBalanceRaw,
   )
-  // Disable the Bridge action while the balance query is still in flight —
-  // `insufficientBalance` alone returns `false` when `orderBalanceRaw` is
-  // undefined, which would let users click through and revert on-chain.
+
   const balanceLoading = isStellarOrder
     ? stellarBalance.isLoading
     : balance.isLoading || nativeBalance.isLoading
   const amountError = scaled && !scaled.ok ? scaled.error : null
 
-  // Bridger's receive address lives on the *ad chain* (the destination).
-  // Pick the wallet that matches its kind so we don't send an EVM 0x address
-  // as a Stellar G-strkey (or vice versa).
   const bridgerDstAddress =
     props.adToken.chainKind === "STELLAR" ? stellarAddress : account.address
 
