@@ -5,3 +5,9 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    networks:
+      - dokploy-network
+
+networks:
+  dokploy-network:
+    external: true
