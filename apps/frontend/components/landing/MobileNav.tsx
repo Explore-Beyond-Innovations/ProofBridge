@@ -36,7 +36,7 @@ export const MobileNav = () => {
               timeline.current.reverse(1)
             },
           },
-          "<"
+          "<",
         )
       timeline.current
         .to("#mobile-menu", {
@@ -54,10 +54,10 @@ export const MobileNav = () => {
             duration: 0.7,
             stagger: 0.05,
           },
-          "-=.8"
+          "-=.8",
         )
     },
-    { scope }
+    { scope },
   )
   return (
     <div ref={scope} className="md:hidden inline-block">
@@ -96,7 +96,7 @@ export const MobileNav = () => {
           </li>
           <li className="signal-line-link">
             <Link
-              href={""}
+              href={"https://x.com/Proof_bridge"}
               target="_blank"
               rel="noopener noreferrer"
               className="mobile-link inline-block"
@@ -106,7 +106,7 @@ export const MobileNav = () => {
           </li>
           <li className="signal-line-link">
             <Link
-              href={""}
+              href={"https://x.com/Proof_bridge"}
               target="_blank"
               rel="noopener noreferrer"
               className="mobile-link inline-block"
@@ -116,7 +116,7 @@ export const MobileNav = () => {
           </li>
           <li className="signal-line-link">
             <Link
-              href={""}
+              href={"https://x.com/Proof_bridge"}
               target="_blank"
               rel="noopener noreferrer"
               className="mobile-link inline-block"
