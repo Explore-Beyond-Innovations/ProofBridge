@@ -9,8 +9,14 @@ import {
   useLockFunds,
   useUnLockFunds,
   type UnlockStage,
+  type TxStage,
 } from "@/hooks/useTrades"
-import { UnlockProgress } from "./UnlockProgress"
+import { TxProgress } from "@/components/shared/TxProgress"
+import {
+  LOCK_ORDER_STAGES,
+  UNLOCK_ORDER_STAGES,
+  withApprove,
+} from "@/components/shared/tx-stages"
 import { useAccount } from "wagmi"
 import { truncateString } from "@/utils/truncate-string"
 import { formatChainAddressShort } from "@/utils/format-address"
@@ -178,9 +184,12 @@ export const OrdersTable: React.FC<{
 
   const chainModal = useChainModal()
   const [unlockStage, setUnlockStage] = useState<UnlockStage | null>(null)
+  const [lockStage, setLockStage] = useState<TxStage>(null)
   const { mutateAsync: unlockFunds, isPending: unlockingFunds } =
     useUnLockFunds({ onStage: setUnlockStage })
-  const { mutateAsync: lockFunds, isPending: lockingFunds } = useLockFunds()
+  const { mutateAsync: lockFunds, isPending: lockingFunds } = useLockFunds({
+    onStage: setLockStage,
+  })
   const adapters = useAdapters()
   const [hubOpen, setHubOpen] = useState(false)
   const adapterFor = (kind: ChainKind) =>
@@ -399,7 +408,19 @@ export const OrdersTable: React.FC<{
             </div>
 
             {unlockStage ? (
-              <UnlockProgress stage={unlockStage} />
+              <TxProgress
+                stages={UNLOCK_ORDER_STAGES}
+                stage={unlockStage}
+              />
+            ) : lockStage ? (
+              <TxProgress
+                stages={
+                  tradeInfo.route.adToken.kind === "ERC20"
+                    ? withApprove(LOCK_ORDER_STAGES)
+                    : LOCK_ORDER_STAGES
+                }
+                stage={lockStage}
+              />
             ) : (
               <div className="bg-amber-500/10 p-3 rounded-lg">
                 {tradeInfo.status === "ACTIVE" ? (

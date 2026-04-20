@@ -59,21 +59,34 @@ async function ensureSacTrustline(
   await establishTrustline(ctx, token.symbol, token.assetIssuer);
 }
 
-export const useCreateTrade = () => {
+export type TxStage =
+  | "preparing"
+  | "trustline"
+  | "approving"
+  | "signing"
+  | "submitting"
+  | "confirming"
+  | null;
+
+export const useCreateTrade = (opts?: { onStage?: (s: TxStage) => void }) => {
   const { writeContractAsync } = useWriteContract();
   const { buildCtx: buildStellarCtx, buildTrustlineCtx } = useStellarAdapter();
+  const emit = (s: TxStage) => opts?.onStage?.(s);
   return useMutation({
     mutationKey: ["create-trade"],
     mutationFn: async (data: {
       payload: ICreateTradeRequest;
       orderTokenId: string;
     }) => {
+      emit("preparing");
       const response = await createTrade(data.payload);
       const rc = response.reqContractDetails;
 
       if (rc.chainKind === "STELLAR") {
         const orderToken = await getSingleToken(data.orderTokenId);
+        emit("trustline");
         await ensureSacTrustline(orderToken, buildTrustlineCtx());
+        emit("submitting");
         const txHash = await createOrderSoroban(
           buildStellarCtx(),
           {
@@ -101,6 +114,7 @@ export const useCreateTrade = () => {
             orderPortalHex: rc.contractAddress,
           },
         );
+        emit("confirming");
         await confirmTradeTx({
           txHash,
           signature: rc.signature,
@@ -112,6 +126,7 @@ export const useCreateTrade = () => {
       const token = await getSingleToken(data.orderTokenId);
 
       if (token.kind === "ERC20") {
+        emit("approving");
         const orderTokenAddr = hex32ToAddress20(rc.orderParams.orderChainToken);
         const approveHash = await writeContractAsync({
           address: orderTokenAddr,
@@ -126,6 +141,7 @@ export const useCreateTrade = () => {
         });
 
         if (approveReceipt.status === "success") {
+          emit("submitting");
           const txHash = await writeContractAsync({
             address: rc.contractAddress,
             chainId: Number(rc.chainId),
@@ -157,6 +173,7 @@ export const useCreateTrade = () => {
             hash: txHash,
           });
           if (receipt.status === "success") {
+            emit("confirming");
             await confirmTradeTx({
               txHash: receipt.transactionHash,
               signature: rc.signature,
@@ -173,6 +190,7 @@ export const useCreateTrade = () => {
           throw Error("Transaction failed, Retry");
         }
       } else if (token.kind === "NATIVE") {
+        emit("submitting");
         const amount = formatUnits(BigInt(data.payload.amount), token.decimals);
         const txHash = await writeContractAsync({
           address: rc.contractAddress,
@@ -206,6 +224,7 @@ export const useCreateTrade = () => {
           hash: txHash,
         });
         if (receipt.status === "success") {
+          emit("confirming");
           await confirmTradeTx({
             txHash: receipt.transactionHash,
             signature: rc.signature,
@@ -222,23 +241,28 @@ export const useCreateTrade = () => {
     },
 
     onSuccess: () => {
+      emit(null);
       toast.success("Trade creation was successful");
     },
     onError: (error: unknown) => {
+      emit(null);
       toast.error(formatTxError(error, "Unable to open trade"));
     },
   });
 };
 
-export const useLockFunds = () => {
+export const useLockFunds = (opts?: { onStage?: (s: TxStage) => void }) => {
   const { writeContractAsync } = useWriteContract();
   const { buildCtx: buildStellarCtx } = useStellarAdapter();
+  const emit = (s: TxStage) => opts?.onStage?.(s);
   return useMutation({
     mutationKey: ["lock-fund"],
     mutationFn: async (id: string) => {
+      emit("preparing");
       const response = await lockFunds(id);
 
       if (response.chainKind === "STELLAR") {
+        emit("submitting");
         const txHash = await lockForOrderSoroban(
           buildStellarCtx(),
           {
@@ -266,6 +290,7 @@ export const useLockFunds = () => {
             adManagerHex: response.contractAddress,
           },
         );
+        emit("confirming");
         await confirmTradeTx({
           txHash,
           signature: response.signature,
@@ -274,6 +299,7 @@ export const useLockFunds = () => {
         return response;
       }
 
+      emit("submitting");
       const txHash = await writeContractAsync({
         address: response.contractAddress,
         chainId: Number(response.chainId),
@@ -305,6 +331,7 @@ export const useLockFunds = () => {
         hash: txHash,
       });
       if (receipt.status === "success") {
+        emit("confirming");
         await confirmTradeTx({
           txHash: receipt.transactionHash,
           signature: response.signature,
@@ -320,9 +347,11 @@ export const useLockFunds = () => {
     },
 
     onSuccess: () => {
+      emit(null);
       toast.success("Funds lock was successful");
     },
     onError: (error: unknown) => {
+      emit(null);
       toast.error(formatTxError(error, "Unable to lock funds"));
     },
   });

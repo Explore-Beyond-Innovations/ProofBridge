@@ -21,7 +21,7 @@ import { config } from "@/utils/wagmi-config";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { formatTxError } from "@/utils/format-tx-error";
-import { useAccount, useWriteContract } from "wagmi";
+import { useWriteContract } from "wagmi";
 import { waitForTransactionReceipt } from "wagmi/actions";
 import { getSingleToken } from "@/services/tokens.service";
 import { IToken } from "@/types/tokens";
@@ -95,22 +95,35 @@ async function ensureSacTrustline(
   await establishTrustline(ctx, token.symbol, token.assetIssuer);
 }
 
-export const useCreateAd = () => {
+export type TxStage =
+  | "preparing"
+  | "trustline"
+  | "approving"
+  | "signing"
+  | "submitting"
+  | "confirming"
+  | null;
+
+export const useCreateAd = (opts?: { onStage?: (s: TxStage) => void }) => {
   const { writeContractAsync } = useWriteContract();
   const {
     buildCtx: buildStellarCtx,
     buildTrustlineCtx,
     address: stellarAddress,
   } = useStellarAdapter();
+  const emit = (s: TxStage) => opts?.onStage?.(s);
   return useMutation({
     mutationKey: ["create-ad"],
     mutationFn: async (data: { payload: ICreateAdRequest; token: IToken }) => {
+      emit("preparing");
       const response = await createAd(data.payload);
       const token = data.token;
 
       if (response.chainKind === "STELLAR") {
         if (!stellarAddress) throw new Error("Stellar wallet not connected");
+        emit("trustline");
         await ensureSacTrustline(token, buildTrustlineCtx());
+        emit("submitting");
         const txHash = await createAdSoroban(
           buildStellarCtx(),
           {
@@ -129,6 +142,7 @@ export const useCreateAd = () => {
             adManagerHex: response.contractAddress,
           },
         );
+        emit("confirming");
         await confirmAdTx({
           txHash,
           signature: response.signature,
@@ -138,6 +152,7 @@ export const useCreateAd = () => {
       }
 
       const performERC20Tx = async () => {
+        emit("submitting");
         const txHash = await writeContractAsync({
           address: response.contractAddress,
           abi: AD_MANAGER_ABI,
@@ -159,6 +174,7 @@ export const useCreateAd = () => {
         });
 
         if (receipt.status === "success") {
+          emit("confirming");
           await confirmAdTx({
             txHash: receipt.transactionHash,
             signature: response.signature,
@@ -171,6 +187,7 @@ export const useCreateAd = () => {
         }
       };
       if (token.kind === "ERC20") {
+        emit("approving");
         const approveHash = await writeContractAsync({
           address: token.address,
           abi: ERC20_ABI,
@@ -189,6 +206,7 @@ export const useCreateAd = () => {
         }
       }
       if (token.kind === "NATIVE") {
+        emit("submitting");
         const amount = formatUnits(
           BigInt(data.payload.fundAmount),
           token.decimals
@@ -214,6 +232,7 @@ export const useCreateAd = () => {
           hash: txHash,
         });
         if (txReceipt.status === "success") {
+          emit("confirming");
           await confirmAdTx({
             txHash: txReceipt.transactionHash,
             signature: response.signature,
@@ -227,26 +246,32 @@ export const useCreateAd = () => {
       return response;
     },
     onSuccess: () => {
+      emit(null);
       toast.success("Ad creation was successful");
     },
     onError: (error: unknown) => {
+      emit(null);
       toast.error(formatTxError(error, "Unable to create ad"));
     },
   });
 };
 
-export const useFundAd = () => {
+export const useFundAd = (opts?: { onStage?: (s: TxStage) => void }) => {
   const { writeContractAsync } = useWriteContract();
   const { buildCtx: buildStellarCtx, buildTrustlineCtx } = useStellarAdapter();
+  const emit = (s: TxStage) => opts?.onStage?.(s);
 
   return useMutation({
     mutationKey: ["fund-ad"],
     mutationFn: async (data: ITopUpAdRequest) => {
+      emit("preparing");
       const response = await fundAd(data);
       const token = await getSingleToken(data.tokenId);
 
       if (response.chainKind === "STELLAR") {
+        emit("trustline");
         await ensureSacTrustline(token, buildTrustlineCtx());
+        emit("submitting");
         const txHash = await fundAdSoroban(
           buildStellarCtx(),
           {
@@ -261,6 +286,7 @@ export const useFundAd = () => {
             adManagerHex: response.contractAddress,
           },
         );
+        emit("confirming");
         await confirmAdTx({
           txHash,
           signature: response.signature,
@@ -270,6 +296,7 @@ export const useFundAd = () => {
       }
 
       if (token.kind === "ERC20") {
+        emit("approving");
         const approveHash = await writeContractAsync({
           address: token.address,
           abi: ERC20_ABI,
@@ -283,6 +310,7 @@ export const useFundAd = () => {
         });
 
         if (approveReceipt.status === "success") {
+          emit("submitting");
           const txHash = await writeContractAsync({
             address: response.contractAddress,
             abi: AD_MANAGER_ABI,
@@ -301,6 +329,7 @@ export const useFundAd = () => {
           });
 
           if (receipt.status === "success") {
+            emit("confirming");
             await confirmAdTx({
               txHash: receipt.transactionHash,
               signature: response.signature,
@@ -318,6 +347,7 @@ export const useFundAd = () => {
       }
 
       if (token.kind === "NATIVE") {
+        emit("submitting");
         const amount = formatUnits(
           BigInt(data.amountBigInt.toString()),
           token.decimals
@@ -341,6 +371,7 @@ export const useFundAd = () => {
         });
 
         if (receipt.status === "success") {
+          emit("confirming");
           await confirmAdTx({
             txHash: receipt.transactionHash,
             signature: response.signature,
@@ -355,26 +386,32 @@ export const useFundAd = () => {
       return response;
     },
     onSuccess: () => {
+      emit(null);
       toast.success("Ad top up was successful");
     },
     onError: (error: unknown) => {
+      emit(null);
       toast.error(formatTxError(error, "Unable to top up ad"));
     },
   });
 };
 
-export const useWithdrawFunds = () => {
+export const useWithdrawFunds = (opts?: { onStage?: (s: TxStage) => void }) => {
   const { writeContractAsync } = useWriteContract();
   const { buildCtx: buildStellarCtx } = useStellarAdapter();
+  const emit = (s: TxStage) => opts?.onStage?.(s);
 
   return useMutation({
     mutationKey: ["withdraw-ad"],
     mutationFn: async (data: IWithdrawFromAdRequest) => {
+      emit("preparing");
       const response = await withdrawFromAd(data);
 
       if (response.chainKind === "STELLAR") {
         const ad = await getSingleAd(data.adId);
+        emit("trustline");
         await assertRecipientTrustline(ad.adToken, data.to);
+        emit("submitting");
         const txHash = await withdrawFromAdSoroban(
           buildStellarCtx(),
           {
@@ -390,6 +427,7 @@ export const useWithdrawFunds = () => {
             adManagerHex: response.contractAddress,
           },
         );
+        emit("confirming");
         await confirmAdTx({
           txHash,
           signature: response.signature,
@@ -398,6 +436,7 @@ export const useWithdrawFunds = () => {
         return response;
       }
 
+      emit("submitting");
       const txHash = await writeContractAsync({
         address: response.contractAddress,
         abi: AD_MANAGER_ABI,
@@ -417,6 +456,7 @@ export const useWithdrawFunds = () => {
       });
 
       if (receipt.status === "success") {
+        emit("confirming");
         await confirmAdTx({
           txHash: receipt.transactionHash,
           signature: response.signature,
@@ -426,9 +466,11 @@ export const useWithdrawFunds = () => {
       return response;
     },
     onSuccess: () => {
+      emit(null);
       toast.success("Funds withdrawal was successful");
     },
     onError: (error: unknown) => {
+      emit(null);
       toast.error(formatTxError(error, "Unable to withdraw"));
     },
   });

@@ -13,7 +13,15 @@ import {
   useCloseAd,
   useFundAd,
   useWithdrawFunds,
+  type TxStage,
 } from "@/hooks/useAds"
+import { TxProgress } from "@/components/shared/TxProgress"
+import {
+  FUND_AD_STAGES,
+  WITHDRAW_AD_STAGES,
+  withApprove,
+  withTrustline,
+} from "@/components/shared/tx-stages"
 
 type ActionType = "withdraw" | "top-up" | "close"
 
@@ -57,9 +65,12 @@ export const AdActionsModal: React.FC<Props> = ({
     parseToBigInt(ad?.availableAmount),
     ad?.adToken?.decimals
   )
-  const { mutateAsync: fundAd, isPending: isFundingAd } = useFundAd()
+  const [txStage, setTxStage] = useState<TxStage>(null)
+  const { mutateAsync: fundAd, isPending: isFundingAd } = useFundAd({
+    onStage: setTxStage,
+  })
   const { mutateAsync: withdrawFund, isPending: isWithdrawing } =
-    useWithdrawFunds()
+    useWithdrawFunds({ onStage: setTxStage })
   const { mutateAsync: closeAd, isPending: isClosingAd } = useCloseAd()
 
   const [form] = Form.useForm<{ amount: string }>()
@@ -235,6 +246,25 @@ export const AdActionsModal: React.FC<Props> = ({
             </Form.Item>
           </Form>
         )}
+        {txStage && actionType !== "close" && (() => {
+          const base =
+            actionType === "top-up" ? FUND_AD_STAGES : WITHDRAW_AD_STAGES
+          let stages = base
+          if (ad.adToken.chainKind === "STELLAR" && ad.adToken.kind === "SAC") {
+            stages = withTrustline(stages)
+          } else if (
+            ad.adToken.chainKind === "EVM" &&
+            ad.adToken.kind === "ERC20" &&
+            actionType === "top-up"
+          ) {
+            stages = withApprove(stages)
+          }
+          return (
+            <div className="mt-4">
+              <TxProgress stages={stages} stage={txStage} />
+            </div>
+          )
+        })()}
       </Modal>
     </>
   )

@@ -14,7 +14,13 @@ import { truncateString } from "@/utils/truncate-string"
 import { formatChainAddress } from "@/utils/format-address"
 import { Status } from "../shared/Status"
 import { useAccount, useBalance } from "wagmi"
-import { useCreateTrade } from "@/hooks/useTrades"
+import { useCreateTrade, type TxStage } from "@/hooks/useTrades"
+import { TxProgress } from "@/components/shared/TxProgress"
+import {
+  CREATE_ORDER_STAGES,
+  withApprove,
+  withTrustline,
+} from "@/components/shared/tx-stages"
 import { useChainModal } from "@rainbow-me/rainbowkit"
 import { useStellarWallet } from "@/components/providers/StellarWallet"
 import { useQuery } from "@tanstack/react-query"
@@ -56,7 +62,8 @@ export const TradeAd = ({ ...props }: IAd) => {
   const [amount, setAmount] = useState("")
   const txFee = Number(amount) * (txFeePercent / 100)
   const account = useAccount()
-  const { mutateAsync, isPending } = useCreateTrade()
+  const [createStage, setCreateStage] = useState<TxStage>(null)
+  const { mutateAsync, isPending } = useCreateTrade({ onStage: setCreateStage })
   const { openChainModal } = useChainModal()
   const { address: stellarAddress } = useStellarWallet()
   const adapters = useAdapters()
@@ -415,6 +422,20 @@ export const TradeAd = ({ ...props }: IAd) => {
               )}
             </div>
 
+            {createStage && (
+              <TxProgress
+                stages={
+                  props.orderToken.chainKind === "STELLAR"
+                    ? props.orderToken.kind === "SAC"
+                      ? withTrustline(CREATE_ORDER_STAGES)
+                      : CREATE_ORDER_STAGES
+                    : props.orderToken.kind === "ERC20"
+                      ? withApprove(CREATE_ORDER_STAGES)
+                      : CREATE_ORDER_STAGES
+                }
+                stage={createStage}
+              />
+            )}
             <div className="flex gap-4">
               <Button
                 size="large"
