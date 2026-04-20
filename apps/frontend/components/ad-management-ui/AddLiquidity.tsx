@@ -1,4 +1,10 @@
-import { useCreateAd } from "@/hooks/useAds"
+import { useCreateAd, type TxStage } from "@/hooks/useAds"
+import { TxProgress } from "@/components/shared/TxProgress"
+import {
+  CREATE_AD_STAGES,
+  withApprove,
+  withTrustline,
+} from "@/components/shared/tx-stages"
 import { useGetBridgeRoutes } from "@/hooks/useBridgeRoutes"
 import { toast } from "sonner"
 import { Button, Modal, Select } from "antd"
@@ -64,7 +70,10 @@ export const AddLiquidity = () => {
         : false
 
   const { openChainModal } = useChainModal()
-  const { mutateAsync: createAd, isPending } = useCreateAd()
+  const [createStage, setCreateStage] = useState<TxStage>(null)
+  const { mutateAsync: createAd, isPending } = useCreateAd({
+    onStage: setCreateStage,
+  })
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [amount, setAmount] = useState("")
@@ -566,6 +575,16 @@ export const AddLiquidity = () => {
                 </div>
               </div>
             </div>
+            {createStage && (() => {
+              const token = tokens?.data?.find((t) => t.id === selectedTokenId)
+              let stages = CREATE_AD_STAGES
+              if (baseChainKind === "STELLAR" && token?.kind === "SAC") {
+                stages = withTrustline(stages)
+              } else if (baseChainKind === "EVM" && token?.kind === "ERC20") {
+                stages = withApprove(stages)
+              }
+              return <TxProgress stages={stages} stage={createStage} />
+            })()}
             <Button
               onClick={handleCreateAd}
               className="w-full mt-5"

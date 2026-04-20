@@ -2,48 +2,20 @@
 
 import React, { useEffect, useState } from "react"
 import { Check, Loader2 } from "lucide-react"
-import type { UnlockStage } from "@/hooks/useTrades"
+import type { TxStageDef } from "./tx-stages"
 
-interface StageDef {
-  key: UnlockStage
-  label: string
-  hint: string
+interface TxProgressProps {
+  stages: TxStageDef[]
+  stage: string | null
 }
 
-const STAGES: StageDef[] = [
-  {
-    key: "signing",
-    label: "Sign the unlock request",
-    hint: "Approve in your wallet to authorise the claim.",
-  },
-  {
-    key: "proving",
-    label: "Generating ZK proof",
-    hint: "This is the slow one — usually 30 to 60 seconds. Keep this window open.",
-  },
-  {
-    key: "submitting",
-    label: "Submitting on-chain",
-    hint: "Sending the unlock transaction to the destination chain.",
-  },
-  {
-    key: "confirming",
-    label: "Finalising",
-    hint: "Waiting for the block to confirm your claim.",
-  },
-]
-
-const stageIndex = (s: UnlockStage | null): number =>
-  s ? STAGES.findIndex((d) => d.key === s) : -1
-
-export const UnlockProgress: React.FC<{ stage: UnlockStage | null }> = ({
-  stage,
-}) => {
-  const active = stageIndex(stage)
+export const TxProgress: React.FC<TxProgressProps> = ({ stages, stage }) => {
+  const active = stage ? stages.findIndex((s) => s.key === stage) : -1
+  const activeDef = active >= 0 ? stages[active] : null
   const [elapsed, setElapsed] = useState(0)
 
   useEffect(() => {
-    if (stage !== "proving") {
+    if (!activeDef?.showTimer) {
       setElapsed(0)
       return
     }
@@ -52,20 +24,20 @@ export const UnlockProgress: React.FC<{ stage: UnlockStage | null }> = ({
       setElapsed(Math.floor((Date.now() - started) / 1000))
     }, 250)
     return () => clearInterval(id)
-  }, [stage])
+  }, [activeDef])
 
   if (active < 0) return null
 
   return (
     <div className="space-y-3 rounded-lg bg-grey-900/60 p-4">
       <div>
-        <p className="text-sm font-semibold text-grey-50">Processing unlock</p>
+        <p className="text-sm font-semibold text-grey-50">Processing</p>
         <p className="text-xs text-grey-300">
           Don&apos;t close this window until it finishes.
         </p>
       </div>
       <ul className="space-y-3">
-        {STAGES.map((s, i) => {
+        {stages.map((s, i) => {
           const done = i < active
           const current = i === active
           const upcoming = i > active
@@ -94,7 +66,7 @@ export const UnlockProgress: React.FC<{ stage: UnlockStage | null }> = ({
                   }`}
                 >
                   {s.label}
-                  {current && s.key === "proving" && (
+                  {current && s.showTimer && (
                     <span className="ml-2 font-mono text-xs text-amber-500">
                       {elapsed}s
                     </span>
