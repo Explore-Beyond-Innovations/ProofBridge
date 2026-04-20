@@ -335,14 +335,20 @@ export const useLockFunds = () => {
   });
 };
 
-export const useUnLockFunds = () => {
+export type UnlockStage = "signing" | "proving" | "submitting" | "confirming";
+
+export const useUnLockFunds = (opts?: {
+  onStage?: (stage: UnlockStage | null) => void;
+}) => {
   const { writeContractAsync } = useWriteContract();
   const { signTypedDataAsync } = useSignTypedData();
   const { buildCtx: buildStellarCtx } = useStellarAdapter();
   const { signMessage: signStellarMessage } = useStellarWallet();
+  const emit = (s: UnlockStage | null) => opts?.onStage?.(s);
   return useMutation({
     mutationKey: ["unlock-fund"],
     mutationFn: async (id: string) => {
+      emit("signing");
       const params = await getTradeParams(id);
 
       // Unlock signing depends on the chain the caller is unlocking on — not
@@ -404,7 +410,9 @@ export const useUnLockFunds = () => {
           },
         });
       }
+      emit("proving");
       const response = await unlockFunds({ id, signature });
+      emit("submitting");
 
       // Role determines which contract ABI we hit. Backend ships
       // OrderPortal-shape params (adManager/adChainId) when the caller is the
@@ -454,6 +462,7 @@ export const useUnLockFunds = () => {
                 adManagerHex: response.contractAddress,
               },
             );
+        emit("confirming");
         await confirmUnlockFunds({
           txHash,
           id,
@@ -513,6 +522,7 @@ export const useUnLockFunds = () => {
             ],
           });
 
+      emit("confirming");
       const receipt = await waitForTransactionReceipt(config, {
         hash: txHash,
       });
@@ -532,8 +542,10 @@ export const useUnLockFunds = () => {
 
     onSuccess: () => {
       toast.success("Funds released successfully");
+      emit(null);
     },
     onError: function (error: any) {
+      emit(null);
       toast.error(
         error?.response?.data?.message ||
           error?.message ||

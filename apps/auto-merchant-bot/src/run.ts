@@ -143,12 +143,25 @@ export async function run(): Promise<void> {
         status: "ACTIVE",
         limit: 50,
       });
+      if (data.length > 0) {
+        log.info("poll result", {
+          count: data.length,
+          trades: data.map((t) => ({
+            id: t.id,
+            status: t.status,
+            adCreator: t.adCreatorAddress,
+            adChainKind: t.route.adToken.chain.kind,
+            adChainId: t.route.adToken.chain.chainId,
+            adSymbol: t.route.adToken.symbol,
+          })),
+        });
+      }
       const actionable = data.filter((t) => !inflight.has(t.id));
       if (actionable.length > 0) {
         log.info("found actionable trades", { count: actionable.length });
       }
       for (const trade of actionable) {
-        const kind = trade.adToken.chainKind;
+        const kind = trade.route.adToken.chain.kind;
         if (gates[kind].busy) continue;
         inflight.add(trade.id);
         gates[kind].busy = true;
@@ -203,8 +216,8 @@ async function handleTrade(
   const ctx = {
     tradeId: trade.id,
     adId: trade.adId,
-    chain: trade.adToken.chainKind,
-    symbol: trade.adToken.symbol,
+    chain: trade.route.adToken.chain.kind,
+    symbol: trade.route.adToken.symbol,
   };
 
   if (deps.cfg.DRY_RUN) {

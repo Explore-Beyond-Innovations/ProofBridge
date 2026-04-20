@@ -2,25 +2,35 @@ import type { ApiClient } from "./client.js"
 
 export type TradeStatus = "INACTIVE" | "ACTIVE" | "LOCKED" | "COMPLETED"
 export type ChainKind = "EVM" | "STELLAR"
+export type TokenKind = "ERC20" | "NATIVE" | "SAC" | "SEP41"
 
 export interface TradeTokenSummary {
   id: string
   symbol: string
   address: string
-  chainId: string
-  chainKind: ChainKind
+  kind: TokenKind
   decimals: number
+  chain: {
+    name: string
+    chainId: string
+    kind: ChainKind
+  }
 }
 
 export interface Trade {
   id: string
   adId: string
+  routeId: string
   status: TradeStatus
   adCreatorAddress: string
   bridgerAddress: string
   amount: string
-  adToken: TradeTokenSummary
-  orderToken: TradeTokenSummary
+  route: {
+    id: string
+    adToken: TradeTokenSummary
+    orderToken: TradeTokenSummary
+  }
+  createdAt: string
   updatedAt: string
 }
 
