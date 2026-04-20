@@ -2,6 +2,8 @@
 import { useGSAP } from "@gsap/react"
 import gsap from "gsap"
 import React from "react"
+import { SpecialButton } from "../ui/SpecialButton"
+import { useRouter } from "next/navigation"
 
 export const HeroAlt = () => {
   useGSAP(() => {
@@ -23,9 +25,10 @@ export const HeroAlt = () => {
       y: -100,
     })
   })
+  const router = useRouter()
   return (
     <div
-      className="md:h-[86vh] h-[70vh] w-full home-hero relative"
+      className="md:h-[86vh] h-[72vh] w-full home-hero relative"
       id="home-hero"
     >
       <div className="h-full w-full flex flex-col justify-between">
@@ -43,6 +46,11 @@ export const HeroAlt = () => {
               bridging
             </span>
           </h2>
+        </div>
+        <div className="relative z-5 pt-4 md:hidden block">
+          <SpecialButton onClick={() => router.push("/home")}>
+            Launch App
+          </SpecialButton>
         </div>
       </div>
 
