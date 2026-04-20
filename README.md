@@ -113,27 +113,13 @@ For detailed information about each component of the ProofBridge system, refer t
 
 ## 📚 Documentation
 
-Full technical specifications and developer guides are coming soon in the [docs](./docs) directory.
-Topics will include:
-
-- Contract deployment and setup
-- Proof verification flow
-- Extending ProofBridge to new chains
-- Local development and testing
-
-## 🔗 Quick Links
-
-- **Pitch Deck**: [Proof Bridge Pitch Deck](https://drive.google.com/file/d/1-293K4ucIXvWaurejT1FX6ocZJ0RmEVH/view?usp=drivesdk)
-- **Demo Video**: [Proof Bridge Demo Video](https://www.youtube.com/watch?v=iSAXf1KP-bM)
-- **Web application**: [https://proof-bridge.vercel.app/](https://proof-bridge.vercel.app/)
+Full technical specifications and developer guides are here in  [docs](https://docs.pfbridge.xyz).
 
 ## 👥 Team
-
-![alt text](team_images/team_picture.jpg)
-
 - **Joseph Edoh** - Blockchain Developer,
-- **Ugonna Dike** - Program manager,
+- **Ugonna Dike** - Ecosystem,
 - **Osaretin Frank** - Fullstack Developer.
+- **Isaac Onyemaechi** - Ai Engineer
 
 ## 📜 License
 

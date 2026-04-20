@@ -36,6 +36,7 @@ import type { TrustlineCtx } from "@/utils/stellar/trustline";
 import type { IToken } from "@/types/tokens";
 import { hex32ToAddress20 } from "@/utils/evm/address";
 import { buildStellarUnlockMessage } from "@/utils/stellar/unlock-message";
+import { formatTxError } from "@/utils/format-tx-error";
 
 async function ensureSacTrustline(
   token: IToken,
@@ -223,12 +224,8 @@ export const useCreateTrade = () => {
     onSuccess: () => {
       toast.success("Trade creation was successful");
     },
-    onError: function (error: any) {
-      toast.error(
-        error?.response?.data?.message ||
-          error?.message ||
-          "Unable to open trade",
-      );
+    onError: (error: unknown) => {
+      toast.error(formatTxError(error, "Unable to open trade"));
     },
   });
 };
@@ -325,12 +322,8 @@ export const useLockFunds = () => {
     onSuccess: () => {
       toast.success("Funds lock was successful");
     },
-    onError: function (error: any) {
-      toast.error(
-        error?.response?.data?.message ||
-          error?.message ||
-          "Unable to lock funds",
-      );
+    onError: (error: unknown) => {
+      toast.error(formatTxError(error, "Unable to lock funds"));
     },
   });
 };
@@ -544,13 +537,9 @@ export const useUnLockFunds = (opts?: {
       toast.success("Funds released successfully");
       emit(null);
     },
-    onError: function (error: any) {
+    onError: (error: unknown) => {
       emit(null);
-      toast.error(
-        error?.response?.data?.message ||
-          error?.message ||
-          "Unable to release funds",
-      );
+      toast.error(formatTxError(error, "Unable to release funds"));
     },
   });
 };
