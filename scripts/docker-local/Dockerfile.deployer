@@ -1,14 +1,6 @@
 # syntax=docker/dockerfile:1.7
-#
-# Slim deployer image for the local docker stack.
-#
-# Only the runtime deploy toolkit is baked in (stellar CLI + node + pnpm).
-# Contract artifacts (WASMs, EVM ABIs, deposit VK) are NOT built here — they
-# are pulled by `up.sh` from the Proofbridge-Contracts `latest` GitHub Release and
-# bind-mounted into the container at the paths deploy.ts expects.
-#
-# Image build is ~1 min on a cold cache; rebuilds happen only when
-# workspace manifests or the deploy scripts change.
+# Slim deployer image for docker-local. Runs deploy-contracts.sh + seed
+# inside a container; artifacts are bind-mounted in by up.sh.
 
 FROM node:20-slim
 
@@ -36,35 +28,37 @@ RUN corepack enable && corepack prepare pnpm@10.10.0 --activate
 
 WORKDIR /repo
 
-# Cache-friendly pnpm install — manifests first, then the workspace sources
-# the deployer actually executes.
+# Manifests first for cache hits, then sources.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY apps/backend-relayer/package.json apps/backend-relayer/
 COPY apps/frontend/package.json apps/frontend/
 COPY packages/proofbridge_mmr/package.json packages/proofbridge_mmr/
+COPY packages/deployment-manifest/package.json packages/deployment-manifest/
+COPY contracts/evm/deploy/package.json contracts/evm/deploy/
+COPY contracts/stellar/deploy/package.json contracts/stellar/deploy/
 COPY scripts/relayer-e2e/package.json scripts/relayer-e2e/
-COPY scripts/cross-chain-e2e/package.json scripts/cross-chain-e2e/
 COPY contracts/stellar/tests/fixtures/package.json contracts/stellar/tests/fixtures/
 
-# Sources needed at runtime: backend-relayer for prisma schema/migrations,
-# packages/* for workspace links, scripts/* for the deploy + seed CLIs.
+# Runtime sources: relayer (prisma + seed CLI), per-chain deployers, packages, scripts.
 COPY apps/backend-relayer apps/backend-relayer
+COPY contracts/evm/deploy contracts/evm/deploy
+COPY contracts/stellar/deploy contracts/stellar/deploy
 COPY packages packages
 COPY scripts scripts
 
-# BuildKit cache mount keeps the pnpm store around across rebuilds; the
-# --filter set pulls only the three workspace roots the deployer actually
-# uses plus their transitive workspace deps.
+# Build @proofbridge/deployment-manifest so its dist/ exists for seed CLI consumers.
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --ignore-scripts \
       --filter backend-relayer \
       --filter relayer-e2e \
-      --filter cross-chain-e2e \
+      --filter @proofbridge/deployment-manifest \
+      --filter @proofbridge/evm-deploy \
+      --filter @proofbridge/stellar-deploy \
+ && pnpm --filter @proofbridge/deployment-manifest run build \
  && pnpm --filter backend-relayer exec prisma generate
 
 COPY scripts/docker-local/entrypoint.sh /usr/local/bin/entrypoint.sh
-# Strip any CR bytes in case the script was checked out with CRLF on Windows
-# — `#!/usr/bin/env bash\r` otherwise fails with "bash\r: No such file".
+# Strip CRs so a Windows-checkout shebang `#!/usr/bin/env bash\r` doesn't 404.
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh \
  && chmod +x /usr/local/bin/entrypoint.sh
 

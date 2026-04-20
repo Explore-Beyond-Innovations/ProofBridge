@@ -145,6 +145,9 @@ export class TradesService {
 
       if (q.routeId) where.routeId = q.routeId;
       if (q.adId) where.adId = q.adId;
+      if (q.status) {
+        where.status = Array.isArray(q.status) ? { in: q.status } : q.status;
+      }
       try {
         if (q.participantAddresses && q.participantAddresses.length > 0) {
           const normalized = q.participantAddresses.map((a) =>

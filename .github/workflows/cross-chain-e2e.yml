@@ -2,7 +2,7 @@ name: Cross-Chain E2E
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
     paths:
       - "contracts/**"
       - "proof_circuits/**"
@@ -54,11 +54,14 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20"
           cache: "pnpm"
 
       - name: Install Node dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: pnpm --filter @proofbridge/deployment-manifest run build
 
       - name: Cache cargo directories
         uses: actions/cache@v4
@@ -71,6 +74,11 @@ jobs:
 
       - name: Start chains (Stellar + Anvil) and build contracts
         run: bash scripts/start_chains.sh
+      - name: Deploy contracts
+        run: |
+          bash scripts/deploy/deploy-contracts.sh \
+            --chains evm,stellar \
+            --local --with-test-tokens --fresh
 
       - name: Run cross-chain E2E test
         run: pnpm --filter cross-chain-e2e exec tsx run.ts

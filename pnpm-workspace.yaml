@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "contracts/*"
+  - "contracts/*/deploy"
   - "packages/*"
   - "contracts/stellar/tests/fixtures"
   - "scripts/cross-chain-e2e"

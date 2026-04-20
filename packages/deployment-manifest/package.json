@@ -1,0 +1,23 @@
+{
+  "name": "@proofbridge/deployment-manifest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared schema for per-chain deployment manifests. Consumed by contracts/<chain>/deploy/ CLIs and the backend-relayer seeder.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^15.0.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "typescript": "^5.7.3"
+  }
+}

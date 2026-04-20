@@ -133,6 +133,7 @@ export interface IGetTradesParams {
   maxAmount?: string
   orderTokenId?: string
   adTokenId?: string
+  status?: TradeStatusT | TradeStatusT[]
 }
 
 export interface ITrade {

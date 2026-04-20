@@ -36,13 +36,22 @@ export const useFaucet = () => {
     onSuccess: () => {
       toast.success("Claim was successful")
     },
-    onError: function (error: any, variables, result, ctx) {
-      toast.error(
-        error.response.data.message || error.message || "Unable to tokens",
-        {
-          description: "",
-        }
-      )
+    onError: (error: unknown) => {
+      const e = error as {
+        response?: { data?: { message?: unknown }; status?: number }
+        code?: string
+        message?: string
+      }
+      const serverMsg =
+        typeof e.response?.data?.message === "string"
+          ? e.response.data.message
+          : null
+      const msg =
+        serverMsg ||
+        (e.code ? `${e.code}: ${e.message ?? "request failed"}` : null) ||
+        e.message ||
+        "Unable to request tokens"
+      toast.error(msg)
     },
   })
 }

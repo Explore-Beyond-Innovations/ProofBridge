@@ -1,0 +1,13 @@
+services:
+  auto-merchant-bot:
+    image: ghcr.io/explore-beyond-innovations/proofbridge-auto-merchant-bot:latest
+    pull_policy: always
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - dokploy-network
+
+networks:
+  dokploy-network:
+    external: true

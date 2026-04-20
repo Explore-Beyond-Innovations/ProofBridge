@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
   BadRequestException,
@@ -14,6 +15,8 @@ import { UserService } from '../user/user.service';
 
 @Injectable()
 export class FaucetService {
+  private readonly logger = new Logger(FaucetService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly chainAdapters: ChainAdapterService,
@@ -24,6 +27,10 @@ export class FaucetService {
     req: Request,
     dto: RequestFaucetDto,
   ): Promise<FaucetResponseDto | undefined> {
+    const userId = req.user?.sub;
+    this.logger.log(
+      `[faucet] begin userId=${userId ?? '<none>'} tokenId=${dto.tokenId}`,
+    );
     try {
       const reqUser = req.user;
 
@@ -47,20 +54,30 @@ export class FaucetService {
       if (!token) {
         throw new NotFoundException(`Token with ID ${dto.tokenId} not found`);
       }
+      this.logger.log(
+        `[faucet] token lookup ok symbol=${token.symbol} chainId=${token.chain.chainId} kind=${token.chain.kind}`,
+      );
 
       const recipient = await this.users.getWalletForChain(
         reqUser.sub,
         token.chain.kind,
       );
+      this.logger.log(
+        `[faucet] recipient resolved chainKind=${token.chain.kind} recipient=${recipient}`,
+      );
 
       const provider = this.chainAdapters.forChain(token.chain.kind);
 
       // Check user's token balance
+      this.logger.log(
+        `[faucet] checking balance tokenAddress=${token.address} account=${recipient}`,
+      );
       const balance = await provider.checkTokenBalance({
         chainId: token.chain.chainId.toString(),
         tokenAddress: token.address as `0x${string}`,
         account: recipient as `0x${string}`,
       });
+      this.logger.log(`[faucet] current balance=${balance}`);
 
       // Define threshold (e.g., 10,000 tokens)
       const BALANCE_THRESHOLD = '10000000000000000000000'; // 100k tokens with 18 decimals
@@ -71,11 +88,15 @@ export class FaucetService {
         );
       }
 
+      this.logger.log(
+        `[faucet] minting tokenAddress=${token.address} receiver=${recipient}`,
+      );
       const result = await provider.mintToken({
         chainId: token.chain.chainId.toString(),
         tokenAddress: token.address as `0x${string}`,
         receiver: recipient as `0x${string}`,
       });
+      this.logger.log(`[faucet] mint ok txHash=${result.txHash}`);
 
       return {
         txHash: result.txHash,
@@ -84,6 +105,10 @@ export class FaucetService {
         amount: '1000000',
       };
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.logger.error(
+        `[faucet] failed userId=${userId ?? '<none>'} tokenId=${dto.tokenId}: ${msg}`,
+      );
       if (e instanceof Error) {
         const status = e.message.toLowerCase().includes('forbidden')
           ? HttpStatus.FORBIDDEN

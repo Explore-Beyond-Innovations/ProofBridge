@@ -2,7 +2,7 @@ name: Backend Relayer E2E
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
     paths:
       - "apps/backend-relayer/**"
       - "contracts/**"
@@ -28,7 +28,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  SNAPSHOT_PATH: ${{ github.workspace }}/scripts/relayer-e2e/deployed.json
   COMPOSE_FILE: apps/backend-relayer/docker-compose.e2e.yaml
   COMPOSE_PROJECT_NAME: relayer-e2e
   HOST_DATABASE_URL: postgresql://relayer:relayer@localhost:5433/relayer
@@ -83,6 +82,9 @@ jobs:
       - name: Install Node dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build shared packages
+        run: pnpm --filter @proofbridge/deployment-manifest run build
+
       - name: Cache cargo directories
         uses: actions/cache@v4
         with:
@@ -90,7 +92,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             contracts/stellar/target
-          key: ${{ runner.os }}-cargo-relayer-e2e-${{ hashFiles('contracts/stellar/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-relayer-e2e-${{
+            hashFiles('contracts/stellar/Cargo.lock') }}
 
       - name: Generate Prisma client
         run: pnpm --filter backend-relayer exec prisma generate
@@ -99,28 +102,40 @@ jobs:
       - name: Start chains (Stellar + Anvil) and build contracts
         run: bash scripts/start_chains.sh
 
-      - name: Export chain env
-        run: |
-          # .chains.env uses `export KEY='value'`; $GITHUB_ENV expects KEY=value.
-          sed -E "s/^export[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)='(.*)'$/\1=\2/" .chains.env >> "$GITHUB_ENV"
-
-      # ── 2. deploy ────────────────────────────────────────────────────
+      # ── 2. deploy contracts + write seed config (ephemeral) ──────────
       - name: Deploy contracts
-        run: pnpm --filter relayer-e2e exec tsx cli.ts deploy --out "$SNAPSHOT_PATH"
+        env:
+          ADMIN_EMAIL: ${{ vars.ADMIN_EMAIL || 'admin@x.com' }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'ChangeMe123!' }}
+        run: |
+          bash scripts/deploy/deploy-contracts.sh \
+            --chains evm,stellar \
+            --local --with-test-tokens --fresh \
+            --seed-config-out "$GITHUB_WORKSPACE/seed.config.ci.yaml"
 
       # ── 3. postgres + backend-relayer containers ─────────────────────
       - name: Start postgres + backend-relayer
-        env:
-          STELLAR_NETWORK_PASSPHRASE: "Standalone Network ; February 2017"
-        run: docker compose -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" up -d --build --wait
+        run: docker compose -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" up -d --build
+          --wait
 
-      # ── 4. seed ──────────────────────────────────────────────────────
+      # ── 4. seed (config written by deploy-contracts.sh) ──────────────
       - name: Seed database
-        run: DATABASE_URL="$HOST_DATABASE_URL" pnpm --filter relayer-e2e exec tsx cli.ts seed --in "$SNAPSHOT_PATH"
+        run: |
+          set -euo pipefail
+          DATABASE_URL="$HOST_DATABASE_URL" \
+            pnpm --filter backend-relayer run seed:dev \
+              --config "$GITHUB_WORKSPACE/seed.config.ci.yaml"
 
-      # ── 5. fund wallets ──────────────────────────────────────────────
+      - name: Shred seed config
+        if: always()
+        run: rm -f "$GITHUB_WORKSPACE/seed.config.ci.yaml"
+
+      # ── 5. fund wallets (reads manifests directly) ───────────────────
       - name: Fund wallets
-        run: pnpm --filter relayer-e2e exec tsx cli.ts fund --in "$SNAPSHOT_PATH"
+        run: |
+          pnpm --filter relayer-e2e exec tsx cli.ts fund \
+            --evm-manifest "$EVM_MANIFEST" \
+            --stellar-manifest "$STELLAR_MANIFEST"
 
       # ── 6. flows ─────────────────────────────────────────────────────
       - name: Run lifecycle flows
@@ -142,13 +157,14 @@ jobs:
 
       - name: Stop containers
         if: always()
-        run: docker compose -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" down --remove-orphans --volumes || true
+        run: docker compose -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" down
+          --remove-orphans --volumes || true
 
       - name: Stop chains
         if: always()
         run: bash scripts/stop_chains.sh || true
 
-      - name: Upload logs + snapshot
+      - name: Upload logs + manifests
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -157,5 +173,6 @@ jobs:
             .relayer.log
             .postgres.log
             .chains.anvil.log
-            scripts/relayer-e2e/deployed.json
+            contracts/evm/deployments/*.json
+            contracts/stellar/deployments/*.json
           if-no-files-found: ignore

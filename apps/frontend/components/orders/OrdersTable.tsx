@@ -8,7 +8,9 @@ import {
   useGetAllTrades,
   useLockFunds,
   useUnLockFunds,
+  type UnlockStage,
 } from "@/hooks/useTrades"
+import { UnlockProgress } from "./UnlockProgress"
 import { useAccount } from "wagmi"
 import { truncateString } from "@/utils/truncate-string"
 import { formatChainAddressShort } from "@/utils/format-address"
@@ -175,8 +177,9 @@ export const OrdersTable: React.FC<{
   ]
 
   const chainModal = useChainModal()
+  const [unlockStage, setUnlockStage] = useState<UnlockStage | null>(null)
   const { mutateAsync: unlockFunds, isPending: unlockingFunds } =
-    useUnLockFunds()
+    useUnLockFunds({ onStage: setUnlockStage })
   const { mutateAsync: lockFunds, isPending: lockingFunds } = useLockFunds()
   const adapters = useAdapters()
   const [hubOpen, setHubOpen] = useState(false)
@@ -299,18 +302,29 @@ export const OrdersTable: React.FC<{
             return
           }
           if (!tradeInfo) return
-          if (type === "incoming" && tradeInfo.status === "ACTIVE") {
-            await lockFunds(tradeInfo.id)
-          } else if (tradeInfo.status === "LOCKED") {
-            await unlockFunds(tradeInfo.id)
+          try {
+            if (type === "incoming" && tradeInfo.status === "ACTIVE") {
+              await lockFunds(tradeInfo.id)
+            } else if (tradeInfo.status === "LOCKED") {
+              await unlockFunds(tradeInfo.id)
+            }
+            setOpenReleaseModal(false)
+            refetch()
+          } catch {
+            // keep the modal open so the user sees the toast + can retry
           }
-          setOpenReleaseModal(false)
-          refetch()
         }}
-        onCancel={() => setOpenReleaseModal(false)}
+        onCancel={() => {
+          // Block cancel while mid-flight so the user can't close the tab on
+          // a proof-generation request they'll never be able to resume.
+          if (unlockingFunds || lockingFunds) return
+          setOpenReleaseModal(false)
+        }}
         confirmLoading={unlockingFunds || lockingFunds}
         centered
         width={400}
+        maskClosable={!(unlockingFunds || lockingFunds)}
+        closable={!(unlockingFunds || lockingFunds)}
         cancelButtonProps={{
           disabled: unlockingFunds || lockingFunds,
         }}
@@ -384,17 +398,22 @@ export const OrdersTable: React.FC<{
               </div>
             </div>
 
-            <div className="bg-amber-500/10 p-3 rounded-lg">
-              {tradeInfo.status === "ACTIVE" ? (
-                <p className="text-amber-500 text-sm">
-                  This action cannot be undone.
-                </p>
-              ) : (
-                <p className="text-amber-500 text-sm">
-                  This action generates a proof for you to claim your tokens.
-                </p>
-              )}
-            </div>
+            {unlockStage ? (
+              <UnlockProgress stage={unlockStage} />
+            ) : (
+              <div className="bg-amber-500/10 p-3 rounded-lg">
+                {tradeInfo.status === "ACTIVE" ? (
+                  <p className="text-amber-500 text-sm">
+                    This action cannot be undone.
+                  </p>
+                ) : (
+                  <p className="text-amber-500 text-sm">
+                    This action generates a proof for you to claim your tokens.
+                    It usually takes 30 to 60 seconds.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
       </Modal>

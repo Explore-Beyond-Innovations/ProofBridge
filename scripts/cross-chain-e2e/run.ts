@@ -1,21 +1,6 @@
-/**
- * Cross-chain E2E test runner.
- *
- * Deploys ProofBridge on a local Stellar network (ad chain) and Anvil (EVM
- * order chain), then exercises the full cross-chain bridge flow.
- *
- * Four actors drive the flow (all provisioned by scripts/start_chains.sh):
- *   1. stellarAdmin  — configures AdManager on Stellar; ed25519 key signs
- *                      manager pre-auth for create_ad / lock_for_order / unlock.
- *   2. evmAdmin      — configures OrderPortal on EVM; ECDSA key signs manager
- *                      pre-auth for createOrder / unlock.
- *   3. adCreator     — primary on Stellar (creates ad + authorizes SAC pull).
- *                      Supplies an EVM address to receive tokens on unlock.
- *   4. orderCreator  — primary on EVM (creates the order, pays test tokens).
- *      (bridger)       Supplies a Stellar identity whose key is in the CLI
- *                      keystore so unlock's order_recipient.require_auth()
- *                      auto-signs.
- */
+// Cross-chain E2E test runner. Loads the deployed Stellar (ad) + Anvil (order)
+// contracts and exercises the full bridge flow with 4 actors from start_chains.sh:
+// stellarAdmin, evmAdmin, adCreator (Stellar), orderCreator/bridger (EVM).
 
 import * as path from "path";
 import { ethers } from "ethers";
@@ -23,15 +8,14 @@ import {
   invokeContract,
   getAddress,
   getSecret,
-  base32Decode,
+  decodeEd25519Secret,
   strkeyToHex,
   evmAddressToBytes32,
 } from "./lib/stellar.js";
 import { NonceTracker, getContract } from "./lib/evm.js";
 import {
-  deployStellarChain,
-  deployEvmChain,
-  linkChains,
+  loadStellarDeployment,
+  loadEvmDeployment,
 } from "./lib/deploy.js";
 import {
   AuthTokenCounter,
@@ -64,11 +48,7 @@ const AD_CREATOR_EVM_RECIPIENT = process.env.AD_CREATOR_EVM_RECIPIENT!;
 const STELLAR_CHAIN_ID = 1000001n;
 const EVM_CHAIN_ID = 31337n; // Anvil default
 
-const WASM_DIR = path.join(
-  ROOT_DIR,
-  "contracts/stellar/target/wasm32v1-none/release",
-);
-const VK_PATH = path.join(ROOT_DIR, "proof_circuits/deposits/target/vk");
+// Only artifact read here is the circuit JSON (for the in-process prover); deploy artifacts are handled by deploy-contracts.sh.
 const CIRCUIT_PATH = path.join(
   ROOT_DIR,
   "proof_circuits/deposits/target/deposit_circuit.json",
@@ -136,8 +116,7 @@ async function main() {
 
   // Stellar admin — default CLI source + manager pre-auth signer.
   const stellarAdmin = getAddress();
-  const stellarAdminSecret = base32Decode(getSecret()).slice(1, 33);
-  const stellarAdminSecretKey = Buffer.from(stellarAdminSecret);
+  const stellarAdminSecretKey = decodeEd25519Secret(getSecret());
   const stellarAdminPubKey = Buffer.from(
     (await import("@noble/ed25519")).getPublicKey(stellarAdminSecretKey),
   );
@@ -164,15 +143,14 @@ async function main() {
   console.log(`  Order creator (xlm):   ${orderCreatorStellar}`);
 
   // ════════════════════════════════════════════════════════════════
-  // Phase 1: Deploy Stellar Contracts (Ad Chain)
+  // Phase 1: Load Stellar Deployment (Ad Chain)
   // ════════════════════════════════════════════════════════════════
-  phase(1, "Deploy Stellar Contracts (ad chain)");
+  // Manifests emitted by deploy-contracts.sh (run before this script).
+  phase(1, "Load Stellar Deployment (ad chain)");
 
-  const stellarDeploy = deployStellarChain({
-    wasmDir: WASM_DIR,
-    vkPath: VK_PATH,
-    adminStrkey: stellarAdmin,
+  const stellarDeploy = await loadStellarDeployment({
     chainId: STELLAR_CHAIN_ID,
+    adminStrkey: stellarAdmin,
   });
   const stellarVerifier = stellarDeploy.verifier;
   const stellarMerkle = stellarDeploy.merkleManager;
@@ -182,12 +160,14 @@ async function main() {
     (t) => t.pairKey === "xlm",
   );
   if (!stellarAdTokenEntry) {
-    throw new Error("[e2e] stellar snapshot missing pairKey=xlm");
+    throw new Error("[e2e] stellar manifest missing pairKey=xlm");
   }
   const stellarAdToken = stellarAdTokenEntry.contractId;
   const stellarAdTokenHex = stellarAdTokenEntry.addressHex;
   const stellarAdManager = stellarDeploy.adManager;
-  console.log("Stellar contracts deployed and initialized.");
+  console.log(
+    `Stellar manifest loaded — adManager=${stellarAdManager.slice(0, 10)}… verifier=${stellarVerifier.slice(0, 10)}…`,
+  );
 
   // Snapshot XLM balances before any contract movement so we can assert
   // deltas at the end: ad creator should lose AMOUNT (locked in the ad),
@@ -204,11 +184,11 @@ async function main() {
   console.log(`  Order creator XLM (before): ${xlm(orderCreatorXlmBefore)}`);
 
   // ════════════════════════════════════════════════════════════════
-  // Phase 2: Deploy EVM Contracts (Order Chain)
+  // Phase 2: Load EVM Deployment (Order Chain)
   // ════════════════════════════════════════════════════════════════
-  phase(2, "Deploy EVM Contracts (order chain)");
+  phase(2, "Load EVM Deployment (order chain)");
 
-  const evmDeploy = await deployEvmChain({
+  const evmDeploy = await loadEvmDeployment({
     rpcUrl: EVM_RPC_URL,
     adminPrivateKey: EVM_ADMIN_PRIVATE_KEY,
     chainId: EVM_CHAIN_ID,
@@ -259,11 +239,11 @@ async function main() {
   );
 
   // ════════════════════════════════════════════════════════════════
-  // Phase 3: Cross-Chain Linking
+  // Phase 3: Confirm Cross-Chain Linking
   // ════════════════════════════════════════════════════════════════
-  phase(3, "Cross-Chain Linking");
-
-  await linkChains(stellarDeploy, evmDeploy);
+  // Links were set by deploy-contracts.sh; bad links surface later as reverts.
+  phase(3, "Confirm Cross-Chain Linking");
+  console.log("  (links configured by deploy-contracts.sh)");
 
   const stellarAdManagerHex = stellarDeploy.adManagerHex;
   const stellarAdManagerBuf = hexToBuffer(stellarAdManagerHex);
@@ -628,8 +608,7 @@ async function main() {
   );
   console.log("  ✓ Ad creator EVM recipient received the order token.");
 
-  // Stellar XLM accounting — allow small slop for network fees (both
-  // accounts were the source of at least one tx).
+  // Stellar XLM accounting — slop allowed for network fees.
   const adCreatorXlmAfter = stellarTokenBalance(
     stellarAdToken,
     adCreatorStellar,

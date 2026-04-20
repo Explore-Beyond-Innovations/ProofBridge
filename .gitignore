@@ -2,5 +2,14 @@ node_modules
 target
 scripts/docker-local/.artifacts/
 scripts/docker-local/.env
+scripts/deploy/.bundle/
+scripts/deploy/.env.*
+!scripts/deploy/.env.*.example
 dump/
 .chains*
+
+contracts/*/deployments/*.json
+!contracts/*/deployments/.gitkeep
+packages/deployment-manifest/dist/
+seed.config.testnet.yaml
+docs/

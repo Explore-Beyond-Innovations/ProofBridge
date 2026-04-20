@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -10,6 +11,7 @@ import {
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { TradeStatus } from '@prisma/client';
 
 export class QueryTradesDto {
   @ApiPropertyOptional({
@@ -30,7 +32,7 @@ export class QueryTradesDto {
 
   @ApiPropertyOptional({
     description:
-      'Address(es) of the advertisement creator. Pass a single address or an array — an array matches when any of the caller\'s linked wallets owns the ad.',
+      "Address(es) of the advertisement creator. Pass a single address or an array — an array matches when any of the caller's linked wallets owns the ad.",
     oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
   })
   @IsOptional()
@@ -45,7 +47,7 @@ export class QueryTradesDto {
 
   @ApiPropertyOptional({
     description:
-      'Address(es) of the bridger. Pass a single address or an array — an array matches when any of the caller\'s linked wallets created the trade.',
+      "Address(es) of the bridger. Pass a single address or an array — an array matches when any of the caller's linked wallets created the trade.",
     oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
   })
   @IsOptional()
@@ -106,6 +108,23 @@ export class QueryTradesDto {
   @IsOptional()
   @Matches(/^\d+$/)
   maxAmount?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Filter trades by status (single value or comma-separated list)',
+    enum: TradeStatus,
+    isArray: true,
+  })
+  @IsOptional()
+  @Transform(({ value }) =>
+    Array.isArray(value)
+      ? value
+      : typeof value === 'string' && value.includes(',')
+        ? value.split(',').filter(Boolean)
+        : value,
+  )
+  @IsEnum(TradeStatus, { each: true })
+  status?: TradeStatus | TradeStatus[];
 
   @ApiPropertyOptional({
     example: 'nextPageToken',
@@ -213,8 +232,7 @@ export class TokenDto {
   @ApiProperty({
     example: 'ERC20',
     enum: ['ERC20', 'NATIVE', 'SAC', 'SEP41'],
-    description:
-      'Token kind (EVM: ERC20/NATIVE; Stellar: NATIVE/SAC/SEP41)',
+    description: 'Token kind (EVM: ERC20/NATIVE; Stellar: NATIVE/SAC/SEP41)',
   })
   kind!: string;
 
@@ -288,10 +306,10 @@ export class TradeResponseDto {
   route!: RouteDto;
 
   @ApiProperty()
-  adCreatorClaimed: boolean;
+  adCreatorClaimed!: boolean;
 
   @ApiProperty()
-  bridgerClaimed: boolean;
+  bridgerClaimed!: boolean;
 }
 
 export class ListTradesResponseDto {
