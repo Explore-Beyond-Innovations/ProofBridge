@@ -19,10 +19,11 @@ import { emitOnboarding } from "@/lib/onboarding/events"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { PageTourButton } from "@/components/onboarding/PageTourButton"
 
-const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
-  chainId,
-  chainName,
-}) => {
+const TokenList: React.FC<{
+  chainId: string
+  chainName?: string
+  tourAnchor?: boolean
+}> = ({ chainId, chainName, tourAnchor = false }) => {
   const { data: tokens, isLoading } = useGetAllTokens({ chainId })
   const [claiming, setClaiming] = useState<Record<string, boolean>>({})
   const [adding, setAdding] = useState<Record<string, boolean>>({})
@@ -184,7 +185,7 @@ const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
         return (
           <div
             key={key}
-            data-tour={idx === 0 ? "faucet-claim" : undefined}
+            data-tour={tourAnchor && idx === 0 ? "faucet-claim" : undefined}
             className="flex items-center justify-between flex-wrap gap-4 p-3 bg-grey-900 rounded-md border border-grey-800"
           >
             <div className="flex items-center gap-3">
@@ -279,7 +280,7 @@ const FaucetPage: React.FC = () => {
           />
         ) : (
           <div className="grid md:grid-cols-2 gap-4">
-            {firstTwo.map((chain: IChain) => (
+            {firstTwo.map((chain: IChain, i) => (
               <div
                 key={chain.chainId}
                 className="bg-grey-900 p-4 rounded-md border border-grey-800"
@@ -292,7 +293,11 @@ const FaucetPage: React.FC = () => {
                   <div className="text-xs text-grey-300">Testnet</div>
                 </div>
 
-                <TokenList chainId={chain.chainId} chainName={chain.name} />
+                <TokenList
+                  chainId={chain.chainId}
+                  chainName={chain.name}
+                  tourAnchor={i === 0}
+                />
               </div>
             ))}
           </div>

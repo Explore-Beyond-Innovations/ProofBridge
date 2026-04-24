@@ -144,13 +144,14 @@ const homeTabsStep: OnboardingStep = {
 }
 
 const homeCreateAdStep: OnboardingStep = {
-  slug: "sidebar-create-ad",
-  target: '[data-tour="sidebar-create-ad"]',
+  slug: "ads-management-create",
+  target: '[data-tour="ads-management-create"]',
   title: "Create an ad",
   content: paragraph(
     <>Start a new ad from here — pick a route, token, and liquidity.</>,
   ),
-  placement: "right",
+  placement: "bottom",
+  route: "/ads-management",
 }
 
 const ordersStatsStep: OnboardingStep = {

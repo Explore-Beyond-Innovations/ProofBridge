@@ -12,6 +12,7 @@ import { usePathname, useRouter } from "next/navigation"
 import type { Controls, EventData } from "react-joyride"
 import { useAdapters } from "@/components/connect-wallet/useAdapters"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
+import { useAuthToken } from "@/hooks/useAuthToken"
 import {
   FLOWS,
   FLOW_ROUTES,
@@ -48,10 +49,10 @@ export const useOnboarding = (): OnboardingContextValue => {
       steps: [],
       run: false,
       stepIndex: 0,
-      startTour: () => {},
-      skipTour: () => {},
-      completeTour: () => {},
-      onEvent: () => {},
+      startTour: () => { },
+      skipTour: () => { },
+      completeTour: () => { },
+      onEvent: () => { },
     }
   }
   return ctx
@@ -64,10 +65,12 @@ export const OnboardingStateProvider: React.FC<{
   const router = useRouter()
   const adapters = useAdapters()
   const { data: currentUser } = useCurrentUser()
+  const authToken = useAuthToken()
 
   const [activeFlow, setActiveFlow] = useState<FlowName | null>(null)
   const [run, setRun] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
+  const autoStartedRef = useRef(false)
 
   const steps = useMemo<OnboardingStep[]>(
     () => (activeFlow ? FLOWS[activeFlow] : []),
@@ -77,20 +80,18 @@ export const OnboardingStateProvider: React.FC<{
   const currentStep = steps[stepIndex]
   const currentRoute = currentStep?.route
 
-  // Auto-start the onboarding flow once on first mount for truly new users.
-  // Wallet-linked users don't get force-started; they can still replay.
   useEffect(() => {
+    if (autoStartedRef.current) return
+    if (authToken && currentUser === undefined) return
+    autoStartedRef.current = true
     const s = readOnboarding()
     if (s.completed || s.skipped) return
     if (currentUser?.wallets?.length) return
     setActiveFlow("onboarding")
     setStepIndex(s.lastStep || 0)
     setRun(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [authToken, currentUser])
 
-  // Pause the tour when we're not on the route the current step expects,
-  // and resume when the route matches.
   useEffect(() => {
     if (!currentStep) return
     if (!currentRoute) return
@@ -156,8 +157,6 @@ export const OnboardingStateProvider: React.FC<{
     })
   }, [advanceToSlug])
 
-  // Watch adapter state directly so sign-in via the hub moves us on even if
-  // the hub modal closed before the event fired.
   useEffect(() => {
     if (activeFlow !== "onboarding") return
     const anyAuthed = adapters.some((a) => a.status === "authenticated")

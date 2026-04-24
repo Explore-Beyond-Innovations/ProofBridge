@@ -10,21 +10,32 @@ interface Props {
   onPrimaryClick?: () => void
 }
 
+const ICON = <CiBadgeDollar size={36} className="text-primary" />
+
 export const AdsEmptyState: React.FC<Props> = ({
   title = "No ads yet",
   message = "You currently have no ads. Create a new ad to have active listings.",
-  primaryLabel = "Create an ad",
+  primaryLabel,
   onPrimaryClick,
 }) => {
+  if (onPrimaryClick) {
+    return (
+      <EmptyState
+        icon={ICON}
+        title={title}
+        description={message}
+        actionLabel={primaryLabel ?? "Refresh"}
+        onAction={onPrimaryClick}
+      />
+    )
+  }
   return (
     <EmptyState
-      icon={<CiBadgeDollar size={36} className="text-primary" />}
+      icon={ICON}
       title={title}
       description={message}
-      actionLabel={primaryLabel}
-      {...(onPrimaryClick
-        ? { onAction: onPrimaryClick }
-        : { actionHref: "/ads-management/create" })}
+      actionLabel="Create an ad"
+      actionHref="/ads-management/create"
     />
   )
 }
