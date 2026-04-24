@@ -15,11 +15,15 @@ import { useStellarWallet } from "@/components/providers/StellarWallet"
 import { hex32ToContractId } from "@/utils/stellar/address"
 import { WalletMinimal } from "lucide-react"
 import { addToken as freighterAddToken } from "@stellar/freighter-api"
+import { emitOnboarding } from "@/lib/onboarding/events"
+import { EmptyState } from "@/components/shared/EmptyState"
+import { PageTourButton } from "@/components/onboarding/PageTourButton"
 
-const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
-  chainId,
-  chainName,
-}) => {
+const TokenList: React.FC<{
+  chainId: string
+  chainName?: string
+  tourAnchor?: boolean
+}> = ({ chainId, chainName, tourAnchor = false }) => {
   const { data: tokens, isLoading } = useGetAllTokens({ chainId })
   const [claiming, setClaiming] = useState<Record<string, boolean>>({})
   const [adding, setAdding] = useState<Record<string, boolean>>({})
@@ -58,6 +62,7 @@ const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
     try {
       await mutateAsync({ tokenId: token.id })
       message.success(`Requested ${token.symbol} on ${chainName || chainId}`)
+      emitOnboarding({ type: "faucet:claimed" })
     } catch (err) {
       // error handled by hook/toast
     } finally {
@@ -165,19 +170,22 @@ const TokenList: React.FC<{ chainId: string; chainName?: string }> = ({
 
   if (claimable.length === 0)
     return (
-      <div className="p-4 text-center text-grey-400">
-        No tokens on this chain
-      </div>
+      <EmptyState
+        size="sm"
+        title="No tokens to claim on this chain"
+        description="Nothing is configured here yet. Try the other chain."
+      />
     )
 
   return (
     <div className="space-y-3">
-      {claimable.map((token: IToken) => {
+      {claimable.map((token: IToken, idx) => {
         const key = token.id || `${token.symbol}-${token.address}`
 
         return (
           <div
             key={key}
+            data-tour={tourAnchor && idx === 0 ? "faucet-claim" : undefined}
             className="flex items-center justify-between flex-wrap gap-4 p-3 bg-grey-900 rounded-md border border-grey-800"
           >
             <div className="flex items-center gap-3">
@@ -250,13 +258,14 @@ const FaucetPage: React.FC = () => {
         <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400">
           <GiWaterDrop size={22} />
         </div>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-semibold">Faucet</h1>
           <p className="text-sm text-grey-400">
             Claim test tokens for supported chains. Select a chain and claim
             tokens below.
           </p>
         </div>
+        <PageTourButton flow="faucet" />
       </div>
 
       <div className="space-y-6">
@@ -265,12 +274,13 @@ const FaucetPage: React.FC = () => {
             <Spin />
           </div>
         ) : firstTwo.length === 0 ? (
-          <div className="p-6 text-center text-grey-400">
-            No chains available for faucet.
-          </div>
+          <EmptyState
+            title="No faucet chains available"
+            description="Come back after the backend finishes configuring testnet chains."
+          />
         ) : (
           <div className="grid md:grid-cols-2 gap-4">
-            {firstTwo.map((chain: IChain) => (
+            {firstTwo.map((chain: IChain, i) => (
               <div
                 key={chain.chainId}
                 className="bg-grey-900 p-4 rounded-md border border-grey-800"
@@ -283,7 +293,11 @@ const FaucetPage: React.FC = () => {
                   <div className="text-xs text-grey-300">Testnet</div>
                 </div>
 
-                <TokenList chainId={chain.chainId} chainName={chain.name} />
+                <TokenList
+                  chainId={chain.chainId}
+                  chainName={chain.name}
+                  tourAnchor={i === 0}
+                />
               </div>
             ))}
           </div>

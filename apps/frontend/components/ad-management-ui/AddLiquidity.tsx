@@ -241,7 +241,7 @@ export const AddLiquidity = () => {
           </p>
         </div>
         <div className="grid md:grid-cols-2 gap-4 md:gap-6">
-          <div>
+          <div data-tour="create-ad-base">
             <p className="text-grey-300 mb-1">Base Chain</p>
             <div>
               <Select
@@ -273,7 +273,7 @@ export const AddLiquidity = () => {
             </div>
           </div>
 
-          <div>
+          <div data-tour="create-ad-order">
             <p className="text-grey-300 mb-1">Destination Chain</p>
             <div>
               <Select
@@ -301,7 +301,7 @@ export const AddLiquidity = () => {
             </div>
           </div>
 
-          <div>
+          <div data-tour="create-ad-token">
             <p className="text-grey-300 mb-1">Token</p>
             <div>
               <Select
@@ -329,7 +329,7 @@ export const AddLiquidity = () => {
             )}
           </div>
 
-          <div>
+          <div data-tour="create-ad-limits">
             <p className="text-grey-300">Liquidity</p>
             <input
               className="w-full h-[40px] border-[1px]"
@@ -374,7 +374,7 @@ export const AddLiquidity = () => {
             )}
           </div>
 
-          <div>
+          <div data-tour="create-ad-details">
             <p className="text-grey-300">Title</p>
             <input
               className="w-full h-[40px] border-[1px]"
@@ -432,7 +432,7 @@ export const AddLiquidity = () => {
           </p>
         </div>
       </div>
-      <div className="flex justify-end">
+      <div className="flex justify-end" data-tour="create-ad-preview">
         {!baseChainId ? (
           <div className="flex items-center gap-2 text-yellow-500">
             <CiWarning size={18} />

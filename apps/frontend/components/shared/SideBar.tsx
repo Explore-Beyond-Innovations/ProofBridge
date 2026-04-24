@@ -16,8 +16,14 @@ export const SideBar = ({ mobileOpen, onClose }: SideBarProps) => {
     <div className="">
       {app_routes.map((route) => {
         const isActive = pathname.includes(route.path)
+        const isFaucet = route.path === "/faucet"
         return (
-          <Link href={route.path} key={route.path} onClick={onClose}>
+          <Link
+            href={route.path}
+            key={route.path}
+            onClick={onClose}
+            data-tour={isFaucet ? "sidebar-faucet" : undefined}
+          >
             <div
               className={`${
                 isActive

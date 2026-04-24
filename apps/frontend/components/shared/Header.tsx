@@ -4,6 +4,7 @@ import { Logo } from "./Logo"
 import Link from "next/link"
 import { ConnectWalletButton } from "../connect-wallet/ConnectWalletButton"
 import { NotificationBell } from "../notifications/NotificationBell"
+import { ReplayTourButton } from "../onboarding/ReplayTourButton"
 import { Menu, X } from "lucide-react"
 
 interface HeaderProps {
@@ -64,6 +65,7 @@ export const Header = ({ mobileMenuOpen, onToggleMobileMenu }: HeaderProps) => {
           <span className="signal-line-link hidden md:inline uppercase">
             <Link href={"/bridge"}>Bridge</Link>
           </span>
+          <ReplayTourButton />
           <NotificationBell />
           <ConnectWalletButton />
         </div>

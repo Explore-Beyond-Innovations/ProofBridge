@@ -1,8 +1,9 @@
 "use client"
-import React from "react"
+import React, { useEffect } from "react"
 import { Modal, Tooltip } from "antd"
 import { Loader2, LogOut } from "lucide-react"
 import type { ChainAdapter, ChainStatus } from "./types"
+import { emitOnboarding } from "@/lib/onboarding/events"
 
 const shortAddress = (addr: string) =>
   `${addr.slice(0, 6)}…${addr.slice(-4)}`
@@ -166,6 +167,10 @@ export const ConnectHubModal: React.FC<ConnectHubModalProps> = ({
   adapters,
   zIndex,
 }) => {
+  useEffect(() => {
+    if (open) emitOnboarding({ type: "hub:opened" })
+  }, [open])
+
   return (
     <Modal
       open={open}
@@ -180,18 +185,20 @@ export const ConnectHubModal: React.FC<ConnectHubModalProps> = ({
         header: { background: "transparent", borderBottom: "none" },
       }}
     >
-      <p className="mb-4 text-xs text-grey-400">
-        ProofBridge works across multiple networks. Connect a wallet on each
-        chain you want to bridge between, then sign in to start a session.
-      </p>
-      <div className="flex flex-col gap-2">
-        {adapters.map((a) => (
-          <AdapterRow key={a.id} adapter={a} onActionLaunch={onClose} />
-        ))}
+      <div data-tour="connect-hub-modal">
+        <p className="mb-4 text-xs text-grey-400">
+          ProofBridge works across multiple networks. Connect a wallet on each
+          chain you want to bridge between, then sign in to start a session.
+        </p>
+        <div className="flex flex-col gap-2">
+          {adapters.map((a) => (
+            <AdapterRow key={a.id} adapter={a} onActionLaunch={onClose} />
+          ))}
+        </div>
+        <p className="mt-4 text-[11px] text-grey-500 text-center">
+          More chains coming soon · Starknet · Solana · Base
+        </p>
       </div>
-      <p className="mt-4 text-[11px] text-grey-500 text-center">
-        More chains coming soon · Starknet · Solana · Base
-      </p>
     </Modal>
   )
 }

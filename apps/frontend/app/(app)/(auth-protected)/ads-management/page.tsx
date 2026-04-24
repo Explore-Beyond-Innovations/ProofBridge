@@ -8,7 +8,10 @@ const AdManagementPage = () => {
     <div>
       <div className="flex items-center gap-4 justify-between flex-wrap md:p-4">
         <p className="text-3xl font-sequel">Ads Management</p>
-        <Link href={"/ads-management/create"}>
+        <Link
+          href={"/ads-management/create"}
+          data-tour="ads-management-create"
+        >
           <Button
             size="middle"
             className="!rounded-full !h-[40px]"

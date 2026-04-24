@@ -1,6 +1,6 @@
 "use client"
 import React, { useEffect, useState } from "react"
-import { Alert, Button, Divider, Select, Skeleton, Tooltip } from "antd"
+import { Alert, Divider, Select, Skeleton, Tooltip } from "antd"
 import { ArrowRight, Bot, Clock, Rabbit, Verified } from "lucide-react"
 import Image from "next/image"
 import { TradeAd } from "./TradeAd"
@@ -16,11 +16,13 @@ import {
   SEPOLIA_CHAIN_ID,
   STELLAR_TESTNET_CHAIN_ID,
 } from "@/lib/chains"
+import { emitOnboarding } from "@/lib/onboarding/events"
+import { EmptyState } from "../shared/EmptyState"
+import { PageTourButton } from "../onboarding/PageTourButton"
 
 const PROOFBRIDGE_TOKEN_SYMBOLS = ["PB", "PBT", "PROOFBRIDGE"]
 const STELLAR_NATIVE_SYMBOLS = ["XLM"]
 import { IoDocumentText } from "react-icons/io5"
-import { Logo } from "../shared/Logo"
 
 export const BridgeTab = () => {
   const { data: chains, isLoading: loadingChains } = useGetAllChains({})
@@ -88,8 +90,17 @@ export const BridgeTab = () => {
       return (preferred ?? list[0]).id
     })
   }, [tokens, selectedBaseChainId, selectedDstChainId])
+
+  useEffect(() => {
+    if (selectedBaseChainId && selectedDstChainId && selectedTokenId) {
+      emitOnboarding({ type: "bridge:route-chosen" })
+    }
+  }, [selectedBaseChainId, selectedDstChainId, selectedTokenId])
   return (
     <div className="w-full bg-grey-900 p-4 md:p-6 rounded-md space-y-4 md:space-y-6 tracking-wider">
+      <div className="flex justify-end">
+        <PageTourButton flow="bridge" />
+      </div>
       <div className="">
         <div className="flex items-center gap-7 mb-2">
           <div className="flex items-center gap-2 w-[200px]">
@@ -110,40 +121,42 @@ export const BridgeTab = () => {
               </>
             ) : (
               <>
-                <Select
-                  onChange={(id) => setSelectedBaseChainId(id)}
-                  className="md:min-w-[200px] w-full !h-[40px]"
-                  value={selectedBaseChainId}
-                >
-                  {chains?.data
-                    ?.filter((chain) => isVisibleChain(chain.chainId))
-                    .map((chain) => {
-                      return (
-                        <Select.Option
-                          key={chain.chainId}
-                          value={chain.chainId}
-                        >
-                          <div className="flex items-center gap-2">
-                            {chain_icons[chain.chainId] ? (
-                              <Image
-                                src={chain_icons[chain.chainId]}
-                                alt=""
-                                width={20}
-                                height={20}
-                              />
-                            ) : (
-                              <span className="h-5 w-5 rounded-full bg-grey-700" />
-                            )}
-                            <span className="text-[13px]">{chain.name}</span>
-                          </div>
-                        </Select.Option>
-                      )
-                    })}
-                </Select>
+                <div data-tour="bridge-source" className="md:w-auto w-full">
+                  <Select
+                    onChange={(id) => setSelectedBaseChainId(id)}
+                    className="md:min-w-[200px] w-full !h-[40px]"
+                    value={selectedBaseChainId}
+                  >
+                    {chains?.data
+                      ?.filter((chain) => isVisibleChain(chain.chainId))
+                      .map((chain) => {
+                        return (
+                          <Select.Option
+                            key={chain.chainId}
+                            value={chain.chainId}
+                          >
+                            <div className="flex items-center gap-2">
+                              {chain_icons[chain.chainId] ? (
+                                <Image
+                                  src={chain_icons[chain.chainId]}
+                                  alt=""
+                                  width={20}
+                                  height={20}
+                                />
+                              ) : (
+                                <span className="h-5 w-5 rounded-full bg-grey-700" />
+                              )}
+                              <span className="text-[13px]">{chain.name}</span>
+                            </div>
+                          </Select.Option>
+                        )
+                      })}
+                  </Select>
+                </div>
                 <div>
                   <ArrowRight size={14} />
                 </div>
-                <div className="w-full">
+                <div data-tour="bridge-dest" className="w-full">
                   <div className="flex items-center gap-2 w-50 md:hidden">
                     <GiChainLightning />
                     <p className="text-sm">To Chain</p>
@@ -196,7 +209,7 @@ export const BridgeTab = () => {
       </div>
 
       <div className="flex md:flex-row flex-col md:items-center md:justify-between gap-3">
-        <div className="">
+        <div data-tour="bridge-token">
           <p className="text-sm text-grey-300 mb-2">Select token</p>
           <div className="flex items-center gap-2 flex-wrap">
             {loadingTokens ? (
@@ -228,9 +241,11 @@ export const BridgeTab = () => {
                 )
               })
             ) : (
-              <p className="text-xs text-grey-400">
-                No tokens available on this chain.
-              </p>
+              <EmptyState
+                size="sm"
+                title="No tokens on this chain"
+                description="Switch to a different source chain to see tokens."
+              />
             )}
           </div>
         </div>
@@ -269,7 +284,7 @@ export const BridgeTab = () => {
         </div>
       </div>
 
-      <div className="space-y-6" id="#bridge-trading-section">
+      <div className="space-y-6" data-tour="bridge-ads-list">
         {loadingAds ? (
           <>
             {[1, 2, 3, 4, 5].map((value) => {
@@ -277,30 +292,15 @@ export const BridgeTab = () => {
             })}
           </>
         ) : Ads?.data?.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 space-y-4">
-            <div className="h-24 w-24 rounded-full bg-grey-800 flex items-center justify-center">
-              <div className="opacity-20">
-                <Logo />
-              </div>
-            </div>
-            <div className="text-center space-y-2">
-              <h3 className="text-xl font-semibold">No Active Bridges</h3>
-              <p className="text-grey-400 max-w-md">
-                There are currently no active bridge offers for this route. Try
-                selecting different tokens or chains, or check back later.
-              </p>
-            </div>
-            <Button
-              type="primary"
-              className="mt-4"
-              onClick={() => {
-                setSelectedBaseChainId("")
-                setSelectedDstChainId("")
-              }}
-            >
-              Reset Filters
-            </Button>
-          </div>
+          <EmptyState
+            title="No active bridges for this route"
+            description="Try a different pair of chains or tokens, or check back later."
+            actionLabel="Reset filters"
+            onAction={() => {
+              setSelectedBaseChainId("")
+              setSelectedDstChainId("")
+            }}
+          />
         ) : (
           <>
             {Ads?.data?.map((ad, index) => (

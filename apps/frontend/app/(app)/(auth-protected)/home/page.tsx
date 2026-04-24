@@ -12,6 +12,7 @@ import { SkeletonAdCard } from "@/components/dashboard/SkeletonAdCard"
 import AdsEmptyState from "@/components/dashboard/AdsEmptyState"
 import { useGetAllTrades } from "@/hooks/useTrades"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
+import { PageTourButton } from "@/components/onboarding/PageTourButton"
 
 const HomePage = () => {
   // Pull the full set of linked wallets (one per chain kind) and filter by
@@ -208,11 +209,17 @@ const HomePage = () => {
 
   return (
     <div className="max-w-[98%] mx-auto space-y-4 md:space-y-8 md:py-2 md:px-0 p-4">
-      <div>
-        <h2 className="md:text-4xl text-lg">Dashboard</h2>
-        <p className="text-sm">Manage your ads and orders here</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="md:text-4xl text-lg">Dashboard</h2>
+          <p className="text-sm">Manage your ads and orders here</p>
+        </div>
+        <PageTourButton flow="home" />
       </div>
-      <div className="grid md:grid-cols-4 grid-cols-2 md:gap-7 gap-4">
+      <div
+        data-tour="home-stats"
+        className="grid md:grid-cols-4 grid-cols-2 md:gap-7 gap-4"
+      >
         <div className="border-grey-700 border-1 p-4 rounded-md w-full bg-gradient-to-bl from-grey-600 to-grey-1000">
           <div className="flex justify-center flex-col gap-2 md:h-[150px] h-[100px] w-full">
             <div className="space-y-2">
@@ -280,7 +287,7 @@ const HomePage = () => {
           </div>
         </div>
       </div>
-      <div>
+      <div data-tour="home-tabs">
         <Tabs defaultActiveKey="1" items={items} type="line" size="large" />
       </div>
     </div>
