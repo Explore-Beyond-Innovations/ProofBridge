@@ -64,6 +64,7 @@ export const ConnectWalletButton = () => {
       <button
         type="button"
         onClick={() => setOpen(true)}
+        data-tour="connect-wallet-button"
         className={`group h-10 inline-flex items-center gap-2 rounded-full border border-grey-800 bg-grey-900/60 px-3 text-sm font-medium text-grey-100 backdrop-blur transition hover:border-primary/60 hover:bg-grey-800/60 ${ringClass}`}
       >
         {active.length > 0 ? (

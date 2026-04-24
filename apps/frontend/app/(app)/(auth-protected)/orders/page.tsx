@@ -10,6 +10,7 @@ import { OrdersTable } from "@/components/orders/OrdersTable"
 import { Tabs, TabsProps } from "antd"
 import { useGetAllTrades } from "@/hooks/useTrades"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
+import { PageTourButton } from "@/components/onboarding/PageTourButton"
 
 const OrdersPage = () => {
   const searchParams = useSearchParams()
@@ -78,11 +79,17 @@ const OrdersPage = () => {
   }, [trades?.data])
   return (
     <div className="max-w-[98%] mx-auto space-y-4 md:space-y-8 md:py-2 md:px-0 p-4">
-      <div>
-        <h2 className="md:text-4xl text-lg">Orders</h2>
-        <p className="text-sm">View and Manage your orders here</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="md:text-4xl text-lg">Orders</h2>
+          <p className="text-sm">View and Manage your orders here</p>
+        </div>
+        <PageTourButton flow="orders" />
       </div>
-      <div className="grid md:grid-cols-4 grid-cols-2 md:gap-7 gap-4 text-white">
+      <div
+        data-tour="orders-stats"
+        className="grid md:grid-cols-4 grid-cols-2 md:gap-7 gap-4 text-white"
+      >
         <div className="border-grey-800 border-1 p-4 rounded-md w-full bg-gradient-to-bl from-primary/20 to-grey-1000">
           <div className="flex justify-center flex-col gap-2 md:h-[150px] h-[100px] w-full">
             <div className="space-y-2">
@@ -152,7 +159,7 @@ const OrdersPage = () => {
         </div>
       </div>
 
-      <div>
+      <div data-tour="orders-tabs">
         <Tabs
           activeKey={type}
           items={items}

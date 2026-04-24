@@ -30,6 +30,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { useAdapters } from "@/components/connect-wallet/useAdapters"
 import { ConnectHubModal } from "@/components/connect-wallet/ConnectHubModal"
 import type { ChainKind } from "@/types/chains"
+import { EmptyState } from "@/components/shared/EmptyState"
 
 const onChange: TableProps<ITrade>["onChange"] = (
   pagination,
@@ -255,7 +256,7 @@ export const OrdersTable: React.FC<{
 
   return (
     <>
-      <div ref={tableWrapRef}>
+      <div ref={tableWrapRef} data-tour="orders-table">
         <Table<ITrade>
           columns={columns}
           dataSource={data?.data!}
@@ -268,6 +269,24 @@ export const OrdersTable: React.FC<{
             }`
           }
           rowKey="id"
+          locale={{
+            emptyText:
+              type === "incoming" ? (
+                <EmptyState
+                  title="No incoming orders yet"
+                  description="When a bridger takes one of your ads, it'll appear here."
+                  actionLabel="Create an ad"
+                  actionHref="/ads-management/create"
+                />
+              ) : (
+                <EmptyState
+                  title="No bridges yet"
+                  description="Head to the P2P bridge to send your first cross-chain transfer."
+                  actionLabel="Bridge now"
+                  actionHref="/bridge"
+                />
+              ),
+          }}
         />
       </div>
 

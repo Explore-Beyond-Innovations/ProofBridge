@@ -12,6 +12,7 @@ import {
 } from "@/hooks/useNotifications"
 import { useAuthToken } from "@/hooks/useAuthToken"
 import { INotification, NotificationType } from "@/types/notifications"
+import { EmptyState } from "@/components/shared/EmptyState"
 
 const TYPE_LABEL: Record<NotificationType, string> = {
   TRADE_CREATED: "New order",
@@ -100,9 +101,11 @@ const NotificationPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             <Spin size="small" />
           </div>
         ) : items.length === 0 ? (
-          <div className="py-8 text-center text-xs text-grey-400">
-            You&apos;re all caught up.
-          </div>
+          <EmptyState
+            size="sm"
+            title="You're all caught up"
+            description="New activity shows up here."
+          />
         ) : (
           items.map((item) => (
             <NotificationRow key={item.id} item={item} onView={handleView} />
