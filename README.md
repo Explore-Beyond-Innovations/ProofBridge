@@ -68,7 +68,7 @@ The ProofBridge system is composed of four main layers, each working together to
 For detailed information about each component of the ProofBridge system, refer to the following documentation:
 
 - **[Contracts](./contracts/README.md)** - Smart contract architecture, deployed addresses with explorer links, deployment guides, and cross-chain route configuration
-  - [EVM Contracts](./contracts/evm/README.md) - Solidity/Foundry implementation (Ethereum, Hedera)
+  - [EVM Contracts](./contracts/evm/README.md) - Solidity/Foundry implementation (Ethereum)
   - [Stellar Contracts](./contracts/stellar/README.md) - Soroban/Rust implementation (Stellar)
 - **[Proof Circuits](./proof_circuits/)** - Zero-knowledge proof circuits for cross-chain verification
   - [Auth Circuits](./proof_circuits/auth/README.md) - Authentication proof circuits using BLS signatures
@@ -79,37 +79,102 @@ For detailed information about each component of the ProofBridge system, refer t
 
 ## 📍 Roadmap
 
-- **Phase 1 – Preauth Relayer (MVP):**
+The protocol ships in tranches anchored to the SCF Build Award
+plan. Each phase below is a concrete tranche with its own design
+doc; the design docs are the source of truth for scope.
+
+- **Phase 1 – Preauth Relayer (MVP, live on testnet):**
 
   - Stateful relayer with pre-authorization to bootstrap trust
-  - On-chain MMR trees maintained per chain
+  - On-chain MMR trees maintained per chain (Poseidon2 leaves)
   - ZK proof circuits for inclusion and trade constraint validation
-  - Single relayer model to ensure stability during early testing
+  - Single relayer model for stability during early testing
+  - Deployed Sepolia ↔ Stellar Testnet, real bridge transactions
+    settling end-to-end through `OrderPortal` / `AdManager`
 
-- **Phase 2 – BLS Aggregation:**
+- **Phase 2 – BLS Authentication & Pre-Auth Retirement (T1):**
 
-  - Introduce Maker + Bridger BLS signatures
-  - Aggregate into compact proof of agreement
-  - Reduce reliance on relayer state by shifting authentication to signatures
+  - End-to-end BLS-from-zero on BLS12-381 (`noir_bls12_381_pairing`
+    in-circuit, CAP-0059 / EIP-2537 native pairing on chain)
+  - Both parties sign the canonical 15-field `Order` struct once;
+    one aggregated signature gates both `unlock` calls
+  - Pre-authorization manager-signing path removed entirely;
+    relayer reduces to a stateless off-chain aggregator
+  - MMR proof generation back to ≤30s on a reference machine
+  - Route-commitment defense pinning each ad's route at creation
+    time so admin-key compromise can't redirect existing ads
+  - Pausability + two-step admin transfer + cascading route cleanup
+  - Standalone Noir BLS auth circuit shipped as a building block
+    for off-chain / agent-side proof-backed auth
 
-- **Phase 3 – AI Layer Introduction:**
+- **Phase 3 – AI Agents & Dispute Resolution (T2):**
 
-  - Deploy AI-driven assistants to help makers process orders quickly
-  - Agents monitor ads, deposits, and proofs in real-time
-  - Automate order validation, matching, and settlement tracking
-  - Improve UX and reduce operational overhead for liquidity providers
+  - Soroban custom-account contracts with `__check_auth`-gated
+    per-agent policies (allowed actions, token whitelist, per-order
+    and per-window caps, expiry, revocation)
+  - EVM-side mirror via per-maker Safe Modules using the same
+    policy schema
+  - Multi-key `BLSKeyRegistry v2` with monotonic stable slot IDs,
+    `valid_until` per slot, and aggregator slot-hint at unlock —
+    single-tx agent rotation without churning maker liquidity
+  - Agent runtime replacing the manager-key auto-merchant-bot;
+    each maker runs (or delegates) one agent against their own
+    custom account
+  - Order `deadline` field added to the signed struct
+    (protocol-fixed per-route window); permissionless cancel paths
+    after expiry
+  - Full dispute path with bonded initiation, evidence submission,
+    and arbiter resolution — `MutualRefund` / `TradeProceeds` /
+    `BridgerForfeit` / `MakerForfeit` outcomes
+  - 14-day public testnet stability run with proof-gen, settlement,
+    and dispute metrics on a public dashboard
 
-- **Phase 4 – Stateless Relayers:**
+- **Phase 4 – Mainnet Launch (T3):**
 
-  - Transition to permissionless relayers
-  - Any actor can submit proofs to the `OrderPortal`
-  - Multi-relayer competition for liveness and decentralization
-  - Support for batching and fee markets
+  - Mainnet contract deployment on Stellar + Ethereum, gated by
+    SCF Audit Bank engagement (audit-clean → deploy)
+  - Admin handed off to multisig on each chain; `ArbiterRole` held
+    by a 5-of-7 multisig (3 team + 4 ecosystem signers,
+    constraint of ≥ 2 non-team for any decision)
+  - 24-hour operational timelock on critical admin functions
+    (route changes, fee parameters, role grants); pause / unpause
+    exempt for emergency response
+  - Protocol fee mechanism live — 20 bps to `protocol_fee_pool`,
+    30 bps to maker as LP profit, deducted destination-side
+  - Per-route bond config for disputes (USDC ↔ USDC at launch:
+    `min_bond` floor + `bond_bps` ratio in the route's own token)
+  - Single launch route: `USDC ↔ USDC` between Circle's existing
+    Ethereum ERC-20 and Stellar SAC. ProofBridge does not issue
+    wrapped assets; future routes wait for ecosystem partners to
+    provide equivalent assets cross-chain.
+  - Production-grade relayer infrastructure (HA pair, monitoring,
+    alerting, runbook) and a public per-service status page
+  - Cross-chain reconciliation listener watching both chains for
+    settlement discrepancies
+  - Developer SDK at `@proofbridge/sdk` and OpenAPI spec at
+    `api.pfbridge.xyz/openapi.json`
+  - 4-week post-launch operational hardening window
 
-- **Phase 5 – Extended Cross-Chain Support:**
+- **Phase 5 – Post-Mainnet Decentralization & Expansion
+  (follow-up tranches, separately scoped):**
 
-  - Expand to non-EVM chains (e.g., Starknet, Solana)
-  - Add monitoring, reconciliation, and safe-mode controls for anomaly handling
+  - **DAO governance for `ArbiterRole`** — moves the dispute-
+    resolution authority from the multisig to community-elected
+    stake-weighted voting. Requires the ProofBridge token launch
+    (its own initiative; not eligible for SCF Build funding).
+  - **Slashing for misbehaving agents** — stake-and-slash penalty
+    layer beyond the existing dispute path's punitive outcomes,
+    calibrated against observed mainnet misbehavior data.
+  - **Cross-chain expansion** — additional chains (Arbitrum, Base,
+    Optimism, Polygon, Starknet, Solana) using the existing T1+T2
+    contract suite plus per-chain circuit work where needed.
+  - **Token route expansion** — RWA-specific routes (e.g.
+    Franklin Templeton BENJI, Etherfuse CETES) and additional
+    stablecoin pairs as ecosystem partnerships land.
+  - **Iterative protocol enhancements** — per-route fee bps,
+    cross-token dispute bonds via price oracle, auth-plus-deposit
+    combined ZK proof for L2 batching once volumes justify the
+    proof-system optimization.
 
 ## 📚 Documentation
 
