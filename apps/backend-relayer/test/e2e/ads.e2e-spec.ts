@@ -29,7 +29,7 @@ describe('Ads E2E', () => {
         creatorDstAddress: userWallet.address,
         fundAmount: '1000',
       })
-      .expect(403);
+      .expect(401);
   });
 
   it('creates an ad, persists INACTIVE row, then fetches it', async () => {

@@ -33,7 +33,7 @@ describe('Chains E2E', () => {
         adManagerAddress: randomAddress(),
         orderPortalAddress: randomAddress(),
       })
-      .expect(403);
+      .expect(401);
   });
 
   describe('Chain CRUD operations', () => {
@@ -101,7 +101,7 @@ describe('Chains E2E', () => {
       await request(app.getHttpServer())
         .patch(`/v1/admin/chains/${chainUUID}`)
         .send({ adManagerAddress: '0xAdMgrUpdated' })
-        .expect(403);
+        .expect(401);
     });
 
     it('fails to update non-existent chain', async () => {

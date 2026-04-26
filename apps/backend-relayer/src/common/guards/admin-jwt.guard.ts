@@ -5,6 +5,7 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '@prisma/prisma.service';
 import { env } from '@libs/configs';
@@ -36,7 +37,7 @@ export class AdminJwtGuard implements CanActivate {
     const admin = await this.prisma.admin.findUnique({
       where: { id: decoded.sub },
     });
-    if (!admin) throw new UnauthorizedException('Admin no longer exists');
+    if (!admin) throw new ForbiddenException('Admin privileges required');
 
     req.admin = decoded;
     return true;

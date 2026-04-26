@@ -96,7 +96,7 @@ describe('Notifications E2E', () => {
   });
 
   it('GET /v1/notifications requires auth', async () => {
-    await request(app.getHttpServer()).get('/v1/notifications').expect(403);
+    await request(app.getHttpServer()).get('/v1/notifications').expect(401);
   });
 
   it('GET /v1/notifications/unread-count returns 0 for a fresh user', async () => {

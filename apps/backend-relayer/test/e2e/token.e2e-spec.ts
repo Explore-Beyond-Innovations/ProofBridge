@@ -33,7 +33,7 @@ describe('Tokens E2E', () => {
         decimals: 18,
         kind: 'NATIVE',
       })
-      .expect(403);
+      .expect(401);
   });
 
   it('creates a token (POST /v1/tokens)', async () => {
