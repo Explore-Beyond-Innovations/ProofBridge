@@ -1,0 +1,23 @@
+{
+  "name": "@proofbridge/status",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Placeholder Next.js app for status.pfbridge.xyz while the uptime dashboard is under development.",
+  "scripts": {
+    "dev": "next dev --turbopack -p 3101",
+    "build": "next build --turbopack",
+    "start": "next start -p 3101",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "15.5.15",
+    "react": "19.2.5",
+    "react-dom": "19.2.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5"
+  }
+}

@@ -38,6 +38,9 @@ async function bootstrap() {
 
   const swaggerOptions = new DocumentBuilder()
     .setTitle('Proof Relayer API')
+    .setDescription(
+      'ProofBridge Relayer REST API. The OpenAPI specification is in active development and may change before the 1.0 mainnet release.',
+    )
     .setVersion('0.1.0')
     .addServer(`http://localhost:${PORT}`, 'Local')
     .addBearerAuth()
@@ -45,7 +48,9 @@ async function bootstrap() {
     .build();
 
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerOptions);
-  SwaggerModule.setup('docs', app, swaggerDocument);
+  SwaggerModule.setup('docs', app, swaggerDocument, {
+    jsonDocumentUrl: 'openapi.json',
+  });
 
   try {
     await app.listen(PORT);
