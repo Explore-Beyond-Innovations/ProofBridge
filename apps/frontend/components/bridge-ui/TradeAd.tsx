@@ -1,7 +1,7 @@
 "use client"
 import React, { useEffect, useMemo, useState } from "react"
-import { Avatar, Button, Modal, Skeleton } from "antd"
-import { ArrowRight, Info, Verified } from "lucide-react"
+import { Avatar, Button, Modal, Skeleton, Tooltip } from "antd"
+import { ArrowRight, Bot, Info, Verified } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { IAd } from "@/types/ads"
@@ -13,6 +13,7 @@ import { useGetAllChains } from "@/hooks/useChains"
 import { truncateString } from "@/utils/truncate-string"
 import { formatChainAddress } from "@/utils/format-address"
 import { Status } from "../shared/Status"
+import { isAutoMerchant } from "@/lib/auto-merchant"
 import { useAccount, useBalance } from "wagmi"
 import { useCreateTrade, type TxStage } from "@/hooks/useTrades"
 import { TxProgress } from "@/components/shared/TxProgress"
@@ -548,6 +549,7 @@ const MerchantInfo = ({
     props.adToken?.chainKind,
   )
   const initial = displayAddress[displayAddress.length - 1] ?? "?"
+  const isBot = isAutoMerchant(creatorAddress, props.adToken?.chainKind)
 
   return (
     <>
@@ -567,6 +569,15 @@ const MerchantInfo = ({
                     {truncateString(displayAddress, 5, 5)}
                   </p>
                   <Verified className="text-primary" size={15} />
+                  {isBot && (
+                    <Tooltip title="Auto-merchant — this ad is served by ProofBridge's bot, so orders are matched automatically.">
+                      <Bot
+                        className="text-amber-400"
+                        size={15}
+                        aria-label="Auto-merchant"
+                      />
+                    </Tooltip>
+                  )}
                 </div>
                 <Status status={status} size="sm" />
               </div>

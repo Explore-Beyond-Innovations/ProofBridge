@@ -487,7 +487,7 @@ const Action = ({
     return <WaitingNote>Order completed</WaitingNote>
   }
   if (isBridger && rowData.bridgerClaimed) {
-    return <WaitingNote>Funds claimed — waiting for ad creator</WaitingNote>
+    return <WaitingNote>Claimed successfully</WaitingNote>
   }
   if (isCreator && rowData.adCreatorClaimed) {
     return <WaitingNote>Funds claimed — waiting for bridger</WaitingNote>

@@ -264,6 +264,18 @@ const FaucetPage: React.FC = () => {
             Claim test tokens for supported chains. Select a chain and claim
             tokens below.
           </p>
+          <p className="text-xs text-grey-400 mt-1">
+            Need Sepolia ETH or Stellar XLM for gas?{" "}
+            <a
+              href="https://docs.pfbridge.xyz/guides/faucet#when-the-faucet-doesnt-give-you-what-you-need"
+              target="_blank"
+              rel="noreferrer"
+              className="text-amber-400 hover:text-amber-300 underline"
+            >
+              See the docs
+            </a>
+            .
+          </p>
         </div>
         <PageTourButton flow="faucet" />
       </div>
