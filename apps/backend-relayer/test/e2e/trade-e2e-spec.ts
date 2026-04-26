@@ -60,7 +60,7 @@ describe('Trades E2E', () => {
         amount: '1000',
         bridgerDstAddress: Wallet.createRandom().address,
       })
-      .expect(403);
+      .expect(401);
   });
 
   it('creates a trade (happy path)', async () => {

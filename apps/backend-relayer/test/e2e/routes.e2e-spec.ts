@@ -30,7 +30,7 @@ describe('Routes E2E', () => {
     await request(app.getHttpServer())
       .post('/v1/admin/routes/create')
       .send({ adTokenId: 't1', orderTokenId: 't2' })
-      .expect(403);
+      .expect(401);
   });
 
   it('creates a route, fetches it, lists by token ids', async () => {
@@ -144,7 +144,7 @@ describe('Routes E2E', () => {
     const random = randomUUID();
     await request(app.getHttpServer())
       .delete(`/v1/admin/routes/${random}`)
-      .expect(403);
+      .expect(401);
   });
 
   it('deletes a route then 404 on get', async () => {

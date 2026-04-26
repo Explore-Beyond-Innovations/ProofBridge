@@ -5,6 +5,7 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '@prisma/prisma.service';
 import { env } from '@libs/configs';
@@ -36,7 +37,7 @@ export class UserJwtGuard implements CanActivate {
     const user = await this.prisma.user.findUnique({
       where: { id: decoded.sub },
     });
-    if (!user) throw new UnauthorizedException('User no longer exists');
+    if (!user) throw new ForbiddenException('User access required');
 
     req.user = decoded;
     return true;

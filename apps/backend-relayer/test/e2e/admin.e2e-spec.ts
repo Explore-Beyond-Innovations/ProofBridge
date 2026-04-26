@@ -67,18 +67,18 @@ describe('Admin E2E', () => {
       .expect(200);
   });
 
-  it('POST /v1/admin/addAdmin -> 403 without token', async () => {
+  it('POST /v1/admin/addAdmin -> 401 without token', async () => {
     await request(app.getHttpServer())
       .post('/v1/admin/addAdmin')
       .send({ email: 'noauth@x.com', password: 'Whatever#1' })
-      .expect(403);
+      .expect(401);
   });
 
-  it('POST /v1/admin/addAdmin -> 403 with invalid token', async () => {
+  it('POST /v1/admin/addAdmin -> 401 with invalid token', async () => {
     await request(app.getHttpServer())
       .post('/v1/admin/addAdmin')
       .set('Authorization', 'Bearer not-a-jwt')
       .send({ email: 'badtoken@x.com', password: 'Whatever#1' })
-      .expect(403);
+      .expect(401);
   });
 });
