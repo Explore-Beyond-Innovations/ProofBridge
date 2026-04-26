@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { JwtService } from '@nestjs/jwt';
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from '@prisma/prisma.service';
 import { env } from '@libs/configs';
 import { Request } from 'express';
@@ -17,31 +22,23 @@ export class AdminJwtGuard implements CanActivate {
     const token =
       req.headers['authorization']?.split('Bearer ')[1] ?? undefined;
 
-    if (!token) return false;
+    if (!token) throw new UnauthorizedException('Missing bearer token');
 
+    let decoded: { sub: string } & Record<string, unknown>;
     try {
-      const decoded = await this.jwtService.verifyAsync(token, {
+      decoded = await this.jwtService.verifyAsync(token, {
         secret: env.jwt.secret,
       });
-
-      this.prisma.admin
-        .findUnique({
-          where: { id: decoded.sub },
-        })
-        .then((res) => {
-          if (!res) {
-            return false;
-          }
-        })
-        .catch(() => {
-          return false;
-        });
-
-      req.admin = decoded;
-      return true;
-    } catch (err) {
-      console.error(err);
-      return false;
+    } catch {
+      throw new UnauthorizedException('Invalid or expired token');
     }
+
+    const admin = await this.prisma.admin.findUnique({
+      where: { id: decoded.sub },
+    });
+    if (!admin) throw new UnauthorizedException('Admin no longer exists');
+
+    req.admin = decoded;
+    return true;
   }
 }
