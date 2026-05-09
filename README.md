@@ -41,7 +41,7 @@ The ProofBridge system is composed of four main layers, each working together to
 
 ### Proof Verifier Module
 
-- **Merkle/Computation Validation:** Zero-knowledge proofs are used to attest that a claimed deposit exists in the Merkle tree of the opposite chain, while also enforcing trade constraints (validity of `orderHash`, amount bounds, expiry, and nullifiers). This ensures cross-chain state transitions are correct and non-replayable without exposing private data.
+- **Merkle/Computation Validation:** Zero-knowledge proofs are used as a **succinct, on-chain-verifiable attestation** that a claimed deposit exists in the Merkle tree of the opposite chain, while also enforcing trade constraints (validity of `orderHash`, amount bounds, expiry, and nullifiers). The destination chain has no native ability to read the source chain's state, so the proof carries that attestation cross-chain in a single 14,592-byte object that both Verifier contracts can check directly.
 
 - **BLS Aggregation Layer (WIP):** In progress, this module will allow both Maker and Bridger to produce signatures over the same order or Merkle root. These signatures are aggregated into a single compact proof of agreement, ensuring both parties have explicitly authorized the trade before settlement.
 

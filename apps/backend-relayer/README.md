@@ -64,9 +64,9 @@ Cross-chain flow:
 Security and verification via:
 
 * **Merkle Proofs**: Cryptographic verification of deposit order inclusion in MMR trees
-* **Zero-Knowledge Attestation**: Verifiable confirmation of deposit settlement without trust assumptions
-* **Nullifier Systems**: Prevents double-spending without revealing transaction links
-* **Encrypted State**: Sensitive trade parameters are encrypted in storage
+* **Zero-Knowledge Attestation**: succinct on-chain-verifiable proof that a deposit on one chain occurred — the destination chain checks the proof directly instead of trusting the relayer or reading the source chain
+* **Nullifier System**: each settlement records a one-time-use nullifier on-chain so the same deposit can never be claimed twice
+* **Encrypted State**: sensitive trade parameters are encrypted at rest in the relayer's storage layer (a backend concern, not a ZK property)
 
 ## Core Services
 
